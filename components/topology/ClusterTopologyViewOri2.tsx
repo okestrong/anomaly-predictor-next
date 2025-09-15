@@ -491,7 +491,6 @@ const CrystalOSD = ({
 }) => {
    const meshRef = useRef<THREE.Mesh>(null);
    const groupRef = useRef<THREE.Group>(null);
-   const labelRef = useRef<THREE.Mesh>(null);
 
    // Register refs for centralized animation
    useEffect(() => {
@@ -513,13 +512,6 @@ const CrystalOSD = ({
          onCreated(groupRef.current);
       }
    }, [onCreated]);
-
-   // Continuous Y-axis rotation for label
-   useFrame((state, delta) => {
-      if (labelRef.current) {
-         labelRef.current.rotation.y += delta * 0.5; // Rotate 0.5 radians per second
-      }
-   });
 
    return (
       <group ref={groupRef} position={position} userData={{ type: 'OSD', id: osdData.id, osdData }}>
@@ -560,7 +552,6 @@ const CrystalOSD = ({
 
          {/* OSD ID label - Rotate to face outward from circular table */}
          <Text3D
-            ref={labelRef}
             position={[0, -3, 0]}
             rotation={[0, -labelRotation, 0]}
             fontSize={0.8}
@@ -1536,11 +1527,7 @@ export default function ClusterTopologyView() {
             clearSearch(); // Also clear any search results
             break;
          case 'host':
-            // 현재 선택된 host를 선택해제
-            if (selectedHostIdRef.current !== null) {
-               selectedHostIdRef.current = null;
-               clearAllHighlights();
-            }
+            // 아무일도 일어나지 않음
             break;
       }
    };
@@ -2611,29 +2598,31 @@ export default function ClusterTopologyView() {
          const animData = osdAnimationDataRef.current.get(osdId);
          const isFloating = animData && (animData as any).isAnimating;
 
-         // Add yellow highlight for all OSDs
-         // Remove existing highlight first
-         const existingHighlight = node.getObjectByName('yellowHighlight');
-         if (existingHighlight) {
-            node.remove(existingHighlight);
-         }
+         // Only add yellow highlight for floating OSDs
+         if (isFloating) {
+            // Remove existing highlight first
+            const existingHighlight = node.getObjectByName('yellowHighlight');
+            if (existingHighlight) {
+               node.remove(existingHighlight);
+            }
 
-         // Create yellow highlight sphere
-         const highlightGeometry = new THREE.SphereGeometry(4, 32, 32);
-         const highlightMaterial = new THREE.MeshStandardMaterial({
-            color: 0xeab308,
-            transparent: true,
-            opacity: 0.4,
-            side: THREE.BackSide,
-            metalness: 0.1,
-            roughness: 0.9,
-            emissive: new THREE.Color(0xeab308),
-            emissiveIntensity: 0.8,
-            depthWrite: false,
-         });
-         const highlightMesh = new THREE.Mesh(highlightGeometry, highlightMaterial);
-         highlightMesh.name = 'yellowHighlight';
-         node.add(highlightMesh);
+            // Create yellow highlight sphere
+            const highlightGeometry = new THREE.SphereGeometry(4, 32, 32);
+            const highlightMaterial = new THREE.MeshStandardMaterial({
+               color: 0xeab308,
+               transparent: true,
+               opacity: 0.4,
+               side: THREE.BackSide,
+               metalness: 0.1,
+               roughness: 0.9,
+               emissive: new THREE.Color(0xeab308),
+               emissiveIntensity: 0.8,
+               depthWrite: false,
+            });
+            const highlightMesh = new THREE.Mesh(highlightGeometry, highlightMaterial);
+            highlightMesh.name = 'yellowHighlight';
+            node.add(highlightMesh);
+         }
       }
 
       // Handle Host selection
