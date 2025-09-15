@@ -1,0 +1,15 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(tree:*)",
+      "Bash(pnpm run:*)",
+      "Read(//Users/jclee/Documents/Okestro/Projects/DevSw/anomaly-predictor-view/src/components/topology/**)",
+      "Bash(find:*)",
+      "Bash(sed:*)",
+      "mcp__ide__getDiagnostics",
+      "WebSearch"
+    ],
+    "deny": [],
+    "ask": []
+  }
+}
