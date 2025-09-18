@@ -79,34 +79,47 @@ const ServerUnit = ({
    const rise = useRef(0); // 0~1 (VM 큐브 상승)
    const vmGroupRef = useRef<THREE.Group>(null);
    const [showVM, setShowVM] = useState(false);
+   const cubesDescended = useRef(false); // 큐브가 내려갔는지 추적
 
    useFrame((_s, dt) => {
-      const target = selected ? 1 : 0;
-      slide.current = THREE.MathUtils.damp(slide.current, target, 6, dt);
+      if (selected) {
+         // 확장: 서버 먼저, 큐브 나중
+         cubesDescended.current = false;
+         slide.current = THREE.MathUtils.damp(slide.current, 1, 6, dt);
+         rise.current = THREE.MathUtils.damp(rise.current, 1, 2.5, dt);
+
+         // 서버가 80% 이상 나왔을 때 VM 큐브 표시 시작
+         if (slide.current > 0.8 && !showVM) {
+            setShowVM(true);
+         }
+      } else {
+         // 축소: 큐브 먼저 내려가고, 그 다음 서버
+         if (showVM && !cubesDescended.current) {
+            // 1단계: 큐브만 내려감 (서버는 고정)
+            rise.current = THREE.MathUtils.damp(rise.current, 0, 3, dt);
+
+            // 큐브가 충분히 내려갔으면 큐브 숨기고 다음 단계로
+            if (rise.current < 0.1) {
+               setShowVM(false);
+               cubesDescended.current = true;
+            }
+         } else {
+            // 2단계: 큐브가 없거나 내려간 후 서버 수축
+            slide.current = THREE.MathUtils.damp(slide.current, 0, 6, dt);
+         }
+      }
 
       if (meshRef.current) {
-         // 로컬 +Z 방향으로 튀어나오게
          meshRef.current.position.z = THREE.MathUtils.lerp(0, size[2] * 0.75, slide.current);
       }
 
-      // 서버가 80% 이상 나왔을 때 VM 큐브 표시 시작
-      if (selected && slide.current > 0.8 && !showVM) {
-         setShowVM(true);
-      }
-      // 서버가 20% 이하로 들어갔을 때 VM 큐브 숨김
-      else if (!selected && slide.current < 0.2 && showVM) {
-         setShowVM(false);
-      }
-
-      // VM 큐브가 보일 때만 상승 애니메이션
-      const riseTarget = showVM ? 1 : 0;
-      rise.current = THREE.MathUtils.damp(rise.current, riseTarget, 2.5, dt);
-
       // VM 그룹: 서버 위치 따라가며 위로 천천히 상승 + 회전
       if (vmGroupRef.current && showVM) {
-         const up = THREE.MathUtils.lerp(0, 3, rise.current); // 최대 3 상승
+         // rise.current가 0일 때 서버 내부로 들어가고, 1일 때 위로 상승
+         const baseY = size[1] * 0.2; // 서버 내부 기준점 (서버 높이의 20% 지점)
+         const up = THREE.MathUtils.lerp(0, 5, rise.current); // 0에서 4까지 상승
          const forwardZ = THREE.MathUtils.lerp(0, size[2] * 0.75, slide.current); // 서버와 같은 Z 위치
-         vmGroupRef.current.position.set(0, size[1] * 0.9 + up, forwardZ);
+         vmGroupRef.current.position.set(0, baseY + up, forwardZ);
          vmGroupRef.current.rotation.y += 0.01 * rise.current; // 천천히 회전
       }
    });
@@ -1544,7 +1557,7 @@ const Table = ({ position, innerRadius, outerRadius }: { position: [number, numb
 };
 
 const GroundPlane = () => {
-   const groundTexture = useTexture('/3d/textures/planet/mars-ground.jpg');
+   const groundTexture = useTexture('/3d/textures/planet/pattern-ground.jpg');
 
    // Configure texture to repeat instead of stretch
    groundTexture.wrapS = groundTexture.wrapT = THREE.RepeatWrapping;
@@ -1570,7 +1583,7 @@ const WorldTrafficView: FC<Props> = () => {
                style={{ background: Colors.neutral[900] }}
             >
                <OrbitControls enableDamping dampingFactor={0.05} enablePan autoRotate autoRotateSpeed={-0.1} />
-               <Environment files="/3d/background/datacenter-blue.jpg" background />
+               <Environment files="/3d/background/darkcenter.jpg" background />
                <EffectComposer>
                   <Bloom mipmapBlur={false} luminanceThreshold={0.5} intensity={0.7} radius={0.3} />
                   <BrightnessContrast brightness={0.08} contrast={0.25} />
