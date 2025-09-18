@@ -3835,7 +3835,7 @@ export default function ClusterTopologyView() {
                   toggleAllPanels={toggleAllPanels}
                />
                {/*<Environment preset="night" />*/}
-               <Environment files={'/3d/background/datacenter-blue.jpg'} />
+               <Environment files={'/3d/background/datacenter.jpg'} />
                {/*<Environment preset="night" />*/}
                <EffectComposer>
                   {/* mipmapBlur 키면 화면 깜빡임 생겨서 false 로 함 */}

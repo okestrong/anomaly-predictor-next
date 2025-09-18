@@ -4,7 +4,7 @@ import { FC, RefObject, useEffect, useMemo, useRef, useState } from 'react';
 import { Canvas, useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 import Colors from '@/utils/color';
-import { Box, Cylinder, Environment, Icosahedron, OrbitControls, PerformanceMonitor, Plane, Sphere, useTexture } from '@react-three/drei';
+import { Box, Cylinder, Environment, Icosahedron, OrbitControls, Plane, Sphere, useTexture } from '@react-three/drei';
 import RoundMirrorTextTable from '@/components/models/RoundMirrorTextTable';
 import { AppHeader } from '@/components/layout';
 import { mockTopologyData } from '@/public/data/topologyMockData';
@@ -520,26 +520,24 @@ const Drawer = ({ position, rotation, type }: { position: [number, number, numbe
          {/* Drawer content */}
          <group position={[0, -drawerHeight / 2 + wallThickness + 2, 0]}>
             {type === 'boxes'
-               ? // 16 boxes arranged from inner side (table center) to outer side
+               ? // 16 boxes arranged in columns (current), max 60 (5x12)
                  Array.from({ length: 16 }, (_, i) => {
-                    const col = Math.floor(i / 5); // 5 per row
+                    const col = Math.floor(i / 5); // 5 columns
                     const row = i % 5;
-                    // Start from table center side (right wall, positive x) and go toward outer side (negative x)
-                    const x = drawerWidth / 2 - 4 - col * 4; // Start from table center side, move outward
-                    const z = (row - 2) * 3; // 5 boxes per row, centered along depth
+                    const x = (col - 1.5) * 4; // 4 columns currently, centered
+                    const z = (row - 2) * 3; // 5 boxes per column, centered
                     return (
                        <Box key={i} args={[2.5, 2.5, 2.5]} position={[x, 0, z]}>
                           <meshStandardMaterial color={Colors.blue[400]} metalness={0.5} roughness={0.5} emissive={Colors.blue[300]} emissiveIntensity={0.1} />
                        </Box>
                     );
                  })
-               : // 35 icosahedrons arranged from inner side (table center) to outer side
+               : // 35 icosahedrons (current), max 100
                  Array.from({ length: 35 }, (_, i) => {
-                    const col = Math.floor(i / 5); // 5 per row
+                    const col = Math.floor(i / 5); // 5 columns
                     const row = i % 5;
-                    // Start from table center side (right wall, positive x) and go toward outer side (negative x)
-                    const x = drawerWidth / 2 - 3 - col * 3.5; // Start from table center side, move outward
-                    const z = (row - 2) * 4; // 5 icosahedrons per row, centered along depth
+                    const x = (col - 3.5) * 4; // 7 columns currently, centered
+                    const z = (row - 2) * 4; // 5 icosahedrons per column, centered with more spacing
                     return (
                        <Icosahedron key={i} args={[1.5]} position={[x, 0, z]}>
                           <meshStandardMaterial
@@ -631,12 +629,10 @@ const DataParticles = ({
    drawerPositions,
    hostPositions,
    cylinderPosition,
-   budget,
 }: {
    drawerPositions: [number, number, number][];
    hostPositions: [number, number, number][];
    cylinderPosition: [number, number, number];
-   budget: number;
 }) => {
    // Fixed capacity pool pattern
    const DRAWER_CAP = 24; // drawer 최대값
@@ -1006,10 +1002,10 @@ const DataParticles = ({
             />
          ))}
          {/* Cyan: Drawer → Cylinder 꼬리(잔상) */}
-         <GhostTrails targetsRef={drawerParticleRefs} color={Colors.cyan[300]} maxPer={budget} life={0.2} spawnInterval={0.02} sizeStart={6} sizeEnd={0} />
+         <GhostTrails targetsRef={drawerParticleRefs} color={Colors.cyan[300]} maxPer={14} life={0.2} spawnInterval={0.02} sizeStart={6} sizeEnd={0} />
 
          {/* Orange: Cylinder → Host 꼬리(잔상) */}
-         <GhostTrails targetsRef={hostParticleRefs} color={Colors.orange[300]} maxPer={budget} life={0.2} spawnInterval={0.02} sizeStart={6} sizeEnd={0} />
+         <GhostTrails targetsRef={hostParticleRefs} color={Colors.orange[300]} maxPer={14} life={0.2} spawnInterval={0.02} sizeStart={6} sizeEnd={0} />
       </group>
    );
 };
@@ -1035,18 +1031,6 @@ const PhysicsSphere = ({
    const velocityRef = useRef([0, 0, 0]);
    const frameCount = useRef(0);
 
-   // Reuse vectors to prevent GC spikes
-   const centerV = useMemo(() => new THREE.Vector3(...centerPosition), [centerPosition]);
-   const posV = useRef(new THREE.Vector3());
-   const dirV = useRef(new THREE.Vector3());
-   const perpV = useRef(new THREE.Vector3());
-   const chaosV = useRef(new THREE.Vector3());
-   const centralV = useRef(new THREE.Vector3());
-   const antiGravV = useRef(new THREE.Vector3());
-   const turbulenceV = useRef(new THREE.Vector3());
-   const totalForceV = useRef(new THREE.Vector3());
-   const impulseV = useRef(new THREE.Vector3());
-
    // Subscribe to velocity once to avoid memory leaks
    useEffect(() => {
       const unsubscribe = api.velocity.subscribe(v => {
@@ -1057,66 +1041,72 @@ const PhysicsSphere = ({
 
    // Apply continuous forces to keep spheres moving
    useFrame(state => {
-      if (!ref.current) return;
+      if (ref.current) {
+         const pos = ref.current.position;
+         const center = new THREE.Vector3(...centerPosition);
+         const currentPos = new THREE.Vector3(pos.x, pos.y, pos.z);
+         const time = state.clock.elapsedTime;
 
-      const pos = ref.current.position;
-      posV.current.set(pos.x, pos.y, pos.z);
-      const time = state.clock.elapsedTime;
+         // Check velocity more frequently for more active movement
+         frameCount.current++;
+         if (frameCount.current % 15 === 0) {
+            // Reduced from 30 to 15
+            const velocity = velocityRef.current;
+            const speed = Math.sqrt(velocity[0] * velocity[0] + velocity[1] * velocity[1] + velocity[2] * velocity[2]);
 
-      // Check velocity more frequently for more active movement
-      frameCount.current++;
-      if (frameCount.current % 15 === 0) {
-         // Reduced from 30 to 15
-         const velocity = velocityRef.current;
-         const speed = Math.sqrt(velocity[0] * velocity[0] + velocity[1] * velocity[1] + velocity[2] * velocity[2]);
-
-         // If speed is too low, add stronger energy boost
-         if (speed < 3) {
-            // Increased threshold from 2 to 3
-            impulseV.current.set((Math.random() - 0.5) * 5, (Math.random() - 0.5) * 4, (Math.random() - 0.5) * 5);
-            api.applyImpulse([impulseV.current.x, impulseV.current.y, impulseV.current.z], [0, 0, 0]);
+            // If speed is too low, add stronger energy boost
+            if (speed < 3) {
+               // Increased threshold from 2 to 3
+               const boostImpulse = new THREE.Vector3((Math.random() - 0.5) * 5, (Math.random() - 0.5) * 4, (Math.random() - 0.5) * 5);
+               api.applyImpulse([boostImpulse.x, boostImpulse.y, boostImpulse.z], [0, 0, 0]);
+            }
          }
-      }
 
-      // Calculate direction towards center using copy instead of clone
-      dirV.current.copy(centerV).sub(posV.current).normalize();
-      const distance = posV.current.distanceTo(centerV);
+         // Calculate direction towards center
+         const direction = center.clone().sub(currentPos).normalize();
+         const distance = currentPos.distanceTo(center);
 
-      // Apply forces every frame for more active movement
-      // Apply stronger orbital force (perpendicular to center direction)
-      perpV.current.set(-dirV.current.z, 0, dirV.current.x).multiplyScalar(2.5); // Increased from 1.0 to 2.5
+         // Apply forces every frame for more active movement
+         // Apply stronger orbital force (perpendicular to center direction)
+         const perpendicular = new THREE.Vector3(-direction.z, 0, direction.x);
+         const orbitalForce = perpendicular.multiplyScalar(2.5); // Increased from 1.0 to 2.5
 
-      // Apply stronger chaotic forces with more variation
-      chaosV.current.set(
-         Math.sin(time * 5 + pos.x) * 1.2 + Math.cos(time * 7) * 0.8,
-         Math.sin(time * 4 + pos.y) * 1.0 + Math.cos(time * 6) * 0.6,
-         Math.cos(time * 6 + pos.z) * 1.2 + Math.sin(time * 8) * 0.8,
-      );
-
-      // Apply central gravity with more strength
-      const gravityStrength = Math.min(distance * 0.08, 1.5); // Increased multiplier and max
-      centralV.current.copy(dirV.current).multiplyScalar(gravityStrength);
-
-      // Add stronger upward force with variation
-      antiGravV.current.set(0, 1.0 + Math.sin(time * 3) * 0.5, 0);
-
-      // Add turbulence for more chaotic movement
-      turbulenceV.current.set(Math.sin(time * 4 + distance) * 0.8, Math.cos(time * 3.5 + distance) * 0.6, Math.sin(time * 5.5 + distance) * 0.8);
-
-      // Combine all forces using copy and add
-      totalForceV.current.copy(perpV.current).add(chaosV.current).add(centralV.current).add(antiGravV.current).add(turbulenceV.current);
-
-      api.applyForce([totalForceV.current.x, totalForceV.current.y, totalForceV.current.z], [0, 0, 0]);
-
-      // More frequent and stronger random impulses
-      if (Math.random() < 0.008) {
-         // Increased from 0.003 to 0.008
-         impulseV.current.set(
-            (Math.random() - 0.5) * 4, // Increased from 2 to 4
-            (Math.random() - 0.5) * 3, // Increased from 1.5 to 3
-            (Math.random() - 0.5) * 4, // Increased from 2 to 4
+         // Apply stronger chaotic forces with more variation
+         const chaoticForce = new THREE.Vector3(
+            Math.sin(time * 5 + pos.x) * 1.2 + Math.cos(time * 7) * 0.8,
+            Math.sin(time * 4 + pos.y) * 1.0 + Math.cos(time * 6) * 0.6,
+            Math.cos(time * 6 + pos.z) * 1.2 + Math.sin(time * 8) * 0.8,
          );
-         api.applyImpulse([impulseV.current.x, impulseV.current.y, impulseV.current.z], [0, 0, 0]);
+
+         // Apply central gravity with more strength
+         const gravityStrength = Math.min(distance * 0.08, 1.5); // Increased multiplier and max
+         const centralForce = direction.multiplyScalar(gravityStrength);
+
+         // Add stronger upward force with variation
+         const antiGravity = new THREE.Vector3(0, 1.0 + Math.sin(time * 3) * 0.5, 0);
+
+         // Add turbulence for more chaotic movement
+         const turbulence = new THREE.Vector3(
+            Math.sin(time * 4 + distance) * 0.8,
+            Math.cos(time * 3.5 + distance) * 0.6,
+            Math.sin(time * 5.5 + distance) * 0.8,
+         );
+
+         // Combine all forces
+         const totalForce = orbitalForce.add(chaoticForce).add(centralForce).add(antiGravity).add(turbulence);
+
+         api.applyForce([totalForce.x, totalForce.y, totalForce.z], [0, 0, 0]);
+
+         // More frequent and stronger random impulses
+         if (Math.random() < 0.008) {
+            // Increased from 0.003 to 0.008
+            const impulse = new THREE.Vector3(
+               (Math.random() - 0.5) * 4, // Increased from 2 to 4
+               (Math.random() - 0.5) * 3, // Increased from 1.5 to 3
+               (Math.random() - 0.5) * 4, // Increased from 2 to 4
+            );
+            api.applyImpulse([impulse.x, impulse.y, impulse.z], [0, 0, 0]);
+         }
       }
    });
 
@@ -1362,17 +1352,7 @@ const PhysicsSpheresContainer = ({ centerPosition }: { centerPosition: [number, 
    );
 };
 
-const Table = ({
-   position,
-   innerRadius,
-   outerRadius,
-   trailBudget,
-}: {
-   position: [number, number, number];
-   innerRadius: number;
-   outerRadius: number;
-   trailBudget: number;
-}) => {
+const Table = ({ position, innerRadius, outerRadius }: { position: [number, number, number]; innerRadius: number; outerRadius: number }) => {
    // Calculate positions and rotations for drawers - similar to server cases layout
    const drawerWidth = 25; // This becomes the depth when rotated
    const drawerDepth = 15; // This becomes the width when rotated
@@ -1605,7 +1585,7 @@ const Table = ({
          </Physics>
 
          {/* Flying data particles */}
-         <DataParticles budget={trailBudget} drawerPositions={drawerPositions} hostPositions={hostPositions} cylinderPosition={cylinderPosition} />
+         <DataParticles drawerPositions={drawerPositions} hostPositions={hostPositions} cylinderPosition={cylinderPosition} />
       </group>
    );
 };
@@ -1659,9 +1639,6 @@ const GroundPlane = () => {
 };
 
 const WorldTrafficView: FC<Props> = () => {
-   const [fxOn, setFxOn] = useState(true);
-   const [trailBudget, setTrailBudget] = useState(12);
-
    return (
       <>
          <AppHeader />
@@ -1669,30 +1646,16 @@ const WorldTrafficView: FC<Props> = () => {
             <Canvas
                camera={{ position: [-150, 120, 50], fov: 60, near: 0.1, far: 2000 }}
                dpr={[1, 1.5]}
-               gl={{
-                  antialias: true,
-                  powerPreference: 'high-performance',
-                  precision: 'mediump',
-                  toneMapping: THREE.ACESFilmicToneMapping,
-                  outputColorSpace: THREE.SRGBColorSpace,
-               }}
+               gl={{ antialias: true, toneMapping: THREE.ACESFilmicToneMapping, outputColorSpace: THREE.SRGBColorSpace }}
                shadows
                style={{ background: Colors.neutral[900] }}
             >
-               <PerformanceMonitor
-                  onChange={({ factor }) => {
-                     setFxOn(factor > 0.9);
-                     setTrailBudget(factor > 0.9 ? 12 : 8);
-                  }}
-               />
                <OrbitControls enableDamping dampingFactor={0.05} enablePan autoRotate autoRotateSpeed={-0.1} />
                <Environment files="/3d/background/darkcenter.jpg" background backgroundBlurriness={0.05} backgroundIntensity={0.5} />
-               {fxOn && (
-                  <EffectComposer>
-                     <Bloom mipmapBlur={false} luminanceThreshold={0.5} intensity={0.7} radius={0.3} />
-                     <BrightnessContrast brightness={0.03} contrast={0.3} />
-                  </EffectComposer>
-               )}
+               <EffectComposer>
+                  <Bloom mipmapBlur={false} luminanceThreshold={0.5} intensity={0.7} radius={0.3} />
+                  <BrightnessContrast brightness={0.03} contrast={0.3} />
+               </EffectComposer>
 
                {/* Ambient light for overall illumination */}
                {/*<ambientLight intensity={0.3} color={Colors.blue[100]} />*/}
@@ -1702,7 +1665,7 @@ const WorldTrafficView: FC<Props> = () => {
                   args={['#ffffff', 3]}
                   position={[150, 150, 150]}
                   castShadow
-                  shadow-mapSize={[1024, 1024]}
+                  shadow-mapSize={[2048, 2048]}
                   shadow-camera-left={-400}
                   shadow-camera-right={400}
                   shadow-camera-top={400}
@@ -1717,7 +1680,7 @@ const WorldTrafficView: FC<Props> = () => {
                <pointLight args={[Colors.teal[300], 1, 80]} position={[100, 30, 100]} />*/}
 
                {/* Main table and components */}
-               <Table position={[0, 10, 0]} innerRadius={100} outerRadius={130} trailBudget={trailBudget} />
+               <Table position={[0, 10, 0]} innerRadius={100} outerRadius={130} />
 
                {/* Central cylinder */}
                <Cylinder args={[30, 30, 35, 32]} position={[0, 15, 0]}>
@@ -1726,11 +1689,9 @@ const WorldTrafficView: FC<Props> = () => {
                      metalness={0.8}
                      roughness={0.2}
                      transparent
-                     opacity={0.5}
+                     opacity={0.4}
                      transmission={0.6}
                      thickness={2}
-                     emissive={Colors.cyan[400]}
-                     emissiveIntensity={0.08}
                   />
                </Cylinder>
                <mesh position={[0, 32.5, 0]} rotation={[Math.PI / 2, 0, 0]}>
