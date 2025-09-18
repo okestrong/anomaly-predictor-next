@@ -5,7 +5,7 @@ import SimpleBar from 'simplebar-react';
 import 'simplebar-react/dist/simplebar.min.css';
 import * as THREE from 'three';
 import { Canvas, useFrame, useThree } from '@react-three/fiber';
-import { Box, Environment, OrbitControls, PerformanceMonitor, Plane, Stars, Text as Text3D, Torus } from '@react-three/drei';
+import { Box, Environment, OrbitControls, Plane, Stars, Text as Text3D } from '@react-three/drei';
 import { Bloom, BrightnessContrast, EffectComposer } from '@react-three/postprocessing';
 import gsap from 'gsap';
 import { AdaptiveLayoutManager } from '@/utils/layouts';
@@ -24,6 +24,7 @@ import RoundMirrorTextTable from '@/components/models/RoundMirrorTextTable';
 import { Stone } from '@/components/models/Stone';
 import GlassBall from '@/components/models/GlassBall';
 import { mockTopologyData } from '@/public/data/topologyMockData';
+import { TrashIcon } from '@heroicons/react/24/solid';
 
 const transition = {
    duration: 0.4, // 0.8에서 0.4로 단축
@@ -31,25 +32,19 @@ const transition = {
    type: 'tween' as const,
 };
 
-// 순차적 애니메이션을 위한 지연 설정
-const getStaggeredTransition = (delay: number = 0) => ({
-   ...transition,
-   delay,
-});
-
 // GSAP 애니메이션을 위한 초기 위치 설정
 const getInitialTransform = (position: string) => {
    switch (position) {
       case 'top':
-         return { x: '0%', y: '-100%', opacity: 0 };
+         return { xPercent: 0, y: -200, opacity: 0 }; // xPercent로 중앙 정렬 유지
       case 'left':
-         return { x: '-100%', y: '0%', opacity: 0 };
+         return { x: -400, y: 0, opacity: 0 }; // 왼쪽에서 오른쪽으로 슬라이드
       case 'bottom':
-         return { x: '0%', y: '100%', opacity: 0 };
+         return { xPercent: 0, y: 200, opacity: 0 }; // xPercent로 중앙 정렬 유지
       case 'right':
-         return { x: '100%', y: '0%', opacity: 0 };
+         return { x: 400, y: 0, opacity: 0 }; // 오른쪽에서 왼쪽으로 슬라이드
       default:
-         return { x: '0%', y: '0%', opacity: 0 };
+         return { x: 0, y: 0, opacity: 0 };
    }
 };
 
@@ -277,6 +272,7 @@ const DoughnutTable = ({ position = [0, -40, 0] }: { position?: [number, number,
          <RoundMirrorTextTable
             topCrystal
             sideMirror
+            // sideColor={Colors.amber[400]}
             position={[0, 0, 0]}
             innerRadius={innerRadius}
             outerRadius={outerRadius}
@@ -284,7 +280,7 @@ const DoughnutTable = ({ position = [0, -40, 0] }: { position?: [number, number,
             height={7}
             castShadow
             bottomText="OKESTRO  *  CONTRABASS  SDS+"
-            bottomTextColor={Colors.neutral[200]}
+            bottomTextColor={Colors.neutral[400]}
             segment={512}
          />
          {/*<BangingGlassBall scale={2.5} useOrbit orbitCenterPosition={[0, -100, 0]} orbitRadius={80} y={-50} angularSpeed={-0.3} />*/}
@@ -496,6 +492,7 @@ const CrystalOSD = ({
 }) => {
    const meshRef = useRef<THREE.Mesh>(null);
    const groupRef = useRef<THREE.Group>(null);
+   const labelRef = useRef<THREE.Mesh>(null);
 
    // Register refs for centralized animation
    useEffect(() => {
@@ -517,6 +514,13 @@ const CrystalOSD = ({
          onCreated(groupRef.current);
       }
    }, [onCreated]);
+
+   // Continuous Y-axis rotation for label
+   useFrame((state, delta) => {
+      if (labelRef.current) {
+         labelRef.current.rotation.y += delta * 0.5; // Rotate 0.5 radians per second
+      }
+   });
 
    return (
       <group ref={groupRef} position={position} userData={{ type: 'OSD', id: osdData.id, osdData }}>
@@ -557,6 +561,7 @@ const CrystalOSD = ({
 
          {/* OSD ID label - Rotate to face outward from circular table */}
          <Text3D
+            ref={labelRef}
             position={[0, -3, 0]}
             rotation={[0, -labelRotation, 0]}
             fontSize={0.8}
@@ -589,6 +594,9 @@ const ClusterTopologyScene = ({
    selectedHostIdRef,
    osdNodesRef,
    initialAnimate,
+   updatePgSearchOption,
+   highlightNode,
+   toggleAllPanels,
 }: {
    selectedObjectRef: RefObject<any>;
    selectedPoolIdRef: RefObject<number | null>;
@@ -605,11 +613,15 @@ const ClusterTopologyScene = ({
    selectedHostIdRef: RefObject<string | null>;
    osdNodesRef: RefObject<THREE.Group[]>;
    initialAnimate: () => void;
+   updatePgSearchOption: (enabled: boolean) => void;
+   highlightNode: (node: any) => void;
+   toggleAllPanels: () => void;
 }) => {
    const { scene, camera, mouse, viewport } = useThree();
    const [texturesLoaded, setTexturesLoaded] = useState(false);
    const textSphereRef = useRef<THREE.Object3D>(null);
-
+   const allPools = useMemo(() => mockTopologyData.pools.map((_, i) => ({ index: i })), []);
+   const poolPositions = useMemo(() => new AdaptiveLayoutManager().applyLayout(allPools, 'spiral', { spacing: 25 }), []);
    // Animation refs for centralized animation
    const poolAnimationRefs = useRef<
       Array<{
@@ -767,6 +779,7 @@ const ClusterTopologyScene = ({
          clearAllHighlights();
          selectedPoolIdRef.current = null;
          selectedObjectRef.current = null;
+         updatePgSearchOption(false);
 
          // Close info-panel when pool is deselected
          const infoPanelElement = document.querySelector('.info-panel') as HTMLElement;
@@ -777,6 +790,7 @@ const ClusterTopologyScene = ({
          // Select new pool
          selectedPoolIdRef.current = poolData.id;
          selectedObjectRef.current = { type: 'Pool', ...poolData };
+         updatePgSearchOption(true);
 
          // info-panel DOM 직접 업데이트 및 표시
          const infoPanelElement = document.querySelector('.info-panel') as HTMLElement;
@@ -845,15 +859,17 @@ const ClusterTopologyScene = ({
       initScene();
    }, []);
 
+   const ref = useRef(false);
+
    useEffect(() => {
-      if (texturesLoaded) {
+      if (texturesLoaded && !ref.current) {
+         ref.current = true;
          // Use a longer delay to ensure all components are mounted
          setTimeout(() => {
-            const allPools = mockTopologyData.pools.map((_, i) => ({ index: i }));
+            /*const allPools = mockTopologyData.pools.map((_, i) => ({ index: i }));
             const positions = new AdaptiveLayoutManager().applyLayout(allPools, 'spiral', {
                spacing: 25,
             });
-
             poolRefs.forEach((pool: RefObject<any>, idx) => {
                if (pool.current && pool.current.position) {
                   gsap.to(pool.current.position, {
@@ -864,7 +880,34 @@ const ClusterTopologyScene = ({
                      ease: 'power2.inOut',
                   });
                }
+            });*/
+
+            let clickPoolId = 0;
+            let maxCount = 0;
+            mockTopologyData.pools.forEach(p => {
+               if (p.pgs.length > maxCount) {
+                  maxCount = p.pgs.length;
+                  clickPoolId = p.id;
+               }
             });
+
+            const pool = poolRefs.find(pool => pool.current && pool.current.userData.id === clickPoolId);
+            if (!!pool) {
+               highlightNode(pool.current);
+            }
+
+            if (cameraRef.current && cameraRef.current.position.y >= 0) {
+               gsap.to(cameraRef.current.position, {
+                  x: 0,
+                  y: 33,
+                  z: 270,
+                  duration: 5,
+                  ease: 'power2.inOut',
+               });
+            }
+            setTimeout(() => {
+               toggleAllPanels();
+            }, 5100);
 
             initialAnimate();
 
@@ -872,7 +915,7 @@ const ClusterTopologyScene = ({
             /*setTimeout(() => {
                generateOSDNodes();
             }, 100);*/
-         }, 500); // Increased delay to ensure refs are ready
+         }, 1); // Increased delay to ensure refs are ready
       }
    }, [texturesLoaded]);
 
@@ -915,7 +958,7 @@ const ClusterTopologyScene = ({
          {/*<hemisphereLight args={['dodgerblue', 'hotpink', 5]} position={[0, 10, 0]} intensity={10} castShadow />*/}
          {/*<pointLight position={[0, -20, 0]} intensity={0.8} distance={150} />*/}
          {/*<directionalLight position={[0, -15, 30]} intensity={0.6} />*/}
-         <OrbitControls enableDamping dampingFactor={0.05} enablePan autoRotate autoRotateSpeed={0.2} />
+         <OrbitControls enableDamping dampingFactor={0.05} enablePan autoRotate autoRotateSpeed={0.05} />
 
          {/* Shadow-receiving ground plane */}
          {/*<mesh receiveShadow position={[0, -60, 0]} rotation={[-Math.PI / 2, 0, 0]}>
@@ -925,10 +968,10 @@ const ClusterTopologyScene = ({
 
          {/* Pool Nodes with Spiral Layout */}
          {mockTopologyData.pools.map((pool, index) => {
-            const layoutManager = new AdaptiveLayoutManager();
-            const allPools = mockTopologyData.pools.map((_, i) => ({ index: i }));
-            const positions = layoutManager.applyLayout(allPools, 'hierarchical', { spacing: 20 });
-            const pos = positions[index].position;
+            // const layoutManager = new AdaptiveLayoutManager();
+            // const allPools = mockTopologyData.pools.map((_, i) => ({ index: i }));
+            // const positions = layoutManager.applyLayout(allPools, 'hierarchical', { spacing: 20 });
+            const pos = poolPositions[index].position;
 
             // Create animation refs for this pool
             if (!poolAnimationRefs.current[index]) {
@@ -1202,22 +1245,28 @@ export default function ClusterTopologyView() {
    // const clock = useMemo(() => new THREE.Clock(), []);
    // useRef로 패널 상태 관리 (리렌더링 방지)
    const panelsRef = useRef({
-      top: { collapsed: false },
-      left: { collapsed: false },
-      bottom: { collapsed: false },
-      right: { collapsed: false },
+      top: { collapsed: true },
+      left: { collapsed: true },
+      bottom: { collapsed: true },
+      right: { collapsed: true },
    });
 
-   // 초기화 시 패널 표시 (React 리렌더링 없음)
+   // 초기화 시 모든 패널 숨기기 (React 리렌더링 없음)
    useEffect(() => {
-      const targetPositions = ['top', 'left', 'bottom', 'right'];
+      const targetPositions: Array<'top' | 'left' | 'bottom' | 'right'> = ['top', 'left', 'bottom', 'right'];
       targetPositions.forEach(position => {
+         // 패널 상태를 collapsed로 설정
+         panelsRef.current[position].collapsed = true;
+
          const panelElement = document.querySelector(`.panel-${position}`) as HTMLElement;
-         if (panelElement && !panelsRef.current[position as keyof typeof panelsRef.current].collapsed) {
-            panelElement.style.display = 'block';
+         if (panelElement) {
+            panelElement.style.display = 'none';
+            // 초기 위치를 숨김 상태로 설정
+            gsap.set(panelElement, getInitialTransform(position));
          }
       });
-   }, []); // 마운트 시 1회만 실행
+   }, []);
+
    const isFullscreenRef = useRef(false);
    const searchPanelRef = useRef({ collapsed: true });
    const searchTypeRef = useRef('pool');
@@ -1268,8 +1317,13 @@ export default function ClusterTopologyView() {
    // const starFieldRef = useRef<THREE.Points | null>(null);
    const trafficParticlesRef = useRef<THREE.Group[]>([]);
 
-   // TODO: Will be handled by R3F Scene component
-   const isPgSearchEnabled = selectedPoolIdRef.current !== null; // && pgNodesRef.current.length > 0;
+   // PG search enabled state - managed via DOM manipulation
+   const updatePgSearchOption = (enabled: boolean) => {
+      const pgOption = document.querySelector('.search-select option[value="pg"]') as HTMLOptionElement;
+      if (pgOption) {
+         pgOption.disabled = !enabled;
+      }
+   };
 
    const handleToggleFullscreen = () => {
       // useRef 사용 (React 리렌더링 없음)
@@ -1360,8 +1414,16 @@ export default function ClusterTopologyView() {
 
       // useRef로 상태 확인 (리렌더링 없음)
       const allCollapsed = targetPositions.every(pos => panelsRef.current[pos].collapsed);
+      console.log('toggleAllPanels 호출됨, allCollapsed:', allCollapsed);
+      console.log('현재 패널 상태:', {
+         top: panelsRef.current.top.collapsed,
+         left: panelsRef.current.left.collapsed,
+         bottom: panelsRef.current.bottom.collapsed,
+         right: panelsRef.current.right.collapsed,
+      });
 
       if (allCollapsed) {
+         console.log('패널 열기 시작');
          // 패널 열기: useRef 상태만 변경 (리렌더링 없음)
          targetPositions.forEach(pos => {
             panelsRef.current[pos].collapsed = false;
@@ -1370,7 +1432,9 @@ export default function ClusterTopologyView() {
          // DOM 직접 조작으로 패널 표시
          targetPositions.forEach((position, index) => {
             const panelElement = document.querySelector(`.panel-${position}`) as HTMLElement;
+            console.log(`패널 ${position} 요소 찾기:`, !!panelElement);
             if (panelElement) {
+               console.log(`패널 ${position} 표시 및 애니메이션 시작`);
                // 패널 표시
                panelElement.style.display = 'block';
 
@@ -1378,13 +1442,19 @@ export default function ClusterTopologyView() {
                gsap.set(panelElement, getInitialTransform(position));
 
                // 목표 위치로 애니메이션
+               const targetTransform =
+                  position === 'top' || position === 'bottom'
+                     ? { xPercent: 0, y: 0, opacity: 1 } // top/bottom 패널은 xPercent로 중앙 정렬
+                     : { x: 0, y: 0, opacity: 1 }; // left/right 패널은 x: 0으로
+
                gsap.to(panelElement, {
-                  x: '0%',
-                  y: '0%',
-                  opacity: 1,
-                  duration: 0.3,
+                  ...targetTransform,
+                  duration: 0.5, // 애니메이션 시간을 조금 늘림
                   // delay: index * 0.05,
                   ease: 'power2.out',
+                  onComplete: () => {
+                     console.log(`패널 ${position} 애니메이션 완료`);
+                  },
                });
             }
          });
@@ -1483,7 +1553,9 @@ export default function ClusterTopologyView() {
 
       searchedPoolIdsRef.current.clear(); // Clear searched pool IDs
       searchedOSDIdsRef.current.clear(); // Clear searched OSD IDs
-      if (searchTypeRef.current === 'pg' && !isPgSearchEnabled) {
+      // Check if PG option is disabled and switch to pool if needed
+      const pgOption = document.querySelector('.search-select option[value="pg"]') as HTMLOptionElement;
+      if (searchTypeRef.current === 'pg' && pgOption && pgOption.disabled) {
          searchTypeRef.current = 'pool';
       }
 
@@ -1496,6 +1568,37 @@ export default function ClusterTopologyView() {
       }
       if (searchSelect) {
          searchSelect.value = searchTypeRef.current;
+      }
+   };
+
+   const handleClearButton = () => {
+      const currentSearchType = searchTypeRef.current;
+
+      switch (currentSearchType) {
+         case 'pool':
+            // 현재 선택상태의 pool을 선택해제
+            if (selectedPoolIdRef.current !== null) {
+               selectedPoolIdRef.current = null;
+               clearAllHighlights();
+               updatePgSearchOption(false);
+            }
+            break;
+         case 'pg':
+         case 'osd':
+            // 선택상태의 PG들을 모두 선택해제하고, 떠올라 있는 OSD들이 모두 제자리로 돌아감
+            if (selectedPGIdRef.current !== null) {
+               selectedPGIdRef.current = null;
+               showOSDsForPG(null); // This will return OSDs to original position
+            }
+            clearSearch(); // Also clear any search results
+            break;
+         case 'host':
+            // 현재 선택된 host를 선택해제
+            if (selectedHostIdRef.current !== null) {
+               selectedHostIdRef.current = null;
+               clearAllHighlights();
+            }
+            break;
       }
    };
 
@@ -1609,8 +1712,7 @@ export default function ClusterTopologyView() {
                // For numeric query, match exact ID. For "osd.X" format, match exactly
                const isExactIdMatch = osdIdStr === query;
                const isFullNameMatch = osdFullName.toLowerCase() === query.toLowerCase();
-               const isOsdPrefixMatch = query.toLowerCase().startsWith('osd.') &&
-                                        osdFullName.toLowerCase() === query.toLowerCase();
+               const isOsdPrefixMatch = query.toLowerCase().startsWith('osd.') && osdFullName.toLowerCase() === query.toLowerCase();
 
                if (isExactIdMatch || isFullNameMatch || isOsdPrefixMatch) {
                   matchingOSDIds.add(osdId);
@@ -2341,7 +2443,7 @@ export default function ClusterTopologyView() {
    // 트래픽 파티클 생성
    const createTrafficParticles = (from: THREE.Vector3, to: THREE.Vector3, color: number = 0x00d2ff): THREE.Group => {
       const particleGroup = new THREE.Group();
-      const particleCount = 3;
+      const particleCount = 6;
 
       for (let i = 0; i < particleCount; i++) {
          const geometry = new THREE.SphereGeometry(0.3, 6, 6);
@@ -2477,7 +2579,7 @@ export default function ClusterTopologyView() {
             node.position.y = targetY;
 
             // Apply boundary constraint to keep PGs within Stars radius
-            const maxRadius = 250;
+            const maxRadius = 200;
             const distanceFromCenter = Math.sqrt(node.position.x * node.position.x + node.position.z * node.position.z);
             if (distanceFromCenter > maxRadius) {
                const scale = maxRadius / distanceFromCenter;
@@ -2566,31 +2668,29 @@ export default function ClusterTopologyView() {
          const animData = osdAnimationDataRef.current.get(osdId);
          const isFloating = animData && (animData as any).isAnimating;
 
-         // Only add yellow highlight for floating OSDs
-         if (isFloating) {
-            // Remove existing highlight first
-            const existingHighlight = node.getObjectByName('yellowHighlight');
-            if (existingHighlight) {
-               node.remove(existingHighlight);
-            }
-
-            // Create yellow highlight sphere
-            const highlightGeometry = new THREE.SphereGeometry(4, 32, 32);
-            const highlightMaterial = new THREE.MeshStandardMaterial({
-               color: 0xeab308,
-               transparent: true,
-               opacity: 0.4,
-               side: THREE.BackSide,
-               metalness: 0.1,
-               roughness: 0.9,
-               emissive: new THREE.Color(0xeab308),
-               emissiveIntensity: 0.8,
-               depthWrite: false,
-            });
-            const highlightMesh = new THREE.Mesh(highlightGeometry, highlightMaterial);
-            highlightMesh.name = 'yellowHighlight';
-            node.add(highlightMesh);
+         // Add yellow highlight for all OSDs
+         // Remove existing highlight first
+         const existingHighlight = node.getObjectByName('yellowHighlight');
+         if (existingHighlight) {
+            node.remove(existingHighlight);
          }
+
+         // Create yellow highlight sphere
+         const highlightGeometry = new THREE.SphereGeometry(4, 32, 32);
+         const highlightMaterial = new THREE.MeshStandardMaterial({
+            color: 0xeab308,
+            transparent: true,
+            opacity: 0.4,
+            side: THREE.BackSide,
+            metalness: 0.1,
+            roughness: 0.9,
+            emissive: new THREE.Color(0xeab308),
+            emissiveIntensity: 0.8,
+            depthWrite: false,
+         });
+         const highlightMesh = new THREE.Mesh(highlightGeometry, highlightMaterial);
+         highlightMesh.name = 'yellowHighlight';
+         node.add(highlightMesh);
       }
 
       // Handle Host selection
@@ -2904,6 +3004,11 @@ export default function ClusterTopologyView() {
             osdAnimationDataRef.current.delete(osdId);
          }
       });
+
+      // Reset pool selection and disable PG search
+      selectedPoolIdRef.current = null;
+      selectedPGIdRef.current = null;
+      updatePgSearchOption(false);
    };
 
    const showOSDsForPG = (pgData: any): void => {
@@ -3274,6 +3379,9 @@ export default function ClusterTopologyView() {
          const newPGNodes = positionPGsAroundPool(pool, poolPGs);
          pgNodesRef.current.push(...newPGNodes);
       }
+
+      // Update PG search enabled state
+      updatePgSearchOption(poolId !== null);
    };
 
    const generatePGsForPool = (poolId: number): any[] => {
@@ -3691,10 +3799,10 @@ export default function ClusterTopologyView() {
    return (
       <>
          <AppHeader />
-         <div className={`topology-container bg-black`}>
+         <div className={`topology-container bg-neutral-900`}>
             <Canvas
                ref={canvasRef}
-               camera={{ position: [0, 30, 180], fov: 60, near: 0.1, far: 2000 }}
+               camera={{ position: [0, 360, 0], fov: 60, near: 0.1, far: 2000 }}
                dpr={[1, 1.5]}
                gl={{ antialias: false, toneMapping: THREE.ACESFilmicToneMapping, outputColorSpace: THREE.SRGBColorSpace }}
                shadows={false}
@@ -3722,8 +3830,12 @@ export default function ClusterTopologyView() {
                   selectedHostIdRef={selectedHostIdRef}
                   osdNodesRef={osdNodesRef}
                   initialAnimate={animate}
+                  updatePgSearchOption={updatePgSearchOption}
+                  highlightNode={highlightNode}
+                  toggleAllPanels={toggleAllPanels}
                />
-               <Environment files={'/3d/background/hongkong.jpg'} />
+               {/*<Environment preset="night" />*/}
+               <Environment files={'/3d/background/datacenter-blue.jpg'} />
                {/*<Environment preset="night" />*/}
                <EffectComposer>
                   {/* mipmapBlur 키면 화면 깜빡임 생겨서 false 로 함 */}
@@ -3734,7 +3846,7 @@ export default function ClusterTopologyView() {
 
             {/* Search Panel with Slide Animation */}
             {/* 항상 렌더링, CSS display로 제어 */}
-            <div className="search-panel top-[74px]" style={{ display: 'none' }}>
+            <div className="search-panel top-[74px] -translate-x-full" style={{ display: 'none' }}>
                <div className={'search-header'}>
                   <button onClick={toggleSearchPanel} className={'search-collapse-btn'}>
                      <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
@@ -3748,21 +3860,26 @@ export default function ClusterTopologyView() {
                </div>
                <div className={'search-content'}>
                   <div className={'search-controls'}>
-                     <select
-                        defaultValue={searchTypeRef.current}
-                        className={'search-select'}
-                        onChange={e => {
-                           searchTypeRef.current = e.target.value as 'pool' | 'host' | 'pg';
-                           clearSearch();
-                        }}
-                     >
-                        <option value="pool">Pool</option>
-                        <option value="pg" disabled={!isPgSearchEnabled}>
-                           PG
-                        </option>
-                        <option value="osd">OSD</option>
-                        <option value="host">Host</option>
-                     </select>
+                     <div className={'search-select-container'}>
+                        <select
+                           defaultValue={searchTypeRef.current}
+                           className={'search-select'}
+                           onChange={e => {
+                              searchTypeRef.current = e.target.value as 'pool' | 'host' | 'pg';
+                              clearSearch();
+                           }}
+                        >
+                           <option value="pool">Pool</option>
+                           <option value="pg" disabled={true}>
+                              PG
+                           </option>
+                           <option value="osd">OSD</option>
+                           <option value="host">Host</option>
+                        </select>
+                        <button onClick={handleClearButton} className={'search-clear-btn'} title="Clear selection">
+                           <TrashIcon color={Colors.teal[500]} />
+                        </button>
+                     </div>
                      <div className={'search-field-container'}>
                         <input
                            defaultValue={searchQueryRef.current}

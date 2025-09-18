@@ -36,15 +36,15 @@ const transition = {
 const getInitialTransform = (position: string) => {
    switch (position) {
       case 'top':
-         return { x: '0%', y: '-100%', opacity: 0 };
+         return { xPercent: 0, y: -200, opacity: 0 }; // xPercent로 중앙 정렬 유지
       case 'left':
-         return { x: '-100%', y: '0%', opacity: 0 };
+         return { x: -400, y: 0, opacity: 0 }; // 왼쪽에서 오른쪽으로 슬라이드
       case 'bottom':
-         return { x: '0%', y: '100%', opacity: 0 };
+         return { xPercent: 0, y: 200, opacity: 0 }; // xPercent로 중앙 정렬 유지
       case 'right':
-         return { x: '100%', y: '0%', opacity: 0 };
+         return { x: 400, y: 0, opacity: 0 }; // 오른쪽에서 왼쪽으로 슬라이드
       default:
-         return { x: '0%', y: '0%', opacity: 0 };
+         return { x: 0, y: 0, opacity: 0 };
    }
 };
 
@@ -152,9 +152,9 @@ const PoolNode = forwardRef<
                         bumpScale={0.03}
                         metalness={0.1}
                         metalnessMap={textures.oceanMap}
-                        emissiveMap={textures.lightsMap}
-                        emissive={new THREE.Color(isSelected ? 0xffff00 : 0xffff88)}
-                        emissiveIntensity={isSelected ? 0.8 : 0.5}
+                        // emissiveMap={textures.lightsMap}
+                        // emissive={new THREE.Color(isSelected ? 0xffff00 : 0xffff88)}
+                        // emissiveIntensity={isSelected ? 0.8 : 0.5}
                      />
                   ) : (
                      <meshStandardMaterial
@@ -272,6 +272,7 @@ const DoughnutTable = ({ position = [0, -40, 0] }: { position?: [number, number,
          <RoundMirrorTextTable
             topCrystal
             sideMirror
+            // sideColor={Colors.amber[400]}
             position={[0, 0, 0]}
             innerRadius={innerRadius}
             outerRadius={outerRadius}
@@ -279,7 +280,7 @@ const DoughnutTable = ({ position = [0, -40, 0] }: { position?: [number, number,
             height={7}
             castShadow
             bottomText="OKESTRO  *  CONTRABASS  SDS+"
-            bottomTextColor={Colors.neutral[200]}
+            bottomTextColor={Colors.neutral[400]}
             segment={512}
          />
          {/*<BangingGlassBall scale={2.5} useOrbit orbitCenterPosition={[0, -100, 0]} orbitRadius={80} y={-50} angularSpeed={-0.3} />*/}
@@ -594,6 +595,8 @@ const ClusterTopologyScene = ({
    osdNodesRef,
    initialAnimate,
    updatePgSearchOption,
+   highlightNode,
+   toggleAllPanels,
 }: {
    selectedObjectRef: RefObject<any>;
    selectedPoolIdRef: RefObject<number | null>;
@@ -611,11 +614,14 @@ const ClusterTopologyScene = ({
    osdNodesRef: RefObject<THREE.Group[]>;
    initialAnimate: () => void;
    updatePgSearchOption: (enabled: boolean) => void;
+   highlightNode: (node: any) => void;
+   toggleAllPanels: () => void;
 }) => {
    const { scene, camera, mouse, viewport } = useThree();
    const [texturesLoaded, setTexturesLoaded] = useState(false);
    const textSphereRef = useRef<THREE.Object3D>(null);
-
+   const allPools = useMemo(() => mockTopologyData.pools.map((_, i) => ({ index: i })), []);
+   const poolPositions = useMemo(() => new AdaptiveLayoutManager().applyLayout(allPools, 'spiral', { spacing: 25 }), []);
    // Animation refs for centralized animation
    const poolAnimationRefs = useRef<
       Array<{
@@ -829,14 +835,14 @@ const ClusterTopologyScene = ({
          texturesRef.current.albedoMap = await loadTexture('/3d/textures/earth/Albedo.jpg');
          texturesRef.current.bumpMap = await loadTexture('/3d/textures/earth/Bump.jpg');
          texturesRef.current.oceanMap = await loadTexture('/3d/textures/earth/Ocean.png');
-         texturesRef.current.lightsMap = await loadTexture('/3d/textures/earth/night_lights_modified.png');
+         // texturesRef.current.lightsMap = await loadTexture('/3d/textures/earth/night_lights_modified.png');
          texturesRef.current.cloudsMap = await loadTexture('/3d/textures/earth/Clouds.png');
 
-         const textureLoader = new THREE.TextureLoader();
-         texturesRef.current.metalPlanetMap = textureLoader.load('/3d/textures/planet/Various_AluminiumFoil01_header.jpg');
-         texturesRef.current.yellowMap = textureLoader.load('/3d/textures/planet/Metal_RedHotSteel_header.jpg');
-         texturesRef.current.redMap = textureLoader.load('/3d/textures/cube/Leather_Tufted_header_red.jpg');
-         texturesRef.current.hostMap = textureLoader.load('/3d/textures/planet/silver-metal-pattern-steel.webp');
+         // const textureLoader = new THREE.TextureLoader();
+         // texturesRef.current.metalPlanetMap = textureLoader.load('/3d/textures/planet/Various_AluminiumFoil01_header.jpg');
+         // texturesRef.current.yellowMap = textureLoader.load('/3d/textures/planet/Metal_RedHotSteel_header.jpg');
+         // texturesRef.current.redMap = textureLoader.load('/3d/textures/cube/Leather_Tufted_header_red.jpg');
+         // texturesRef.current.hostMap = textureLoader.load('/3d/textures/planet/silver-metal-pattern-steel.webp');
 
          // Mark textures as loaded and loading as complete
          setTexturesLoaded(true);
@@ -853,15 +859,17 @@ const ClusterTopologyScene = ({
       initScene();
    }, []);
 
+   const ref = useRef(false);
+
    useEffect(() => {
-      if (texturesLoaded) {
+      if (texturesLoaded && !ref.current) {
+         ref.current = true;
          // Use a longer delay to ensure all components are mounted
          setTimeout(() => {
-            const allPools = mockTopologyData.pools.map((_, i) => ({ index: i }));
+            /*const allPools = mockTopologyData.pools.map((_, i) => ({ index: i }));
             const positions = new AdaptiveLayoutManager().applyLayout(allPools, 'spiral', {
                spacing: 25,
             });
-
             poolRefs.forEach((pool: RefObject<any>, idx) => {
                if (pool.current && pool.current.position) {
                   gsap.to(pool.current.position, {
@@ -872,7 +880,34 @@ const ClusterTopologyScene = ({
                      ease: 'power2.inOut',
                   });
                }
+            });*/
+
+            let clickPoolId = 0;
+            let maxCount = 0;
+            mockTopologyData.pools.forEach(p => {
+               if (p.pgs.length > maxCount) {
+                  maxCount = p.pgs.length;
+                  clickPoolId = p.id;
+               }
             });
+
+            const pool = poolRefs.find(pool => pool.current && pool.current.userData.id === clickPoolId);
+            if (!!pool) {
+               highlightNode(pool.current);
+            }
+
+            if (cameraRef.current && cameraRef.current.position.y >= 0) {
+               gsap.to(cameraRef.current.position, {
+                  x: 0,
+                  y: 33,
+                  z: 270,
+                  duration: 5,
+                  ease: 'power2.inOut',
+               });
+            }
+            setTimeout(() => {
+               toggleAllPanels();
+            }, 5100);
 
             initialAnimate();
 
@@ -880,7 +915,7 @@ const ClusterTopologyScene = ({
             /*setTimeout(() => {
                generateOSDNodes();
             }, 100);*/
-         }, 500); // Increased delay to ensure refs are ready
+         }, 1); // Increased delay to ensure refs are ready
       }
    }, [texturesLoaded]);
 
@@ -923,7 +958,7 @@ const ClusterTopologyScene = ({
          {/*<hemisphereLight args={['dodgerblue', 'hotpink', 5]} position={[0, 10, 0]} intensity={10} castShadow />*/}
          {/*<pointLight position={[0, -20, 0]} intensity={0.8} distance={150} />*/}
          {/*<directionalLight position={[0, -15, 30]} intensity={0.6} />*/}
-         <OrbitControls enableDamping dampingFactor={0.05} enablePan autoRotate autoRotateSpeed={0.2} />
+         <OrbitControls enableDamping dampingFactor={0.05} enablePan autoRotate autoRotateSpeed={0.05} />
 
          {/* Shadow-receiving ground plane */}
          {/*<mesh receiveShadow position={[0, -60, 0]} rotation={[-Math.PI / 2, 0, 0]}>
@@ -933,10 +968,10 @@ const ClusterTopologyScene = ({
 
          {/* Pool Nodes with Spiral Layout */}
          {mockTopologyData.pools.map((pool, index) => {
-            const layoutManager = new AdaptiveLayoutManager();
-            const allPools = mockTopologyData.pools.map((_, i) => ({ index: i }));
-            const positions = layoutManager.applyLayout(allPools, 'hierarchical', { spacing: 20 });
-            const pos = positions[index].position;
+            // const layoutManager = new AdaptiveLayoutManager();
+            // const allPools = mockTopologyData.pools.map((_, i) => ({ index: i }));
+            // const positions = layoutManager.applyLayout(allPools, 'hierarchical', { spacing: 20 });
+            const pos = poolPositions[index].position;
 
             // Create animation refs for this pool
             if (!poolAnimationRefs.current[index]) {
@@ -1210,22 +1245,28 @@ export default function ClusterTopologyView() {
    // const clock = useMemo(() => new THREE.Clock(), []);
    // useRef로 패널 상태 관리 (리렌더링 방지)
    const panelsRef = useRef({
-      top: { collapsed: false },
-      left: { collapsed: false },
-      bottom: { collapsed: false },
-      right: { collapsed: false },
+      top: { collapsed: true },
+      left: { collapsed: true },
+      bottom: { collapsed: true },
+      right: { collapsed: true },
    });
 
-   // 초기화 시 패널 표시 (React 리렌더링 없음)
+   // 초기화 시 모든 패널 숨기기 (React 리렌더링 없음)
    useEffect(() => {
-      const targetPositions = ['top', 'left', 'bottom', 'right'];
+      const targetPositions: Array<'top' | 'left' | 'bottom' | 'right'> = ['top', 'left', 'bottom', 'right'];
       targetPositions.forEach(position => {
+         // 패널 상태를 collapsed로 설정
+         panelsRef.current[position].collapsed = true;
+
          const panelElement = document.querySelector(`.panel-${position}`) as HTMLElement;
-         if (panelElement && !panelsRef.current[position as keyof typeof panelsRef.current].collapsed) {
-            panelElement.style.display = 'block';
+         if (panelElement) {
+            panelElement.style.display = 'none';
+            // 초기 위치를 숨김 상태로 설정
+            gsap.set(panelElement, getInitialTransform(position));
          }
       });
-   }, []); // 마운트 시 1회만 실행
+   }, []);
+
    const isFullscreenRef = useRef(false);
    const searchPanelRef = useRef({ collapsed: true });
    const searchTypeRef = useRef('pool');
@@ -1373,8 +1414,16 @@ export default function ClusterTopologyView() {
 
       // useRef로 상태 확인 (리렌더링 없음)
       const allCollapsed = targetPositions.every(pos => panelsRef.current[pos].collapsed);
+      console.log('toggleAllPanels 호출됨, allCollapsed:', allCollapsed);
+      console.log('현재 패널 상태:', {
+         top: panelsRef.current.top.collapsed,
+         left: panelsRef.current.left.collapsed,
+         bottom: panelsRef.current.bottom.collapsed,
+         right: panelsRef.current.right.collapsed,
+      });
 
       if (allCollapsed) {
+         console.log('패널 열기 시작');
          // 패널 열기: useRef 상태만 변경 (리렌더링 없음)
          targetPositions.forEach(pos => {
             panelsRef.current[pos].collapsed = false;
@@ -1383,7 +1432,9 @@ export default function ClusterTopologyView() {
          // DOM 직접 조작으로 패널 표시
          targetPositions.forEach((position, index) => {
             const panelElement = document.querySelector(`.panel-${position}`) as HTMLElement;
+            console.log(`패널 ${position} 요소 찾기:`, !!panelElement);
             if (panelElement) {
+               console.log(`패널 ${position} 표시 및 애니메이션 시작`);
                // 패널 표시
                panelElement.style.display = 'block';
 
@@ -1391,13 +1442,19 @@ export default function ClusterTopologyView() {
                gsap.set(panelElement, getInitialTransform(position));
 
                // 목표 위치로 애니메이션
+               const targetTransform =
+                  position === 'top' || position === 'bottom'
+                     ? { xPercent: 0, y: 0, opacity: 1 } // top/bottom 패널은 xPercent로 중앙 정렬
+                     : { x: 0, y: 0, opacity: 1 }; // left/right 패널은 x: 0으로
+
                gsap.to(panelElement, {
-                  x: '0%',
-                  y: '0%',
-                  opacity: 1,
-                  duration: 0.3,
+                  ...targetTransform,
+                  duration: 0.5, // 애니메이션 시간을 조금 늘림
                   // delay: index * 0.05,
                   ease: 'power2.out',
+                  onComplete: () => {
+                     console.log(`패널 ${position} 애니메이션 완료`);
+                  },
                });
             }
          });
@@ -2386,7 +2443,7 @@ export default function ClusterTopologyView() {
    // 트래픽 파티클 생성
    const createTrafficParticles = (from: THREE.Vector3, to: THREE.Vector3, color: number = 0x00d2ff): THREE.Group => {
       const particleGroup = new THREE.Group();
-      const particleCount = 3;
+      const particleCount = 6;
 
       for (let i = 0; i < particleCount; i++) {
          const geometry = new THREE.SphereGeometry(0.3, 6, 6);
@@ -3742,10 +3799,10 @@ export default function ClusterTopologyView() {
    return (
       <>
          <AppHeader />
-         <div className={`topology-container bg-black`}>
+         <div className={`topology-container bg-neutral-900`}>
             <Canvas
                ref={canvasRef}
-               camera={{ position: [0, 30, 180], fov: 60, near: 0.1, far: 2000 }}
+               camera={{ position: [0, 360, 0], fov: 60, near: 0.1, far: 2000 }}
                dpr={[1, 1.5]}
                gl={{ antialias: false, toneMapping: THREE.ACESFilmicToneMapping, outputColorSpace: THREE.SRGBColorSpace }}
                shadows={false}
@@ -3774,8 +3831,11 @@ export default function ClusterTopologyView() {
                   osdNodesRef={osdNodesRef}
                   initialAnimate={animate}
                   updatePgSearchOption={updatePgSearchOption}
+                  highlightNode={highlightNode}
+                  toggleAllPanels={toggleAllPanels}
                />
-               <Environment files={'/3d/background/hongkong.jpg'} />
+               {/*<Environment preset="night" />*/}
+               <Environment files={'/3d/background/datacenter-blue.jpg'} />
                {/*<Environment preset="night" />*/}
                <EffectComposer>
                   {/* mipmapBlur 키면 화면 깜빡임 생겨서 false 로 함 */}
@@ -3786,7 +3846,7 @@ export default function ClusterTopologyView() {
 
             {/* Search Panel with Slide Animation */}
             {/* 항상 렌더링, CSS display로 제어 */}
-            <div className="search-panel top-[74px]" style={{ display: 'none' }}>
+            <div className="search-panel top-[74px] -translate-x-full" style={{ display: 'none' }}>
                <div className={'search-header'}>
                   <button onClick={toggleSearchPanel} className={'search-collapse-btn'}>
                      <svg width="16" height="16" viewBox="0 0 16 16" fill="none">

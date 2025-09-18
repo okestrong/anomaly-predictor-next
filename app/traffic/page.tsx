@@ -1,6 +1,7 @@
 import { Metadata } from 'next';
 import ClusterTopologyViewStyles from '@/components/topology/ClusterTopologyViewStyles';
 import ClusterTopologyView from '@/components/topology/ClusterTopologyView';
+import WorldTrafficView from '@/components/traffic/WorldTrafficView';
 
 export const metadata: Metadata = {
    title: 'Cluster Traffic - Ceph AI Dashboard',
@@ -10,7 +11,7 @@ export const metadata: Metadata = {
 export default function TrafficPage() {
    return (
       <>
-         <div>hello</div>
+         <WorldTrafficView />
       </>
    );
 }
