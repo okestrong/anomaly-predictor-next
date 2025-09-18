@@ -1011,7 +1011,7 @@ const ClusterTopologyScene = ({
 
          {/*Bubble 주변 조명*/}
          <rectAreaLight
-            args={['#ffffff', 2, 50, 50]}
+            args={['#ffffff', 3, 50, 50]}
             position={[0, -28, 0]}
             rotation-x={-Math.PI / 2} // -> 조명이 밑에서 위로 (위에서 아래로 비추려면 : Math.PI / 2)
          />
@@ -1019,8 +1019,8 @@ const ClusterTopologyScene = ({
          {/*<pointLight args={['#ffffff', 50, 50, 1]} position={[0, -33, -13]} />*/}
          {/*<pointLight args={['#ffffff', 50, 50, 1]} position={[13, -33, 0]} />*/}
          {/*<pointLight args={['#ffffff', 50, 50, 1]} position={[-13, -33, 0]} />*/}
-         <Bubble position={[0, -35, 0]} scale={3} color={Colors.slate[200]} useBubble />
-         <TextSphere ref={textSphereRef} position={[0, -36, 0]} scale={4} text="OKESTRO  OKESTRO" bgColor={Colors.white} textColor={Colors.blue[500]} />
+         <Bubble position={[0, -35, 0]} scale={3} color={Colors.white} useBubble />
+         <TextSphere ref={textSphereRef} position={[0, -36, 0]} scale={4} text="OKESTRO  OKESTRO" bgColor={Colors.pink[300]} textColor={Colors.blue[500]} />
          {/*Portal 상단 조명*/}
          {/*<rectAreaLight args={['#ffffff', 3, 30, 20]} position={[0, -45, 0]} rotation-x={Math.PI / 2} />*/}
          {/*<pointLight args={['#ffffff', 40, 20, 0.5]} position={[0, -50, 0]} />*/}

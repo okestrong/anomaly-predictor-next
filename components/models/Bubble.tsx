@@ -127,7 +127,7 @@ export default function Bubble({
            Displace로 노이즈 기반 변형을 수행합니다.
          */}
          <LayerMaterial color={color} lighting={'physical'} transmission={1} roughness={0.15} thickness={2} metalness={0.21}>
-            <Displace ref={displaceRef} strength={1.6} scale={0.25} />
+            <Displace ref={displaceRef} strength={1.8} scale={0.25} />
          </LayerMaterial>
       </mesh>
       // </group>
