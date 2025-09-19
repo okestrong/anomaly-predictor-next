@@ -32,23 +32,24 @@ Vue 3 원본 프로젝트의 완성된 기능들:
 
 ### 1. Next.js 15 App Router 구조
 
-#### 1.1 디렉토리 구조
+#### 1.1 디렉토리 구조 (완료)
 ```
 app/
-├── layout.tsx              # 루트 레이아웃 (헤더, 테마, 폰트)
-├── page.tsx                # 대시보드 메인 (서버 컴포넌트)
-├── globals.css             # Tailwind CSS v4 + 커스텀 스타일
-├── favicon.ico             # 파비콘
-├── dashboard/page.tsx      # 대시보드 페이지
-├── prediction/page.tsx     # 장애 예측 메인
-├── topology/page.tsx       # 3D 토폴로지 뷰
-├── anomaly/page.tsx        # ML 이상감지 대시보드
-├── alerts/page.tsx         # 알림 센터 페이지
-├── health/page.tsx         # 헬스 체크 페이지
-├── monitoring/page.tsx     # 모니터링 페이지
-├── performance/page.tsx    # 성능 분석 페이지
-├── network/page.tsx        # 네트워크 페이지
-└── storage/page.tsx        # 스토리지 페이지
+├── layout.tsx              # ✅ 루트 레이아웃 (헤더, 테마, 폰트)
+├── page.tsx                # ✅ 대시보드 메인 (서버 컴포넌트)
+├── globals.css             # ✅ Tailwind CSS v4 + 커스텀 스타일
+├── favicon.ico             # ✅ 파비콘
+├── dashboard/page.tsx      # ✅ 대시보드 페이지
+├── prediction/page.tsx     # ✅ 장애 예측 메인
+├── topology/page.tsx       # ✅ 3D 토폴로지 뷰
+├── traffic/page.tsx        # ✅ 트래픽 시각화 페이지
+├── anomaly/page.tsx        # ✅ ML 이상감지 대시보드
+├── alerts/page.tsx         # ✅ 알림 센터 페이지
+├── health/page.tsx         # ✅ 헬스 체크 페이지
+├── monitoring/page.tsx     # ✅ 모니터링 페이지
+├── performance/page.tsx    # ✅ 성능 분석 페이지
+├── network/page.tsx        # ✅ 네트워크 페이지
+└── storage/page.tsx        # ✅ 스토리지 페이지
 ```
 
 #### 1.2 루트 레이아웃 구현
@@ -1555,35 +1556,241 @@ export interface ClusterStatus {
 }
 ```
 
-## 마이그레이션 체크리스트
+## 개발 체크리스트 (Development Checklists)
 
-### Phase 1: 기본 환경 (완료)
+### Phase 1: 프로젝트 초기 설정 (Week 1-2)
 - [x] Next.js 15 + React 19 프로젝트 생성
 - [x] Tailwind CSS v4 설정 (prefix 제거)
 - [x] TypeScript 엄격 모드 설정
 - [x] 기본 레이아웃 및 App Router 구조
+- [x] Zustand 스토어 구조 설계
+- [x] 라우터 설정 및 페이지 구조 정의
+- [x] WebSocket STOMP 연결 설정
+- [x] 개발 환경 변수 설정
 
-### Phase 2: 핵심 컴포넌트 (진행 중)
-- [ ] 공통 컴포넌트 마이그레이션 (Card, Button 등)
-- [ ] ECharts SSR 최적화 시스템 구축
-- [ ] 8개 차트 컴포넌트 React 변환
-- [ ] 대시보드 상태 컴포넌트 변환
+### Phase 2: 기본 레이아웃 및 공통 컴포넌트 (Week 3-4)
+- [x] AppHeader.tsx 구현
+- [x] MegaMenu.tsx 네비게이션 구현
+- [x] 다크/라이트 모드 지원 (기본 다크모드)
+- [x] 공통 컴포넌트 라이브러리 구축
+  - [x] Card.tsx
+  - [x] Button.tsx
+  - [x] LoadingSpinner.tsx
+  - [x] ErrorMessage.tsx
+  - [x] DataTable.tsx
+  - [x] ConfirmDialog.tsx
 
-### Phase 3: 3D 토폴로지 (예정)
-- [ ] React Three Fiber 기반 3D 시각화 구현
-- [ ] 4141라인 Vue 컴포넌트 → React 변환
-- [ ] 우주선 대시보드 UI 4개 패널
-- [ ] 인터랙션 시스템 (검색, 선택, 애니메이션)
+### Phase 3: 대시보드 핵심 기능 (Week 5-7)
+- [x] ClusterStatus.tsx 구현
+- [x] CapacityStatus.tsx 구현
+- [x] RiskPanel.tsx (AI 예측 위험 요소 패널) 구현
+- [x] AlertCenter.tsx 구현
+- [x] 8개 실시간 차트 컴포넌트 구현
+  - [x] PoolUsageChart.tsx
+  - [x] IopsChart.tsx
+  - [x] LatencyChart.tsx
+  - [x] ScrubErrorChart.tsx
+  - [x] PgInconsistencyChart.tsx
+  - [x] NetworkErrorChart.tsx
+  - [x] OsdPerformanceChart.tsx
+  - [x] ThroughputChart.tsx
+- [x] 메인 대시보드 레이아웃 통합
+- [x] ECharts 기반 차트 시스템 구축
 
-### Phase 4: 상태 관리 (예정)
-- [ ] Pinia → Zustand 완전 변환
+### Phase 3.5: 3D 토폴로지 시각화 (완료)
+- [x] React Three Fiber 기반 3D 렌더링 시스템 구축
+- [x] 우주 공간 테마 환경 구성 (별 배경, 조명 시스템)
+- [x] 4계층 노드 시각화 구현
+  - [x] Pool 노드: 구형 노드, 상태 기반 링 표시
+  - [x] PG 노드: DodecahedronGeometry 기반 메탈릭 노드
+  - [x] OSD 노드: 호스트별 그룹화, 상태 기반 색상
+  - [x] Host 노드: 원형 플랫폼 (바닥면만 표시)
+- [x] 인터랙션 시스템
+  - [x] 검색 패널: Pool/PG/OSD/Host 타입별 검색 및 펄스 효과
+  - [x] 풀스크린 모드: 헤더 토글, 캔버스 크기 자동 조정
+  - [x] 패널 제어: Ctrl+클릭으로 4개 패널 동시 토글
+  - [x] 노드 선택: 클릭으로 정보 패널 표시
+- [x] 우주선 대시보드 UI (4개 패널)
+  - [x] 상단 중앙: Cluster Command Center
+  - [x] 좌측 하단: AI Threat Analysis
+  - [x] 중앙 하단: Quick Status
+  - [x] 우측 하단: Performance Matrix
+- [x] 애니메이션 및 시각 효과
+  - [x] 자동 회전, 노드 회전, 펄스 애니메이션
+  - [x] 상태 기반 링, 그림자 렌더링
+  - [x] 페이지 전환 애니메이션
+- [x] 트래픽 시각화 구현 (WorldTrafficView)
+  - [x] 실린더 중앙 허브
+  - [x] 데이터 파티클 시스템 (서랍→실린더→호스트)
+  - [x] VM/Container 파티클 애니메이션
+  - [x] 더블클릭 헤더 토글 기능
+
+### Phase 4: 상태 관리 및 서비스 구조 (Week 8-9)
+- [x] Zustand 스토어 구조 설계 (기본 UIStore 구현)
+- [ ] 실시간 데이터 스토어 구현
+- [ ] 클러스터 상태 스토어 구현
 - [ ] WebSocket 실시간 통신 시스템
 - [ ] 데이터 플로우 최적화
+- [ ] API 서비스 레이어 구현
+- [ ] 에러 처리 및 fallback 시스템
+- [ ] 실시간 데이터 업데이트 테스트
 
-### Phase 5: AI/ML 기능 (예정)
-- [ ] 장애 예측 12개 카테고리 UI
+### Phase 5: AI/ML 기능 구현 (Week 10-12)
+- [ ] 장애 예측 UI 구현
+  - [ ] PredictionGrid.tsx
+  - [ ] PredictionCard.tsx
+  - [ ] PredictionModal.tsx
+  - [ ] RiskDashboard.tsx
 - [ ] ML 이상감지 대시보드
-- [ ] RAG 조치 가이드 인터페이스
+  - [ ] AnomalyScoreGauge.tsx
+  - [ ] AnomalyHeatmap.tsx
+  - [ ] AnomalyAlert.tsx
+  - [ ] ModelPerformanceMetrics.tsx
+- [ ] ML API 서비스 연동
+- [ ] 12개 예측 카테고리 구현
+
+### Phase 4.5: 트래픽 시각화 페이지 (완료)
+- [x] WorldTrafficView 컴포넌트 구현
+- [x] Ceph 데이터 플로우 시각화 (서랍→실린더→호스트)
+- [x] VM/Container 파티클 시스템
+- [x] 3D 환경 구성 (조명, 배경, 효과)
+- [x] 실시간 데이터 파티클 애니메이션
+- [x] 더블클릭 헤더 토글 기능
+- [x] 성능 모니터링 시스템
+- [x] wallThickness 조정 (0.5 → 0.24)
+
+### Phase 6: RAG 기반 조치 가이드 (Week 13-14)
+- [ ] RAG 검색 인터페이스 구현
+- [ ] AI 응답 표시 컴포넌트
+- [ ] 컨텍스트 기반 제안 UI
+- [ ] 명령어 자동 생성 뷰어
+- [x] RAG API 서비스 연동 (ceph-doc-crawler 통합)
+- [x] sentence-transformers 임베딩 모델 적용
+
+### Phase 7: Ceph Squid 특화 기능 (Week 15-16)
+- [ ] NVMe/RoCE 모니터링 대시보드
+- [ ] BlueStore 메트릭 시각화
+- [ ] QoS 정책 관리 UI
+- [ ] Stretch Cluster 상태 뷰
+- [ ] Crimson OSD 모니터링
+
+### Phase 8: 최적화 및 트러블슈팅 (Week 17-18)
+- [ ] PG 계산기 구현
+- [ ] PG 분포 시각화 (Treemap, Heatmap)
+- [ ] 로그 분석 인터페이스
+- [ ] RCA 결과 표시
+- [ ] 알람 칸반 보드
+- [ ] 알람 상관관계 분석
+
+### Phase 9: 리포트 및 문서화 (Week 19-20)
+- [ ] 리포트 생성 UI
+- [ ] 리포트 스케줄러
+- [ ] 템플릿 관리
+- [ ] PDF/HTML 내보내기
+- [ ] 변경작업 영향도 평가
+
+### Phase 10: 테스트 및 최적화 (Week 21-22)
+- [ ] Unit 테스트 작성
+- [ ] E2E 테스트 구현
+- [ ] 성능 최적화
+- [ ] 번들 사이즈 최적화
+- [ ] 접근성 검증 (WCAG 2.1)
+- [ ] 보안 취약점 스캔
+
+### Phase 11: 배포 준비 (Week 23)
+- [ ] Production 빌드 설정
+- [ ] Docker 이미지 생성
+- [ ] CI/CD 파이프라인 설정
+- [ ] 문서화 완료
+- [ ] 운영 가이드 작성
+
+## 상세 개발 체크리스트
+
+### 컴포넌트 개발 체크리스트
+- [ ] React 19 기능 활용 (use, forwardRef 등)
+- [ ] Props 타입 정의 (TypeScript interface)
+- [ ] forwardRef 적용 (필요시)
+- [ ] Tailwind CSS 클래스 적용 (prefix 제거됨)
+- [ ] 반응형 디자인 확인 (모바일, 태블릿, 데스크톱)
+- [ ] 다크모드 지원 (dark: 클래스)
+- [ ] 접근성 속성 추가 (ARIA, role 등)
+- [ ] 에러 처리 구현 (Error Boundary)
+- [ ] 로딩 상태 표시 (Suspense, Skeleton)
+- [ ] 단위 테스트 작성 (Jest, Testing Library)
+
+### 페이지 개발 체크리스트
+- [ ] App Router 파일 구조 (page.tsx, layout.tsx)
+- [ ] 서버/클라이언트 컴포넌트 구분
+- [ ] Zustand 스토어 연결
+- [ ] API 서비스 구현
+- [ ] WebSocket 구독 설정
+- [ ] 에러 바운더리 설정
+- [ ] 로딩 스켈레톤 구현
+- [ ] 메타데이터 설정 (title, description)
+- [ ] 성능 최적화 (코드 분할, 지연 로딩)
+- [ ] E2E 테스트 작성
+
+### ECharts SSR 최적화 체크리스트
+- [ ] 서버 컴포넌트용 SVG 렌더링
+- [ ] 클라이언트 하이드레이션 구현
+- [ ] 동적 import로 차트 라이브러리 로딩
+- [ ] 테마 기반 차트 옵션 설정
+- [ ] 반응형 차트 크기 조정
+- [ ] 애니메이션 최적화 (서버/클라이언트 구분)
+- [ ] 차트 인스턴스 메모리 관리
+- [ ] 실시간 데이터 업데이트 성능 최적화
+
+### 3D 토폴로지 개발 체크리스트
+- [ ] React Three Fiber 기본 설정
+- [ ] Three.js 씬 구성 (카메라, 조명, 렌더러)
+- [ ] 노드 계층 구조 구현
+- [ ] 텍스처 및 머티리얼 최적화
+- [ ] 인터랙션 시스템 (Raycaster, 이벤트)
+- [ ] 애니메이션 시스템 (useFrame, gsap)
+- [ ] 성능 최적화 (frustum culling, LOD)
+- [ ] 메모리 관리 (dispose, cleanup)
+
+### WebSocket 연동 체크리스트
+- [ ] STOMP 클라이언트 설정
+- [ ] 연결 상태 관리
+- [ ] 재연결 로직 구현
+- [ ] 메시지 큐 처리
+- [ ] 에러 처리 및 fallback
+- [ ] 구독 관리 (subscribe/unsubscribe)
+- [ ] 메모리 누수 방지
+- [ ] 백프레셔 처리
+
+### 상태 관리 체크리스트
+- [ ] Zustand 스토어 구조 설계
+- [ ] 상태 정규화 (normalization)
+- [ ] 액션 크리에이터 정의
+- [ ] 미들웨어 적용 (devtools, persist)
+- [ ] 선택적 구독 최적화
+- [ ] 비동기 액션 처리
+- [ ] 상태 불변성 유지
+- [ ] 타입 안전성 확보
+
+### 성능 최적화 체크리스트
+- [ ] React.memo 적용 (적절한 컴포넌트)
+- [ ] useMemo, useCallback 최적화
+- [ ] 코드 분할 (동적 import)
+- [ ] 이미지 최적화 (next/image)
+- [ ] 번들 분석 및 최적화
+- [ ] Core Web Vitals 측정
+- [ ] 메모리 누수 검사
+- [ ] 렌더링 성능 프로파일링
+
+### 배포 전 체크리스트
+- [ ] 빌드 에러 확인
+- [ ] TypeScript 타입 검사
+- [ ] ESLint/Prettier 검사
+- [ ] 테스트 커버리지 80% 이상
+- [ ] 환경 변수 설정 확인
+- [ ] 보안 헤더 설정
+- [ ] SEO 최적화 (메타태그, 구조화 데이터)
+- [ ] 접근성 검사 (WAVE, axe)
+- [ ] 브라우저 호환성 테스트
+- [ ] 모바일 반응형 테스트
 
 ## 성공 기준
 
@@ -1594,8 +1801,8 @@ export interface ClusterStatus {
 - [ ] WebSocket 연결 안정성
 
 ### 성능 개선
-- [ ] 초기 로딩 시간 50% 단축
-- [ ] Core Web Vitals 전 항목 Good
+- [ ] 초기 로딩 시간 Vue 대비 50% 단축
+- [ ] Core Web Vitals 전 항목 Good 등급
 - [ ] 번들 크기 최적화
 - [ ] SEO 점수 90+ 달성
 

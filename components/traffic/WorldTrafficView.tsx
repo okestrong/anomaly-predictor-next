@@ -33,6 +33,7 @@ const VMParticles = ({ count = 8, radius = 3.5, speed = 0.8, colors = [0x00e5ff,
          m.rotation.x += 0.02; // x축 회전도 추가
       });
    });
+
    return (
       <group ref={grp}>
          {Array.from({ length: count }, (_, i) => (
@@ -117,7 +118,7 @@ const ServerUnit = ({
          const baseY = size[1] * 0.2; // 서버 내부 기준점 (서버 높이의 20% 지점)
          const up = THREE.MathUtils.lerp(0, 5, rise.current); // 0에서 4까지 상승
          const forwardZ = THREE.MathUtils.lerp(0, size[2] * 0.75, slide.current); // 서버와 같은 Z 위치
-         vmGroupRef.current.position.set(0, baseY + up, forwardZ);
+         vmGroupRef.current.position.set(0, baseY + up, forwardZ + 2);
          vmGroupRef.current.rotation.y += 0.01 * rise.current; // 천천히 회전
       }
    });
@@ -482,7 +483,7 @@ const Drawer = ({ position, rotation, type }: { position: [number, number, numbe
    const drawerWidth = 40;
    const drawerHeight = 8;
    const drawerDepth = 25;
-   const wallThickness = 0.5;
+   const wallThickness = 0.1;
    const label = type === 'boxes' ? 'OpenStack VMs' : 'Kubernetes Containers';
 
    return (
@@ -1346,6 +1347,7 @@ const WorldTrafficView: FC<Props> = () => {
    const [fxOn, setFxOn] = useState(true);
    const [trailBudget, setTrailBudget] = useState(12);
    const [writeOps, setWriteOps] = useState({ drawer: 100, host: 50 });
+   const [showHeader, setShowHeader] = useState(true);
    const [cyl_position, cyl_rarius, cyl_height] = useMemo<[[number, number, number], number, number]>(() => [[0, 15, 0], 30, 35], []);
    // Update write ops every 30 seconds
    useEffect(() => {
@@ -1360,10 +1362,15 @@ const WorldTrafficView: FC<Props> = () => {
       return () => clearInterval(interval);
    }, []);
 
+   // Handle double click to toggle header
+   const handleDoubleClick = () => {
+      setShowHeader(prev => !prev);
+   };
+
    return (
       <>
-         <AppHeader />
-         <div className="w-screen h-screen overflow-hidden">
+         {showHeader && <AppHeader />}
+         <div className="w-screen h-screen overflow-hidden" onDoubleClick={handleDoubleClick}>
             <Canvas
                camera={{ position: [-150, 120, 50], fov: 60, near: 0.1, far: 2000 }}
                dpr={[1, 1.5]}
@@ -1379,16 +1386,16 @@ const WorldTrafficView: FC<Props> = () => {
             >
                <PerformanceMonitor
                   onChange={({ factor }) => {
-                     setFxOn(factor > 0.9);
-                     setTrailBudget(factor > 0.9 ? 12 : 8);
+                     setFxOn(factor > 0.8);
+                     setTrailBudget(factor > 0.8 ? 12 : 8);
                   }}
                />
                <OrbitControls enableDamping dampingFactor={0.05} enablePan autoRotate autoRotateSpeed={-0.1} />
                <Environment files="/3d/background/darkcenter.jpg" background backgroundBlurriness={0.05} backgroundIntensity={!fxOn ? 3 : 0.5} />
                {fxOn && (
                   <EffectComposer>
-                     <Bloom mipmapBlur={false} luminanceThreshold={0.5} intensity={0.7} radius={0.3} />
-                     <BrightnessContrast brightness={0.03} contrast={0.3} />
+                     <Bloom mipmapBlur={false} luminanceThreshold={0.5} intensity={1.0} radius={0.3} />
+                     <BrightnessContrast brightness={0.05} contrast={0.3} />
                   </EffectComposer>
                )}
 
@@ -1397,8 +1404,7 @@ const WorldTrafficView: FC<Props> = () => {
 
                {/* Main directional light */}
                <directionalLight
-                  // intensity={!fxOn ? 3.5 : 3}
-                  args={['#ffffff', 3]}
+                  args={['#ffffff', 1.8]}
                   position={[150, 150, 150]}
                   castShadow
                   shadow-mapSize={[1024, 1024]}
@@ -1409,7 +1415,7 @@ const WorldTrafficView: FC<Props> = () => {
                   shadow-camera-near={0.1}
                   shadow-camera-far={1000}
                />
-
+               <pointLight args={['#ffffff', 50, 200, 0]} position={[0, -20, 0]} intensity={10} />
                {/* Additional point lights for atmosphere */}
                {/*<pointLight args={[Colors.blue[300], 2, 100]} position={[0, 50, 0]} />
                <pointLight args={[Colors.cyan[300], 1, 80]} position={[-100, 30, -100]} />
@@ -1442,6 +1448,10 @@ const WorldTrafficView: FC<Props> = () => {
                   />
                </Cylinder>
                <mesh position={[0, 32.5, 0]} rotation={[Math.PI / 2, 0, 0]}>
+                  <torusGeometry args={[30, 0.2, 8, 64]} />
+                  <meshStandardMaterial color={0x06b6d4} emissive={0x06b6d4} emissiveIntensity={1.0} transparent={false} />
+               </mesh>
+               <mesh position={[0, 0, 0]} rotation={[Math.PI / 2, 0, 0]}>
                   <torusGeometry args={[30, 0.2, 8, 64]} />
                   <meshStandardMaterial color={0x06b6d4} emissive={0x06b6d4} emissiveIntensity={1.0} transparent={false} />
                </mesh>

@@ -329,7 +329,49 @@ export function AnomalyDashboard() {
 }
 ```
 
-## REST API Endpoints (기존 유지)
+### 8. PG 최적화 도구
+
+#### 8.1 PG 계산기 시스템
+- **입력 필드**: OSD 수, 복제 수, Pool 타입, Target PGs per OSD
+- **실시간 계산**: 권장 PG 수, 최대 PG 수, PG per OSD 비율
+- **Treemap 차트**: Pool 크기와 PG 수 시각화
+- **히트맵 차트**: Host x Pool 매트릭스
+- **리밸런싱 시뮬레이션**: 변경 전/후 비교, 예상 데이터 이동량
+
+#### 8.2 PG 분포 분석
+- **상태별 PG 수 파이 차트**
+- **문제 PG 리스트 테이블**: PG ID, 현재 상태, Acting/Up Set
+- **불균형 지표**: CRUSH weight 대비 실제 PG 수
+
+### 9. 트러블슈팅 시스템
+
+#### 9.1 로그 분석 워크플로우
+```mermaid
+graph LR
+    A[로그 수집] --> B[필터링]
+    B --> C[AI 분석]
+    C --> D[RCA 생성]
+    D --> E[해결 가이드]
+    E --> F[실행 및 검증]
+```
+
+#### 9.2 알람 관리 대시보드
+- **칸반 보드 UI**: 긴급/중요/일반/정보 레인으로 구분
+- **알람 상관관계 분석**: 네트워크 그래프로 근본 원인 하이라이트
+- **RCA 결과 표시**: 근본 원인, 신뢰도, 관련 증거 리스트
+
+### 10. 운영문서 자동 생성
+
+#### 10.1 변경작업 영향도 평가
+- **변경 유형 선택**: OSD 추가/제거, Pool 설정 변경, CRUSH map 수정
+- **영향도 분석**: 영향받는 컴포넌트, 성능 영향 예측, 리밸런싱 시간
+
+#### 10.2 인사이트 리포트
+- **리포트 유형**: 일일/주간/월간/커스텀 기간
+- **리포트 섹션**: Executive Summary, 성능 트렌드, 주요 이벤트, 용량 예측
+- **스케줄링**: 실행 주기, 수신자, 포맷 선택
+
+## REST API Endpoints
 
 ### 클러스터 상태 API
 ```
@@ -338,27 +380,79 @@ GET /api/cluster/metrics - 실시간 메트릭
 GET /api/cluster/capacity - 용량 정보
 GET /api/cluster/pools - Pool 목록 및 상태
 GET /api/cluster/osds - OSD 목록 및 상태
+GET /api/cluster/pgs - PG 상태 정보
+GET /api/cluster/performance - 성능 메트릭
+GET /api/cluster/network - 네트워크 상태
 ```
 
 ### 장애 예측 API
 ```
 GET /api/prediction/osd-failure - OSD 장애 예측
 GET /api/prediction/capacity-exhaustion - 용량 고갈 예측
+GET /api/prediction/performance-degradation - 성능 저하 예측
+GET /api/prediction/pg-imbalance - PG 불균형 예측
+GET /api/prediction/network-bottleneck - 네트워크 병목 예측
+GET /api/prediction/memory-shortage - 메모리 부족 예측
+GET /api/prediction/rebalancing-needed - 리밸런싱 필요 예측
+GET /api/prediction/hotspot-osd - 핫스팟 OSD 예측
+GET /api/prediction/cluster-expansion - 클러스터 확장 예측
+GET /api/prediction/smart-disk-failure - SMART 디스크 장애 예측
+GET /api/prediction/metric-disk-failure - 메트릭 기반 디스크 장애 예측
 GET /api/prediction/comprehensive - 종합 장애 예측
 ```
 
 ### RAG 조치 가이드 API
 ```
 POST /api/rag/ask - 지능형 질의응답
-GET /api/rag/search?query={query} - 문서 검색
-GET /api/rag/suggestions?component={component} - 실시간 조치 제안
+GET /api/rag/search?query={query}&version={version} - 문서 검색
+GET /api/rag/suggestions?component={component}&status={status} - 실시간 조치 제안
 ```
 
 ### ML 이상감지 API
 ```
 GET /api/ml/anomaly/realtime - 실시간 이상감지
 POST /api/ml/predict - ML 기반 예측
+GET /api/ml/anomaly/history?hours={n} - 이상감지 이력
 GET /api/ml/model/performance - ML 모델 성능 지표
+```
+
+### 최적화 API
+```
+GET /api/optimization/pg/recommendation?osdCount={n}&replicaSize={n}&poolType={type} - PG 수 추천
+GET /api/optimization/pg/distribution - PG 분포 분석
+POST /api/optimization/pg/rebalance-simulation - 리밸런싱 시뮬레이션
+GET /api/optimization/pg/status - PG 상태 상세
+GET /api/optimization/configuration/suggestions - 설정 최적화 제안
+```
+
+### 트러블슈팅 API
+```
+POST /api/troubleshooting/analyze-logs - 로그 분석 및 RCA
+GET /api/troubleshooting/alarms/classify?timeRange={range} - 알람 분류
+GET /api/troubleshooting/alarms/correlation?timeRange={range} - 알람 상관관계
+POST /api/troubleshooting/generate-guide - 대응 가이드 생성
+GET /api/troubleshooting/recent-logs?source={source}&severity={level} - 최근 로그 조회
+```
+
+### 리포트 API
+```
+POST /api/reports/generate - 리포트 생성
+GET /api/reports/templates - 템플릿 목록
+POST /api/reports/schedule - 스케줄 설정
+POST /api/reports/send-email - 이메일 발송
+GET /api/reports/history?days={n} - 리포트 히스토리
+GET /api/reports/download/{reportId} - 리포트 다운로드
+DELETE /api/reports/{reportId} - 리포트 삭제
+```
+
+### WebSocket Endpoints
+```
+ws://localhost:8080/ws - WebSocket 연결
+/topic/metrics - 메트릭 구독 (이상감지 점수 포함)
+/topic/alarms - 알람 구독 (RAG 조치제안 포함)
+/topic/predictions - 예측 업데이트 구독 (ML 알고리즘 정보 포함)
+/topic/rag-guidance - RAG 기반 조치 가이드 업데이트
+/queue/critical-alarms - 개인 큐 (중요 알람)
 ```
 
 ## Next.js 15 최적화 전략
