@@ -4,10 +4,11 @@ import { FC, RefObject, useEffect, useMemo, useRef, useState } from 'react';
 import { Canvas, useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 import Colors from '@/utils/color';
-import { Box, Cylinder, Environment, Icosahedron, OrbitControls, PerformanceMonitor, Plane, useTexture } from '@react-three/drei';
+import { Box, Cylinder, Environment, Icosahedron, OrbitControls, PerformanceMonitor, Plane, Sphere, useTexture } from '@react-three/drei';
 import RoundMirrorTextTable from '@/components/models/RoundMirrorTextTable';
 import { AppHeader } from '@/components/layout';
 import { mockTopologyData } from '@/public/data/topologyMockData';
+import { Physics, useBox, useSphere } from '@react-three/cannon';
 import { Bloom, BrightnessContrast, EffectComposer } from '@react-three/postprocessing';
 import { AdaptiveLayoutManager } from '@/utils/layouts';
 import Atmosphere from '@/components/models/Atmosphere';
@@ -16,7 +17,8 @@ import { loadTexture } from '@/utils/utils';
 import GhostTrails from '@/components/traffic/GhostTrails';
 import { gsap } from 'gsap';
 import ServerRackModel from '@/components/models/ServerRackModel';
-import InstancedSpheres from '@/components/traffic/InstancedSpheres';
+
+// ------ Server Racks (Door, Servers, HDD, VM Particles) ------
 
 // 간단한 VM 파티클: 반투명 아쿠아 큐브 위에서 사이버 색상의 점들이 공전
 const VMParticles = ({ count = 8, radius = 3.5, speed = 0.8, colors = [0x00e5ff, 0x7c3aed, 0x22d3ee] }) => {
@@ -1003,27 +1005,470 @@ const DataParticles = ({
                visible={false}
             />
          ))}
-         {/* Cyan: Drawer → Cylinder 꼬리(잔상) - Optimized settings */}
-         <GhostTrails
-            targetsRef={drawerParticleRefs}
-            color={Colors.cyan[300]}
-            maxPer={Math.floor(budget * 0.7)}
-            life={0.2}
-            spawnInterval={0.035}
-            sizeStart={6}
-            sizeEnd={0}
-         />
+         {/* Cyan: Drawer → Cylinder 꼬리(잔상) */}
+         <GhostTrails targetsRef={drawerParticleRefs} color={Colors.cyan[300]} maxPer={budget} life={0.2} spawnInterval={0.02} sizeStart={6} sizeEnd={0} />
 
-         {/* Orange: Cylinder → Host 꼬리(잔상) - Optimized settings */}
-         <GhostTrails
-            targetsRef={hostParticleRefs}
-            color={Colors.orange[300]}
-            maxPer={Math.floor(budget * 0.7)}
-            life={0.2}
-            spawnInterval={0.035}
-            sizeStart={6}
-            sizeEnd={0}
+         {/* Orange: Cylinder → Host 꼬리(잔상) */}
+         <GhostTrails targetsRef={hostParticleRefs} color={Colors.orange[300]} maxPer={budget} life={0.2} spawnInterval={0.02} sizeStart={6} sizeEnd={0} />
+      </group>
+   );
+};
+
+// Physics sphere component with central gravity and continuous energy
+const PhysicsSphere = ({
+   position,
+   color,
+   centerPosition,
+   opacity = 1,
+   scale = 1,
+}: {
+   position: [number, number, number];
+   color: string;
+   centerPosition: [number, number, number];
+   opacity?: number;
+   scale?: number;
+}) => {
+   const [ref, api] = useSphere(() => ({
+      mass: 1,
+      position,
+      material: { restitution: 0.7, friction: 0.02 }, // Reduced restitution to prevent too much bounce
+      args: [1.5], // radius
+      velocity: [(Math.random() - 0.5) * 4, (Math.random() - 0.5) * 3, (Math.random() - 0.5) * 4], // Reduced initial velocity
+   }));
+
+   const velocityRef = useRef([0, 0, 0]);
+   const frameCount = useRef(0);
+
+   // Reuse vectors to prevent GC spikes
+   const centerV = useMemo(() => new THREE.Vector3(...centerPosition), [centerPosition]);
+   const posV = useRef(new THREE.Vector3());
+   const dirV = useRef(new THREE.Vector3());
+   const perpV = useRef(new THREE.Vector3());
+   const chaosV = useRef(new THREE.Vector3());
+   const centralV = useRef(new THREE.Vector3());
+   const antiGravV = useRef(new THREE.Vector3());
+   const turbulenceV = useRef(new THREE.Vector3());
+   const totalForceV = useRef(new THREE.Vector3());
+   const impulseV = useRef(new THREE.Vector3());
+
+   // Subscribe to velocity once to avoid memory leaks
+   useEffect(() => {
+      const unsubscribe = api.velocity.subscribe(v => {
+         velocityRef.current = v;
+      });
+      return unsubscribe;
+   }, [api]);
+
+   // Apply continuous forces to keep spheres moving
+   useFrame(state => {
+      if (!ref.current) return;
+
+      const pos = ref.current.position;
+      posV.current.set(pos.x, pos.y, pos.z);
+      const time = state.clock.elapsedTime;
+
+      // Check velocity more frequently for more active movement
+      frameCount.current++;
+      if (frameCount.current % 15 === 0) {
+         // Reduced from 30 to 15
+         const velocity = velocityRef.current;
+         const speed = Math.sqrt(velocity[0] * velocity[0] + velocity[1] * velocity[1] + velocity[2] * velocity[2]);
+
+         // If speed is too low, add stronger energy boost
+         if (speed < 3) {
+            // Increased threshold from 2 to 3
+            impulseV.current.set((Math.random() - 0.5) * 5, (Math.random() - 0.5) * 4, (Math.random() - 0.5) * 5);
+            api.applyImpulse([impulseV.current.x, impulseV.current.y, impulseV.current.z], [0, 0, 0]);
+         }
+      }
+
+      // Calculate direction towards center using copy instead of clone
+      dirV.current.copy(centerV).sub(posV.current).normalize();
+      const distance = posV.current.distanceTo(centerV);
+
+      // Apply forces every frame for more active movement
+      // Apply orbital force (perpendicular to center direction) - reduced to prevent escape
+      perpV.current.set(-dirV.current.z, 0, dirV.current.x).multiplyScalar(1.2);
+
+      // Apply chaotic forces with moderation to prevent wall collision
+      chaosV.current.set(
+         Math.sin(time * 5 + pos.x) * 0.5 + Math.cos(time * 7) * 0.3,
+         Math.sin(time * 4 + pos.y) * 0.4 + Math.cos(time * 6) * 0.3,
+         Math.cos(time * 6 + pos.z) * 0.5 + Math.sin(time * 8) * 0.3,
+      );
+
+      // Strong central gravity to keep spheres contained
+      const gravityStrength = Math.max(0.3, Math.min(distance * 0.12, 1.5)); // Stronger pull toward center
+      centralV.current.copy(dirV.current).multiplyScalar(gravityStrength);
+
+      // Moderate upward force
+      antiGravV.current.set(0, 0.5 + Math.sin(time * 3) * 0.2, 0);
+
+      // Reduced turbulence for containment
+      turbulenceV.current.set(Math.sin(time * 4 + distance) * 0.3, Math.cos(time * 3.5 + distance) * 0.2, Math.sin(time * 5.5 + distance) * 0.3);
+
+      // Combine all forces using copy and add
+      totalForceV.current.copy(perpV.current).add(chaosV.current).add(centralV.current).add(antiGravV.current).add(turbulenceV.current);
+
+      api.applyForce([totalForceV.current.x, totalForceV.current.y, totalForceV.current.z], [0, 0, 0]);
+
+      // Occasional small random impulses for variety
+      if (Math.random() < 0.005) {
+         // Reduced frequency and strength
+         impulseV.current.set(
+            (Math.random() - 0.5) * 2, // Reduced strength
+            (Math.random() - 0.5) * 1.5, // Reduced strength
+            (Math.random() - 0.5) * 2, // Reduced strength
+         );
+         api.applyImpulse([impulseV.current.x, impulseV.current.y, impulseV.current.z], [0, 0, 0]);
+      }
+   });
+
+   return (
+      <Sphere ref={ref as any} args={[1.5]} castShadow scale={[scale, scale, scale]}>
+         <meshStandardMaterial
+            color={color}
+            emissive={color}
+            emissiveIntensity={0.2 * scale} // Dim as it shrinks
+            metalness={0.6}
+            roughness={0.4}
+            transparent={opacity < 1}
+            opacity={opacity}
          />
+      </Sphere>
+   );
+};
+
+// Physics cylinder boundary using individual box walls
+const CylinderBoundary = ({ position }: { position: [number, number, number] }) => {
+   const cylinderRadius = 20; // Even smaller radius for stronger containment
+   const cylinderHeight = 40; // Taller walls for better containment
+   const wallThickness = 12; // Extra thick walls to prevent escape
+
+   // Create 16 walls in a circle - each wall must be declared separately
+   const angle0 = (0 / 16) * Math.PI * 2;
+   useBox(() => ({
+      mass: 0,
+      position: [position[0] + Math.cos(angle0) * cylinderRadius, position[1], position[2] + Math.sin(angle0) * cylinderRadius],
+      args: [wallThickness, cylinderHeight, wallThickness * 2],
+      material: { restitution: 0.95, friction: 0.01 },
+      type: 'Static',
+      rotation: [0, angle0, 0],
+   }));
+
+   const angle1 = (1 / 16) * Math.PI * 2;
+   useBox(() => ({
+      mass: 0,
+      position: [position[0] + Math.cos(angle1) * cylinderRadius, position[1], position[2] + Math.sin(angle1) * cylinderRadius],
+      args: [wallThickness, cylinderHeight, wallThickness * 2],
+      material: { restitution: 0.95, friction: 0.01 },
+      type: 'Static',
+      rotation: [0, angle1, 0],
+   }));
+
+   const angle2 = (2 / 16) * Math.PI * 2;
+   useBox(() => ({
+      mass: 0,
+      position: [position[0] + Math.cos(angle2) * cylinderRadius, position[1], position[2] + Math.sin(angle2) * cylinderRadius],
+      args: [wallThickness, cylinderHeight, wallThickness * 2],
+      material: { restitution: 0.95, friction: 0.01 },
+      type: 'Static',
+      rotation: [0, angle2, 0],
+   }));
+
+   const angle3 = (3 / 16) * Math.PI * 2;
+   useBox(() => ({
+      mass: 0,
+      position: [position[0] + Math.cos(angle3) * cylinderRadius, position[1], position[2] + Math.sin(angle3) * cylinderRadius],
+      args: [wallThickness, cylinderHeight, wallThickness * 2],
+      material: { restitution: 0.95, friction: 0.01 },
+      type: 'Static',
+      rotation: [0, angle3, 0],
+   }));
+
+   const angle4 = (4 / 16) * Math.PI * 2;
+   useBox(() => ({
+      mass: 0,
+      position: [position[0] + Math.cos(angle4) * cylinderRadius, position[1], position[2] + Math.sin(angle4) * cylinderRadius],
+      args: [wallThickness, cylinderHeight, wallThickness * 2],
+      material: { restitution: 0.95, friction: 0.01 },
+      type: 'Static',
+      rotation: [0, angle4, 0],
+   }));
+
+   const angle5 = (5 / 16) * Math.PI * 2;
+   useBox(() => ({
+      mass: 0,
+      position: [position[0] + Math.cos(angle5) * cylinderRadius, position[1], position[2] + Math.sin(angle5) * cylinderRadius],
+      args: [wallThickness, cylinderHeight, wallThickness * 2],
+      material: { restitution: 0.95, friction: 0.01 },
+      type: 'Static',
+      rotation: [0, angle5, 0],
+   }));
+
+   const angle6 = (6 / 16) * Math.PI * 2;
+   useBox(() => ({
+      mass: 0,
+      position: [position[0] + Math.cos(angle6) * cylinderRadius, position[1], position[2] + Math.sin(angle6) * cylinderRadius],
+      args: [wallThickness, cylinderHeight, wallThickness * 2],
+      material: { restitution: 0.95, friction: 0.01 },
+      type: 'Static',
+      rotation: [0, angle6, 0],
+   }));
+
+   const angle7 = (7 / 16) * Math.PI * 2;
+   useBox(() => ({
+      mass: 0,
+      position: [position[0] + Math.cos(angle7) * cylinderRadius, position[1], position[2] + Math.sin(angle7) * cylinderRadius],
+      args: [wallThickness, cylinderHeight, wallThickness * 2],
+      material: { restitution: 0.95, friction: 0.01 },
+      type: 'Static',
+      rotation: [0, angle7, 0],
+   }));
+
+   const angle8 = (8 / 16) * Math.PI * 2;
+   useBox(() => ({
+      mass: 0,
+      position: [position[0] + Math.cos(angle8) * cylinderRadius, position[1], position[2] + Math.sin(angle8) * cylinderRadius],
+      args: [wallThickness, cylinderHeight, wallThickness * 2],
+      material: { restitution: 0.95, friction: 0.01 },
+      type: 'Static',
+      rotation: [0, angle8, 0],
+   }));
+
+   const angle9 = (9 / 16) * Math.PI * 2;
+   useBox(() => ({
+      mass: 0,
+      position: [position[0] + Math.cos(angle9) * cylinderRadius, position[1], position[2] + Math.sin(angle9) * cylinderRadius],
+      args: [wallThickness, cylinderHeight, wallThickness * 2],
+      material: { restitution: 0.95, friction: 0.01 },
+      type: 'Static',
+      rotation: [0, angle9, 0],
+   }));
+
+   const angle10 = (10 / 16) * Math.PI * 2;
+   useBox(() => ({
+      mass: 0,
+      position: [position[0] + Math.cos(angle10) * cylinderRadius, position[1], position[2] + Math.sin(angle10) * cylinderRadius],
+      args: [wallThickness, cylinderHeight, wallThickness * 2],
+      material: { restitution: 0.95, friction: 0.01 },
+      type: 'Static',
+      rotation: [0, angle10, 0],
+   }));
+
+   const angle11 = (11 / 16) * Math.PI * 2;
+   useBox(() => ({
+      mass: 0,
+      position: [position[0] + Math.cos(angle11) * cylinderRadius, position[1], position[2] + Math.sin(angle11) * cylinderRadius],
+      args: [wallThickness, cylinderHeight, wallThickness * 2],
+      material: { restitution: 0.95, friction: 0.01 },
+      type: 'Static',
+      rotation: [0, angle11, 0],
+   }));
+
+   const angle12 = (12 / 16) * Math.PI * 2;
+   useBox(() => ({
+      mass: 0,
+      position: [position[0] + Math.cos(angle12) * cylinderRadius, position[1], position[2] + Math.sin(angle12) * cylinderRadius],
+      args: [wallThickness, cylinderHeight, wallThickness * 2],
+      material: { restitution: 0.95, friction: 0.01 },
+      type: 'Static',
+      rotation: [0, angle12, 0],
+   }));
+
+   const angle13 = (13 / 16) * Math.PI * 2;
+   useBox(() => ({
+      mass: 0,
+      position: [position[0] + Math.cos(angle13) * cylinderRadius, position[1], position[2] + Math.sin(angle13) * cylinderRadius],
+      args: [wallThickness, cylinderHeight, wallThickness * 2],
+      material: { restitution: 0.95, friction: 0.01 },
+      type: 'Static',
+      rotation: [0, angle13, 0],
+   }));
+
+   const angle14 = (14 / 16) * Math.PI * 2;
+   useBox(() => ({
+      mass: 0,
+      position: [position[0] + Math.cos(angle14) * cylinderRadius, position[1], position[2] + Math.sin(angle14) * cylinderRadius],
+      args: [wallThickness, cylinderHeight, wallThickness * 2],
+      material: { restitution: 0.95, friction: 0.01 },
+      type: 'Static',
+      rotation: [0, angle14, 0],
+   }));
+
+   const angle15 = (15 / 16) * Math.PI * 2;
+   useBox(() => ({
+      mass: 0,
+      position: [position[0] + Math.cos(angle15) * cylinderRadius, position[1], position[2] + Math.sin(angle15) * cylinderRadius],
+      args: [wallThickness, cylinderHeight, wallThickness * 2],
+      material: { restitution: 0.95, friction: 0.01 },
+      type: 'Static',
+      rotation: [0, angle15, 0],
+   }));
+
+   // Bottom floor (raised by 2 units)
+   useBox(() => ({
+      mass: 0,
+      position: [position[0], position[1] - cylinderHeight / 2 - 1 - 3 + 2, position[2]], // -3 + 2 = -1
+      args: [cylinderRadius * 2, 2, cylinderRadius * 2],
+      material: { restitution: 0.95, friction: 0.01 },
+      type: 'Static',
+   }));
+
+   // Top ceiling (lowered by 10 units total: previously -5, now -10)
+   useBox(() => ({
+      mass: 0,
+      position: [position[0], position[1] + cylinderHeight / 2 + 1 - 10, position[2]], // -5 → -10 (additional 5 units lower)
+      args: [cylinderRadius * 2, 2, cylinderRadius * 2],
+      material: { restitution: 0.95, friction: 0.01 },
+      type: 'Static',
+   }));
+
+   return null;
+};
+
+// Shrinking sphere component
+const ShrinkingSphere = ({
+   id,
+   position,
+   color,
+   centerPosition,
+   fadeOut,
+   onFadeComplete,
+}: {
+   id: string;
+   position: [number, number, number];
+   color: string;
+   centerPosition: [number, number, number];
+   fadeOut: boolean;
+   onFadeComplete: (id: string) => void;
+}) => {
+   const [scale, setScale] = useState(1);
+   const fadeStartTime = useRef<number | null>(null);
+
+   useFrame(state => {
+      if (fadeOut && scale > 0) {
+         if (!fadeStartTime.current) {
+            fadeStartTime.current = state.clock.getElapsedTime();
+         }
+         const elapsed = state.clock.getElapsedTime() - fadeStartTime.current;
+         const newScale = Math.max(0, 1 - elapsed / 2); // 2 seconds to shrink
+         setScale(newScale);
+
+         if (newScale <= 0.05) {
+            // Remove when very small
+            onFadeComplete(id);
+         }
+      }
+   });
+
+   return <PhysicsSphere position={position} color={color} centerPosition={centerPosition} opacity={1} scale={scale} />;
+};
+
+// Physics spheres container with dynamic count
+const PhysicsSpheresContainer = ({
+   centerPosition,
+   writeOps = { drawer: 100, host: 50 },
+}: {
+   centerPosition: [number, number, number];
+   writeOps?: { drawer: number; host: number };
+}) => {
+   const [spheres, setSpheres] = useState<
+      Array<{
+         id: string;
+         position: [number, number, number];
+         fadeOut: boolean;
+      }>
+   >([]);
+   const [currentCount, setCurrentCount] = useState(5); // Gradual stepping state
+   const THRESHOLD = 200; // Threshold for color change
+
+   // Calculate sphere count and color based on combined write ops
+   const totalOps = writeOps.drawer + writeOps.host;
+   const targetCount = Math.min(40, Math.max(5, Math.floor(totalOps / 10)));
+   const sphereColor = totalOps >= THRESHOLD ? Colors.red[500] : Colors.blue[500];
+
+   // Gradual step transition (Perf-2.md B)
+   useEffect(() => {
+      let raf: number | null = null;
+      let last = performance.now();
+
+      const step = (now: number) => {
+         if (now - last >= 70) {
+            // 70ms intervals for smooth transition
+            setCurrentCount(n => {
+               const diff = Math.sign(targetCount - n);
+               return diff === 0 ? n : n + diff;
+            });
+            last = now;
+         }
+         if (currentCount !== targetCount) {
+            raf = requestAnimationFrame(step);
+         }
+      };
+
+      if (currentCount !== targetCount) {
+         raf = requestAnimationFrame(step);
+      }
+
+      return () => {
+         if (raf) cancelAnimationFrame(raf);
+      };
+   }, [targetCount, currentCount]);
+
+   // Update spheres when count changes - DIFFERENTIAL approach (Perf-2.md A)
+   useEffect(() => {
+      setSpheres(prev => {
+         const active = prev.filter(s => !s.fadeOut);
+         const fading = prev.filter(s => s.fadeOut);
+
+         const diff = currentCount - active.length;
+
+         if (diff > 0) {
+            // Add only the needed amount
+            const adds = Array.from({ length: diff }, (_, i) => {
+               const angle = Math.random() * Math.PI * 2;
+               const radius = Math.random() * 15;
+               const height = (Math.random() - 0.5) * 15;
+               return {
+                  id: `sphere-${Date.now()}-${i}`,
+                  position: [centerPosition[0] + Math.cos(angle) * radius, centerPosition[1] + height, centerPosition[2] + Math.sin(angle) * radius] as [
+                     number,
+                     number,
+                     number,
+                  ],
+                  fadeOut: false,
+               };
+            });
+            return [...fading, ...active, ...adds];
+         } else if (diff < 0) {
+            // Fade out only the excess amount
+            const toFade = active.slice(0, -diff).map(s => ({ ...s, fadeOut: true }));
+            const keepActive = active.slice(-diff);
+            return [...fading, ...toFade, ...keepActive];
+         }
+         return prev; // No change needed
+      });
+   }, [currentCount, centerPosition]);
+
+   const handleFadeComplete = (id: string) => {
+      setSpheres(prev => prev.filter(s => s.id !== id));
+   };
+
+   return (
+      <group>
+         <CylinderBoundary position={centerPosition} />
+         {spheres.map(sphere => (
+            <ShrinkingSphere
+               key={sphere.id}
+               id={sphere.id}
+               position={sphere.position}
+               color={sphereColor}
+               centerPosition={centerPosition}
+               fadeOut={sphere.fadeOut}
+               onFadeComplete={handleFadeComplete}
+            />
+         ))}
       </group>
    );
 };
@@ -1034,18 +1479,12 @@ const Table = ({
    outerRadius,
    trailBudget,
    writeOps,
-   cyl_h,
-   cyl_p,
-   cyl_r,
 }: {
    position: [number, number, number];
    innerRadius: number;
    outerRadius: number;
    trailBudget: number;
    writeOps: { drawer: number; host: number };
-   cyl_h: number;
-   cyl_r: number;
-   cyl_p: [number, number, number];
 }) => {
    // Calculate positions and rotations for drawers - similar to server cases layout
    const drawerWidth = 25; // This becomes the depth when rotated
@@ -1273,20 +1712,20 @@ const Table = ({
                );
             })}
 
-         {/* High-performance instanced spheres - replaces physics system */}
-         <InstancedSpheres
-            center={[cyl_p[0], cyl_p[1] - 8, cyl_p[2]]}
-            radius={cyl_r - 1.5} // 30(실린더 반경)보다 약간 작게
-            halfHeight={cyl_h / 2 - 4} // 35~40 높이에 맞춰 여유
-            maxCap={160}
-            targetCount={Math.min(40, Math.max(5, Math.floor((writeOps.drawer + writeOps.host) / 10)))}
-            sphereRadius={1.5}
-            color={writeOps.drawer + writeOps.host >= 200 ? '#ef4444' : '#3b82f6'}
-            stiffness={0.06} // ↓ 중심 흡인 약화
-            swirl={0.45} // ↓ 동일 궤도화 약화
-            noise={1.1} // ↑ 난류 증가로 경로 분산
-            drag={0.995} // ↑ 관성 유지로 활기 강화
-         />
+         {/* Physics spheres inside cylinder */}
+         <Physics
+            gravity={[0, 0, 0]}
+            broadphase="SAP"
+            allowSleep
+            iterations={10}
+            defaultContactMaterial={{
+               friction: 0.03,
+               restitution: 0.1,
+               contactEquationRelaxation: 4,
+            }}
+         >
+            <PhysicsSpheresContainer centerPosition={[0, 10, 0]} writeOps={writeOps} />
+         </Physics>
 
          {/* Flying data particles */}
          <DataParticles budget={trailBudget} drawerPositions={drawerPositions} hostPositions={hostPositions} cylinderPosition={cylinderPosition} />
@@ -1346,7 +1785,7 @@ const WorldTrafficView: FC<Props> = () => {
    const [fxOn, setFxOn] = useState(true);
    const [trailBudget, setTrailBudget] = useState(12);
    const [writeOps, setWriteOps] = useState({ drawer: 100, host: 50 });
-   const [cyl_position, cyl_rarius, cyl_height] = useMemo<[[number, number, number], number, number]>(() => [[0, 15, 0], 30, 35], []);
+
    // Update write ops every 30 seconds
    useEffect(() => {
       const interval = setInterval(() => {
@@ -1384,7 +1823,7 @@ const WorldTrafficView: FC<Props> = () => {
                   }}
                />
                <OrbitControls enableDamping dampingFactor={0.05} enablePan autoRotate autoRotateSpeed={-0.1} />
-               <Environment files="/3d/background/darkcenter.jpg" background backgroundBlurriness={0.05} backgroundIntensity={!fxOn ? 3 : 0.5} />
+               <Environment files="/3d/background/darkcenter.jpg" background backgroundBlurriness={0.05} backgroundIntensity={0.5} />
                {fxOn && (
                   <EffectComposer>
                      <Bloom mipmapBlur={false} luminanceThreshold={0.5} intensity={0.7} radius={0.3} />
@@ -1397,7 +1836,6 @@ const WorldTrafficView: FC<Props> = () => {
 
                {/* Main directional light */}
                <directionalLight
-                  // intensity={!fxOn ? 3.5 : 3}
                   args={['#ffffff', 3]}
                   position={[150, 150, 150]}
                   castShadow
@@ -1416,19 +1854,10 @@ const WorldTrafficView: FC<Props> = () => {
                <pointLight args={[Colors.teal[300], 1, 80]} position={[100, 30, 100]} />*/}
 
                {/* Main table and components */}
-               <Table
-                  cyl_p={cyl_position}
-                  cyl_r={cyl_rarius}
-                  cyl_h={cyl_height}
-                  position={[0, 10, 0]}
-                  innerRadius={100}
-                  outerRadius={130}
-                  trailBudget={trailBudget}
-                  writeOps={writeOps}
-               />
+               <Table position={[0, 10, 0]} innerRadius={100} outerRadius={130} trailBudget={trailBudget} writeOps={writeOps} />
 
                {/* Central cylinder */}
-               <Cylinder args={[cyl_rarius, cyl_rarius, cyl_height, 32]} position={cyl_position}>
+               <Cylinder args={[30, 30, 35, 32]} position={[0, 15, 0]}>
                   <meshPhysicalMaterial
                      color={Colors.neutral[200]}
                      metalness={0.8}
