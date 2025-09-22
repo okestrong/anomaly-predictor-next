@@ -3528,7 +3528,7 @@ export default function ClusterTopologyView() {
 
             if (mesh && mesh.material) {
                const material = mesh.material as THREE.MeshPhongMaterial;
-               const ing = (document.querySelector('.search-panel') as HTMLElement).getAttribute('ing') === '1';
+               const ing = (document.querySelector('.search-panel') as HTMLElement)?.getAttribute('ing') === '1';
                // Subtle rotation animation for all OSDs
                mesh.rotation.x += delta * 0.1;
                mesh.rotation.y += delta * 0.15;

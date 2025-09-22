@@ -15,7 +15,8 @@
       "Bash(curl:*)",
       "Bash(open:*)",
       "Bash(pnpm dev:*)",
-      "Bash(pnpm build:*)"
+      "Bash(pnpm build:*)",
+      "Bash(git restore:*)"
     ],
     "deny": [],
     "ask": []

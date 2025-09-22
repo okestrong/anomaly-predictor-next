@@ -403,7 +403,7 @@ export default function AppHeader() {
   }, [updateTime, handleClickOutside])
 
   return (
-    <header className="ai-header sticky top-0 z-40 w-full">
+    <header className="ai-header sticky top-0 z-[9998] w-full">
       <div className="w-full px-6 relative">
         <div className="flex items-center justify-between h-16">
           {/* Left: Logo and title */}
@@ -459,7 +459,7 @@ export default function AppHeader() {
                 >
                   <button
                     className={cn(
-                      'flex items-center space-x-2 px-4 py-2 text-sm font-medium text-secondary-300 hover:text-white transition-all duration-200 rounded-lg hover:bg-secondary-700/50',
+                      'flex items-center space-x-2 px-4 py-2 text-sm font-medium text-secondary-300 hover:text-white transition-all duration-200 rounded-lg hover:bg-secondary-700/50 cursor-pointer',
                       {
                         'text-ai-circuit bg-secondary-700/50': activeMenu === menu.id,
                         'text-white': isActiveRoute(menu.route),
@@ -488,7 +488,7 @@ export default function AppHeader() {
                         animate={{ opacity: 1, scale: 1, y: 0 }}
                         exit={{ opacity: 0, scale: 0.95, y: -10 }}
                         transition={{ duration: 0.2 }}
-                        className="absolute top-full left-0 mt-1 w-80 bg-secondary-900/95 backdrop-blur-lg border border-secondary-700 rounded-lg shadow-xl py-2 z-50"
+                        className="absolute top-full left-0 mt-1 w-80 bg-secondary-900/95 backdrop-blur-lg border border-secondary-700 rounded-lg shadow-xl py-2 z-[9999]"
                       >
                         <div className="grid grid-cols-1 gap-1">
                           {menu.submenu.map((submenu) => (
@@ -591,7 +591,7 @@ export default function AppHeader() {
                     animate={{ opacity: 1, scale: 1 }}
                     exit={{ opacity: 0, scale: 0.95 }}
                     transition={{ duration: 0.15 }}
-                    className="absolute right-0 mt-2 w-48 bg-secondary-800 rounded-lg shadow-lg border border-secondary-700 py-2 z-50"
+                    className="absolute right-0 mt-2 w-48 bg-secondary-800 rounded-lg shadow-lg border border-secondary-700 py-2 z-[9999]"
                   >
                     <div className="px-4 py-2 border-b border-secondary-700">
                       <p className="text-sm font-medium text-white">Admin User</p>
