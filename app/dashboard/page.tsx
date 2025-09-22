@@ -3,7 +3,7 @@
 import React, { useRef, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { Card, Button } from '@/components/common';
-import { AppHeader, MegaMenu } from '@/components/layout';
+import { AppHeader } from '@/components/layout';
 import {
    LatencyChart,
    PoolUsageChart,
@@ -79,8 +79,6 @@ export default function DashboardPage() {
       <div className="min-h-screen relative">
          {/* Header */}
          <AppHeader />
-         {/* MegaMenu */}
-         {/*<MegaMenu />*/}
 
          {/* 배경 비디오 */}
          <div className="fixed inset-0 w-full h-full overflow-hidden z-0">

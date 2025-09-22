@@ -12,7 +12,7 @@
 - **3D 시각화**: React Three Fiber + @react-three/drei
 
 ### 마이그레이션 베이스
-Vue 3 원본 프로젝트의 완성된 기능들:
+Vue 3 원본 프로젝트(/Users/jclee/Documents/Okestro/Projects/DevSw/anomaly-predictor-view)의 완성된 기능들:
 - ✅ 4141라인의 3D 토폴로지 시각화 (ClusterTopologyVisualization.vue)
 - ✅ 8개 ECharts 실시간 차트 컴포넌트
 - ✅ 우주선 대시보드 UI (4개 패널)
@@ -1368,9 +1368,12 @@ anomaly-predictor-next/
 │   ├── globals.css             # Tailwind + 커스텀 스타일
 │   ├── favicon.ico             # 파비콘
 │   ├── dashboard/page.tsx      # 대시보드 페이지
-│   ├── prediction/page.tsx     # 장애 예측 페이지
+│   ├── prediction/page.tsx     # ✅ AI 장애 예측 페이지 (사이버펑크 UI)
+│   ├── anomaly/page.tsx        # ✅ ML 이상감지 페이지 (Matrix Rain)
+│   ├── control-center/page.tsx # ✅ AI Command Center (홀로그래픽)
+│   ├── command/page.tsx        # ✅ Cyberpunk Command Interface
 │   ├── topology/page.tsx       # 3D 토폴로지 페이지
-│   ├── anomaly/page.tsx        # ML 이상감지 페이지
+│   ├── traffic/page.tsx        # ✅ 트래픽 시각화 페이지
 │   ├── alerts/page.tsx         # 알림 센터 페이지
 │   ├── health/page.tsx         # 헬스 체크 페이지
 │   ├── monitoring/page.tsx     # 모니터링 페이지
@@ -1408,6 +1411,9 @@ anomaly-predictor-next/
 │   ├── particles/
 │   │   ├── SimpleBrainParticles.tsx
 │   │   └── index.ts
+│   ├── ui/                     # ✅ 새로운 고급 UI 컴포넌트
+│   │   ├── HolographicDataGrid.tsx  # ✅ 홀로그래픽 데이터 그리드
+│   │   └── NeuralNetworkConnections.tsx # ✅ 신경망 연결 시각화
 │   └── common/
 │       ├── Button.tsx
 │       ├── Card.tsx
@@ -1416,7 +1422,11 @@ anomaly-predictor-next/
 │       ├── ErrorMessage.tsx
 │       ├── LoadingSpinner.tsx
 │       └── index.ts
-├── stores/
+├── stores/                     # ✅ Zustand 스토어 시스템 완성
+│   ├── realtimeData.ts         # ✅ 실시간 데이터 스토어 (8개 메트릭)
+│   ├── cluster.ts              # ✅ 클러스터 상태 스토어
+│   ├── anomaly.ts              # ✅ 이상감지 AI 스토어
+│   ├── prediction.ts           # ✅ 예측 모델 스토어 (12개 카테고리)
 │   └── index.ts                # Zustand 스토어들
 ├── hooks/
 │   └── index.ts                # 커스텀 훅들
@@ -1472,6 +1482,13 @@ anomaly-predictor-next/
 
 ## 개발 규칙 (Development Rules)
 
+### 핵심 원칙 (필수 준수 사항)
+1. **서버 컴포넌트 우선**: 'use client'는 필수불가결한 경우에만 사용
+2. **하이드레이션 에러 방지**: `Math.random()`, `Date.now()` 등은 클라이언트에서만 실행
+3. **캐시 전략 수립**: 데이터 특성에 맞는 적절한 캐시 설정
+4. **타입 안전성**: TypeScript 엄격 모드 및 완전한 타입 정의
+5. **성능 최적화**: 동적 import, 코드 분할, 선택적 구독 활용
+
 ### 1. Next.js 15 최적화 규칙
 
 #### 1.1 서버/클라이언트 컴포넌트 구분
@@ -1492,7 +1509,7 @@ export function InteractiveChart() {
 
 #### 1.2 Suspense와 스트리밍 활용
 ```tsx
-// 로딩 경계 설정
+// 로딩 경계 설정 - 컴포넌트별 개별 스트리밍
 export default function Layout({ children }) {
   return (
     <div>
@@ -1504,6 +1521,103 @@ export default function Layout({ children }) {
       </Suspense>
     </div>
   )
+}
+
+// 검색 결과 스트리밍 예시
+async function SearchResult({ q }: { q: string }) {
+  const res = await fetch(`/api/search?q=${q}`, {
+    cache: 'force-cache',
+  });
+
+  if (!res.ok) {
+    return <div>문제가 발생했습니다...</div>;
+  }
+
+  const results = await res.json();
+  return <div>{/* 검색 결과 렌더링 */}</div>;
+}
+
+export default async function Page({ searchParams }: {
+  searchParams: Promise<{ q?: string }>
+}) {
+  const { q } = await searchParams;
+
+  return (
+    <Suspense fallback={<SearchLoading />} key={q ?? ''}>
+      <SearchResult q={q ?? ''} />
+    </Suspense>
+  );
+}
+```
+
+#### 1.3 Server/Client Component 패턴
+```tsx
+// ❌ 나쁜 예: Client Component에서 Server Component 직접 import
+'use client';
+import ServerComponent from './ServerComponent';
+
+export default function ClientComponent() {
+  return (
+    <div>
+      <ServerComponent /> {/* 이렇게 하면 안됨 */}
+    </div>
+  );
+}
+
+// ✅ 좋은 예: children props 활용
+'use client';
+import { ReactNode } from 'react';
+
+interface Props {
+  children: ReactNode; // Server Component가 될 수 있음
+}
+
+export default function ClientComponent({ children }: Props) {
+  const [state, setState] = useState();
+
+  return (
+    <div>
+      {children} {/* Server Component를 children으로 전달 */}
+    </div>
+  );
+}
+
+// 사용하는 곳 (Server Component)
+export default function Page() {
+  return (
+    <ClientComponent>
+      <ServerComponent /> {/* Server Component로 유지됨 */}
+    </ClientComponent>
+  );
+}
+```
+
+#### 1.4 URL 파라미터 처리 최적화
+```tsx
+// ❌ 나쁜 예: useParams/useSearchParams 남용
+'use client';
+import { useParams, useSearchParams } from 'next/navigation';
+
+export default function Page() {
+  const params = useParams();
+  const searchParams = useSearchParams();
+  // Client Component가 되어버림
+}
+
+// ✅ 좋은 예: Server Component에서 직접 받기
+export default async function Page({
+  params,
+  searchParams
+}: {
+  params: Promise<{ id: string }>;
+  searchParams: Promise<{ q?: string }>;
+}) {
+  const { id } = await params;
+  const { q } = await searchParams;
+
+  // Server Component로 유지되어 SSR 최적화
+  const data = await fetch(`/api/data/${id}?q=${q}`);
+  return <div>{/* 렌더링 */}</div>;
 }
 ```
 
@@ -1518,11 +1632,62 @@ const HeavyChart = dynamic(() => import('@/components/HeavyChart'), {
 })
 ```
 
-#### 2.2 Zustand 선택적 구독
+#### 2.2 캐시 전략 활용
+```tsx
+// ✅ 목록 데이터: force-cache + revalidate
+const response = await fetch('/api/clusters', {
+  cache: 'force-cache',
+  next: { revalidate: 30 } // 30초마다 재검증
+});
+
+// ✅ 실시간 데이터: no-store
+const realtimeData = await fetch('/api/realtime-metrics', {
+  cache: 'no-store' // 항상 최신 데이터
+});
+
+// ✅ 정적 데이터: force-cache (무기한)
+const staticConfig = await fetch('/api/config', {
+  cache: 'force-cache' // 빌드 시점에 캐시되어 계속 사용
+});
+```
+
+#### 2.3 정적 생성 최적화 (generateStaticParams)
+```tsx
+// 동적 라우트의 사전 생성으로 성능 향상
+export const generateStaticParams = async () => {
+  // 자주 접근되는 클러스터 ID들을 미리 생성
+  const clusters = await fetch('/api/clusters').then(r => r.json());
+
+  return clusters.map((cluster: any) => ({
+    id: cluster.id.toString() // 반드시 string
+  }));
+};
+
+export default async function ClusterPage({
+  params
+}: {
+  params: Promise<{ id: string }>
+}) {
+  const { id } = await params;
+
+  // 미리 생성된 페이지는 즉시 로드됨
+  const clusterData = await fetch(`/api/clusters/${id}`, {
+    cache: 'force-cache'
+  });
+
+  return <ClusterDashboard data={clusterData} />;
+}
+```
+
+#### 2.4 Zustand 선택적 구독
 ```tsx
 // 특정 데이터만 구독 (리렌더링 최소화)
 const poolData = useRealtimeStore(state => state.chartMetrics.poolUsage)
 const isActive = useRealtimeStore(state => state.isActive)
+
+// 계산된 값 구독 (성능 최적화)
+const healthyOSDCount = useClusterStore(state => state.getHealthyOSDCount())
+const totalCapacity = useClusterStore(state => state.getTotalCapacity())
 ```
 
 ### 3. 타입 안전성 규칙
@@ -1625,29 +1790,59 @@ export interface ClusterStatus {
   - [x] VM/Container 파티클 애니메이션
   - [x] 더블클릭 헤더 토글 기능
 
-### Phase 4: 상태 관리 및 서비스 구조 (Week 8-9)
+### Phase 4: 상태 관리 및 서비스 구조 (Week 8-9) - 완료
 - [x] Zustand 스토어 구조 설계 (기본 UIStore 구현)
-- [ ] 실시간 데이터 스토어 구현
-- [ ] 클러스터 상태 스토어 구현
-- [ ] WebSocket 실시간 통신 시스템
-- [ ] 데이터 플로우 최적화
-- [ ] API 서비스 레이어 구현
-- [ ] 에러 처리 및 fallback 시스템
-- [ ] 실시간 데이터 업데이트 테스트
+- [x] 실시간 데이터 스토어 구현 (realtimeData.ts)
+- [x] 클러스터 상태 스토어 구현 (cluster.ts)
+- [x] 이상감지 스토어 구현 (anomaly.ts)
+- [x] 예측 모델 스토어 구현 (prediction.ts)
+- [x] 데이터 플로우 최적화 (선택적 구독, immer 미들웨어)
+- [x] API 서비스 레이어 구현 (스토어 통합)
+- [x] 에러 처리 및 fallback 시스템
+- [x] 실시간 데이터 업데이트 테스트 (auto-generation)
 
-### Phase 5: AI/ML 기능 구현 (Week 10-12)
-- [ ] 장애 예측 UI 구현
-  - [ ] PredictionGrid.tsx
-  - [ ] PredictionCard.tsx
-  - [ ] PredictionModal.tsx
-  - [ ] RiskDashboard.tsx
-- [ ] ML 이상감지 대시보드
-  - [ ] AnomalyScoreGauge.tsx
-  - [ ] AnomalyHeatmap.tsx
-  - [ ] AnomalyAlert.tsx
-  - [ ] ModelPerformanceMetrics.tsx
-- [ ] ML API 서비스 연동
-- [ ] 12개 예측 카테고리 구현
+### Phase 5: AI/ML 기능 구현 (Week 10-12) - 완료
+- [x] 장애 예측 UI 구현
+  - [x] AI Failure Prediction 페이지 (/prediction)
+  - [x] PredictionCard 컴포넌트 (홀로그래픽 효과)
+  - [x] 신경망 백그라운드 애니메이션
+  - [x] 위험도 측정기 (SVG 기반)
+- [x] ML 이상감지 대시보드
+  - [x] ML Anomaly Detection 페이지 (/anomaly)
+  - [x] AnomalyScoreGauge (실시간 이상 점수)
+  - [x] AnomalyHeatmap (Matrix Rain 효과)
+  - [x] AI Brain 시각화 컴포넌트
+  - [x] ModelPerformanceMetrics 표시
+- [x] AI Command Center 구현 (/control-center)
+- [x] Cyberpunk Command Interface (/command)
+- [x] HolographicDataGrid 컴포넌트
+- [x] NeuralNetworkConnections 시각화
+- [x] ML API 서비스 연동 (스토어 통합)
+- [x] 12개 예측 카테고리 구현 (stores/prediction.ts)
+
+### Phase 5.5: 고급 AI 인터페이스 및 사이버펑크 UI (완료)
+- [x] 사이버펑크 테마 디자인 시스템 구축
+  - [x] 홀로그래픽 카드 효과 (HolographicCard)
+  - [x] 매트릭스 레인 배경 애니메이션
+  - [x] 신경망 연결 시각화 (NeuralNetworkConnections)
+  - [x] AI 브레인 애니메이션 컴포넌트
+  - [x] 네온 글로우 효과 및 그라데이션
+- [x] 실시간 데이터 그리드 시스템
+  - [x] HolographicDataGrid 컴포넌트
+  - [x] 파티클 필드 백그라운드
+  - [x] 상태 기반 색상 코딩
+  - [x] 실시간 메트릭 업데이트
+  - [x] 인터랙티브 데이터 셀
+- [x] AI 명령 인터페이스 시스템
+  - [x] 터미널 스타일 명령 실행
+  - [x] 자연어 명령어 처리
+  - [x] AI 상태 표시기
+  - [x] 실시간 명령 피드백
+  - [x] 사이버그리드 배경 효과
+- [x] 네비게이션 메뉴 업데이트
+  - [x] AI Command Center 메뉴 항목 추가
+  - [x] Command Interface 서브메뉴 추가
+  - [x] CommandLineIcon 아이콘 통합
 
 ### Phase 4.5: 트래픽 시각화 페이지 (완료)
 - [x] WorldTrafficView 컴포넌트 구현
@@ -1720,15 +1915,32 @@ export interface ClusterStatus {
 
 ### 페이지 개발 체크리스트
 - [ ] App Router 파일 구조 (page.tsx, layout.tsx)
-- [ ] 서버/클라이언트 컴포넌트 구분
-- [ ] Zustand 스토어 연결
-- [ ] API 서비스 구현
-- [ ] WebSocket 구독 설정
+- [ ] 서버/클라이언트 컴포넌트 구분 (최대한 서버 컴포넌트 활용)
+- [ ] useParams/useSearchParams 사용 자제 (서버 컴포넌트에서 직접 받기)
+- [ ] generateStaticParams 구현 (동적 라우트 정적 생성)
+- [ ] 캐시 전략 설정 (force-cache, revalidate, no-store)
+- [ ] Suspense 경계 설정 (컴포넌트별 스트리밍)
+- [ ] Zustand 스토어 연결 (선택적 구독)
+- [ ] API 서비스 구현 (fetch 기반)
+- [ ] WebSocket 구독 설정 (클라이언트 전용)
 - [ ] 에러 바운더리 설정
 - [ ] 로딩 스켈레톤 구현
-- [ ] 메타데이터 설정 (title, description)
-- [ ] 성능 최적화 (코드 분할, 지연 로딩)
+- [ ] 메타데이터 설정 (title, description, OG tags)
+- [ ] 성능 최적화 (코드 분할, 지연 로딩, 동적 import)
+- [ ] 하이드레이션 에러 방지 (Math.random(), Date.now() 등 클라이언트 분리)
 - [ ] E2E 테스트 작성
+
+### Next.js 15 최적화 체크리스트
+- [ ] 서버 컴포넌트 우선 원칙 준수 ('use client' 최소화)
+- [ ] Server/Client Component 패턴 (children props 활용)
+- [ ] 캐시 전략 적절히 설정 (목록: force-cache+revalidate, 실시간: no-store)
+- [ ] generateStaticParams로 동적 라우트 사전 생성
+- [ ] Suspense 경계 설정으로 스트리밍 최적화
+- [ ] useParams/useSearchParams 남용 방지 (서버에서 직접 받기)
+- [ ] 동적 import로 heavy 컴포넌트 지연 로딩
+- [ ] 하이드레이션 불일치 방지 (isClient 패턴 활용)
+- [ ] 메타데이터 API 활용 (SEO 최적화)
+- [ ] ISR(Incremental Static Regeneration) 적절히 활용
 
 ### ECharts SSR 최적화 체크리스트
 - [ ] 서버 컴포넌트용 SVG 렌더링
@@ -1811,5 +2023,53 @@ export interface ClusterStatus {
 - [ ] Next.js 15 최신 기능 활용
 - [ ] 테스트 커버리지 80%+
 - [ ] 문서화 완성도
+
+## 🎯 Phase 4-5 완성 성과 요약
+
+### ✅ 완료된 주요 기능들
+
+1. **상태 관리 시스템 (Phase 4)**
+   - 4개의 핵심 Zustand 스토어 구현
+   - 실시간 데이터 업데이트 시스템
+   - 선택적 구독 최적화
+   - Immer 미들웨어로 불변성 보장
+
+2. **AI/ML 인터페이스 (Phase 5)**
+   - 사이버펑크 테마 AI 예측 대시보드
+   - Matrix Rain 이상감지 인터페이스
+   - 홀로그래픽 데이터 그리드
+   - 신경망 연결 시각화
+
+3. **고급 사이버펑크 UI (Phase 5.5)**
+   - AI Command Center (통합 대시보드)
+   - Cyberpunk Command Interface (터미널)
+   - 실시간 파티클 시스템
+   - 네온 글로우 효과 및 애니메이션
+
+### 🔧 기술적 혁신 사항
+
+- **홀로그래픽 카드 시스템**: 동적 shimmer 효과와 상태 기반 색상
+- **신경망 시각화**: Canvas 기반 실시간 연결 애니메이션
+- **AI 브레인 컴포넌트**: 펄싱 뉴럴 노드와 회전 링 효과
+- **매트릭스 레인**: 일본어 문자 기반 배경 애니메이션
+- **터미널 인터페이스**: 자연어 명령어 처리 시스템
+
+### 📊 구현된 페이지 및 컴포넌트
+
+```
+✅ /control-center     - AI Command Center (통합 대시보드)
+✅ /prediction         - AI Failure Prediction (사이버펑크 UI)
+✅ /anomaly           - ML Anomaly Detection (Matrix Rain)
+✅ /command           - Cyberpunk Command Interface
+✅ HolographicDataGrid - 실시간 메트릭 그리드
+✅ NeuralNetworkConnections - AI 시스템 시각화
+```
+
+### 🎨 사이버펑크 디자인 시스템
+
+- **색상 팔레트**: Cyan/Purple/Amber 기반 네온 효과
+- **애니메이션**: Framer Motion + Canvas 조합
+- **타이포그래피**: 그라데이션 텍스트 및 글로우 효과
+- **인터랙션**: 홀로그래픽 호버 및 클릭 피드백
 
 이 문서는 Vue 3에서 완성된 기능들을 Next.js 15에서 더욱 최적화하여 구현하기 위한 완전한 가이드입니다.

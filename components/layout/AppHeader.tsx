@@ -76,6 +76,12 @@ export default function AppHeader() {
   // Menu configuration
   const mainMenus: MenuItem[] = [
     {
+      id: 'command-center',
+      name: '🚀 Command Center',
+      icon: CpuChipIcon,
+      route: '/command-center',
+    },
+    {
       id: 'monitoring',
       name: 'Monitoring',
       icon: ChartBarIcon,
@@ -109,6 +115,13 @@ export default function AppHeader() {
           icon: MapIcon,
           route: '/topology',
         },
+        {
+          id: 'traffic',
+          name: 'Cluster Traffic',
+          description: 'Real-time data flow visualization',
+          icon: WifiIcon,
+          route: '/traffic',
+        },
       ],
     },
     {
@@ -130,6 +143,13 @@ export default function AppHeader() {
           description: 'Failure prediction and forecasting',
           icon: SparklesIcon,
           route: '/prediction',
+        },
+        {
+          id: 'command',
+          name: 'Command Interface',
+          description: 'Cyberpunk AI command terminal',
+          icon: DocumentTextIcon,
+          route: '/command',
         },
       ],
     },
@@ -201,8 +221,6 @@ export default function AppHeader() {
   ]
 
   // Mock data
-  const [clusterHealth] = useState('Healthy')
-  const [storageUsage] = useState('67.8%')
   const [alertCount, setAlertCount] = useState(3)
   const [recentAlerts, setRecentAlerts] = useState<Alert[]>([
     {
@@ -230,18 +248,6 @@ export default function AppHeader() {
     isConnected ? 'bg-[#00ff41]' : 'bg-warning-500'
   , [isConnected])
 
-  const clusterHealthColor = useMemo(() => {
-    switch (clusterHealth.toLowerCase()) {
-      case 'healthy':
-        return 'bg-status-healthy'
-      case 'warning':
-        return 'bg-status-warning'
-      case 'error':
-        return 'bg-status-error'
-      default:
-        return 'bg-secondary'
-    }
-  }, [clusterHealth])
 
   const themeIcon = useMemo(() => isDark ? SunIcon : MoonIcon, [isDark])
 

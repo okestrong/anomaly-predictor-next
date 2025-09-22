@@ -1,24 +1,17 @@
-import { Metadata } from 'next'
+import { Metadata } from 'next';
+import AppHeader from '@/components/layout/AppHeader';
+import PredictionDashboard from '@/components/prediction/PredictionDashboard';
 
 export const metadata: Metadata = {
-  title: 'AI Prediction - Ceph AI Dashboard',
-  description: 'RAG 기반 예측 및 컨설팅'
-}
+  title: 'AI Failure Prediction - Ceph Cluster',
+  description: 'ML-powered predictive analytics for proactive cluster management and failure prevention',
+};
 
 export default function PredictionPage() {
   return (
-    <div className="min-h-screen bg-gradient-to-br from-secondary-900 to-secondary-800 p-6">
-      <div className="max-w-7xl mx-auto">
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold text-white mb-2">AI Prediction</h1>
-          <p className="text-secondary-400">RAG 기반 예측 및 컨설팅</p>
-        </div>
-        
-        <div className="bg-secondary-800/50 rounded-lg p-8 text-center">
-          <h2 className="text-xl font-semibold text-white mb-4">AI Prediction Dashboard</h2>
-          <p className="text-secondary-400">This page will be implemented in the next migration phase.</p>
-        </div>
-      </div>
+    <div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-blue-950">
+      <AppHeader />
+      <PredictionDashboard />
     </div>
-  )
+  );
 }

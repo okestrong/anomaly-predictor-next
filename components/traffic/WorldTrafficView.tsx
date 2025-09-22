@@ -1,7 +1,7 @@
 'use client';
 
-import { FC, RefObject, useEffect, useMemo, useRef, useState } from 'react';
-import { Canvas, useFrame } from '@react-three/fiber';
+import { FC, RefObject, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Canvas, useFrame, useThree } from '@react-three/fiber';
 import * as THREE from 'three';
 import Colors from '@/utils/color';
 import { Box, Cylinder, Environment, Icosahedron, OrbitControls, PerformanceMonitor, Plane, useTexture } from '@react-three/drei';
@@ -227,17 +227,6 @@ const ServerRack = ({
    const [open, setOpen] = useState(false);
    const [selectedIdx, setSelectedIdx] = useState<number | null>(null);
 
-   // 디버깅: 텍스처 전달 확인
-   useEffect(() => {
-      if (tex) {
-         console.log('ServerRack received textures:', {
-            hasRackSide: !!tex.rackSide,
-            hasRackFront: !!tex.rackFront,
-            hasServerFront: !!tex.serverFront,
-         });
-      }
-   }, [tex]);
-
    // 도어 회전은 GSAP으로 부드럽게 (바깥쪽으로 열리도록)
    useEffect(() => {
       const y = open ? (doorHinge === 'left' ? -Math.PI / 1.8 : Math.PI / 1.8) : 0; // 부호 반대로
@@ -440,6 +429,7 @@ const PoolNode = ({
    animationRefs?: {
       meshRef: RefObject<THREE.Mesh | null>;
       cloudsRef: RefObject<THREE.Mesh | null>;
+      groupRef: RefObject<THREE.Group | null>;
    };
 }) => {
    const meshRef = useRef<THREE.Mesh>(null);
@@ -450,6 +440,7 @@ const PoolNode = ({
       if (animationRefs) {
          animationRefs.meshRef.current = meshRef.current;
          animationRefs.cloudsRef.current = cloudsRef.current;
+         animationRefs.groupRef.current = groupRef.current;
       }
    }, [animationRefs]);
 
@@ -468,7 +459,7 @@ const PoolNode = ({
                <sphereGeometry args={[4.1, 32, 32]} />
                <meshStandardMaterial map={textures?.cloudsMap || undefined} transparent opacity={0.5} depthWrite={false} />
             </mesh>
-            <Atmosphere radius={4} intensity={1.1} power={2.0} color={Colors.emerald[400]} />
+            <Atmosphere radius={4} intensity={1.1} power={2.0} color={Colors.sky[400]} />
          </>
          {/* Pool name text - positioned above the sphere */}
          {/*<Text3D position={[0, 10, 0]} fontSize={1.5} color={0xffffff} anchorX="center" anchorY="top" outlineColor={Colors.blue[600]} outlineWidth={0.1}>
@@ -661,28 +652,58 @@ const DataParticles = ({
 
          setDrawerWriteOps(newDrawerOps);
          setHostWriteOps(newHostOps);
-
-         console.log(`[Simulation] Pool Write OPS: ${newDrawerOps}, OSD Write OPS: ${newHostOps}`);
-         console.log(
-            `[Simulation] Drawer Particles: ${Math.min(24, Math.max(4, Math.floor(newDrawerOps / 10)))}, Host Particles: ${Math.min(36, Math.max(8, Math.floor(newHostOps / 5)))}`,
-         );
-      }, 10000); // Every 10 seconds
+      }, 30000); // Every 10 seconds
 
       return () => clearInterval(interval);
    }, []);
+
+   // Cleanup refs on unmount to prevent memory leaks
+   useEffect(() => {
+      return () => {
+         drawerParticleRefs.current = [];
+         hostParticleRefs.current = [];
+      };
+   }, []);
+
+   // Clean up particles when N_DRAWER/N_HOST changes
+   useEffect(() => {
+      // Clean up drawer particles beyond new limit
+      for (let i = N_DRAWER; i < DRAWER_CAP; i++) {
+         if (drawerActive.current[i]) {
+            drawerActive.current[i] = false;
+            const m = drawerParticleRefs.current[i];
+            if (m) {
+               m.visible = false;
+               m.position.set(999999, 999999, 999999);
+            }
+         }
+      }
+
+      // Clean up host particles beyond new limit
+      for (let i = N_HOST; i < HOST_CAP; i++) {
+         if (hostActive.current[i]) {
+            hostActive.current[i] = false;
+            const m = hostParticleRefs.current[i];
+            if (m) {
+               m.visible = false;
+               m.position.set(999999, 999999, 999999);
+            }
+         }
+      }
+   }, [N_DRAWER, N_HOST]);
 
    // State machine refs
    const drawerActive = useRef<boolean[]>(Array(DRAWER_CAP).fill(false));
    const drawerNextStart = useRef<number[]>(Array(DRAWER_CAP).fill(0));
    const drawerWarmup = useRef<number[]>(Array(DRAWER_CAP).fill(0));
    const drawerCycleId = useRef<number[]>(Array(DRAWER_CAP).fill(0));
-   const [drawerCycleIds, setDrawerCycleIds] = useState<number[]>(Array(DRAWER_CAP).fill(0));
+   // Removed drawerCycleIds state to prevent unnecessary re-renders
 
    const hostActive = useRef<boolean[]>(Array(HOST_CAP).fill(false));
    const hostNextStart = useRef<number[]>(Array(HOST_CAP).fill(0));
    const hostWarmup = useRef<number[]>(Array(HOST_CAP).fill(0));
    const hostCycleId = useRef<number[]>(Array(HOST_CAP).fill(0));
-   const [hostCycleIds, setHostCycleIds] = useState<number[]>(Array(HOST_CAP).fill(0));
+   // Removed hostCycleIds state to prevent unnecessary re-renders
 
    // Particle mesh refs
    const drawerParticleRefs = useRef<THREE.Group[]>([]);
@@ -795,12 +816,7 @@ const DataParticles = ({
          m.visible = true;
       }
 
-      // Update state to trigger re-render
-      setDrawerCycleIds(prev => {
-         const newIds = [...prev];
-         newIds[i] = drawerCycleId.current[i];
-         return newIds;
-      });
+      // Removed setState call to prevent unnecessary re-renders
    };
 
    const endDrawerCycle = (i: number, now: number) => {
@@ -811,7 +827,7 @@ const DataParticles = ({
       const m = drawerParticleRefs.current[i];
       if (m) {
          m.visible = false;
-         m.position.set(99999, 99999, 99999);
+         m.position.set(999999, 999999, 999999); // Move farther away to ensure culling
       }
    };
 
@@ -826,15 +842,12 @@ const DataParticles = ({
       const offsetIndex = i % 3;
       const endPos = getOffsetPosition(hostPositions[hostIndex % hostPositions.length], 'host', offsetIndex);
       // 실린더에서 해당 host 쪽으로 시작점 계산
-      const dx = endPos[0] - cylinderPosition[0],
-         dz = endPos[2] - cylinderPosition[2];
+      const cylPos = cylinderPosRef.current;
+      const dx = endPos[0] - cylPos[0],
+         dz = endPos[2] - cylPos[2];
       const angle = Math.atan2(dz, dx) + (Math.random() - 0.5) * 0.3;
       const R = 30;
-      const startPos: [number, number, number] = [
-         cylinderPosition[0] + Math.cos(angle) * R,
-         cylinderPosition[1] + (Math.random() - 0.5) * 20,
-         cylinderPosition[2] + Math.sin(angle) * R,
-      ];
+      const startPos: [number, number, number] = [cylPos[0] + Math.cos(angle) * R, cylPos[1] + (Math.random() - 0.5) * 20, cylPos[2] + Math.sin(angle) * R];
       const duration = (4 + Math.random() * 2) / hostSpeedMultiplier;
       hostParticleData.current[i] = { startTime: now, duration, startPos, endPos };
 
@@ -844,12 +857,7 @@ const DataParticles = ({
          m.visible = true;
       }
 
-      // Update state to trigger re-render
-      setHostCycleIds(prev => {
-         const newIds = [...prev];
-         newIds[i] = hostCycleId.current[i];
-         return newIds;
-      });
+      // Removed setState call to prevent unnecessary re-renders
    };
 
    const endHostCycle = (i: number, now: number) => {
@@ -860,126 +868,147 @@ const DataParticles = ({
       const m = hostParticleRefs.current[i];
       if (m) {
          m.visible = false;
-         m.position.set(99999, 99999, 99999);
+         m.position.set(999999, 999999, 999999); // Move farther away to ensure culling
       }
    };
 
-   useFrame(state => {
-      const now = state.clock.elapsedTime;
+   // Store cylinderPosition as a ref to avoid dependencies
+   const cylinderPosRef = useRef(cylinderPosition);
+   useEffect(() => {
+      cylinderPosRef.current = cylinderPosition;
+   }, [cylinderPosition]);
 
-      // 1) Drawer → Cylinder
-      drawerParticleRefs.current.forEach((m, i) => {
-         if (!m) return;
-         const data = drawerParticleData.current[i];
-         if (!data) return;
+   const updateParticles = useCallback(
+      (state: any) => {
+         const now = state.clock.elapsedTime;
+         const cylPos = cylinderPosRef.current;
 
-         // CAP 내에서만 돈다. 개수 제한은 "새 시작 금지"로만 처리.
-         if (i >= N_DRAWER && !drawerActive.current[i]) {
-            return; // 새로 시작하지 않음(하지만 이미 달리는 건 끝까지 달리게 둠)
-         }
+         // 1) Drawer → Cylinder - Process all particles but respect N_DRAWER limit
+         for (let i = 0; i < DRAWER_CAP; i++) {
+            const m = drawerParticleRefs.current[i];
+            if (!m) continue;
+            const data = drawerParticleData.current[i];
+            if (!data) continue;
 
-         // (a) Check if inactive and should start
-         if (!drawerActive.current[i]) {
-            if (now >= drawerNextStart.current[i]) {
-               startDrawerCycle(i, now);
-            } else {
-               return; // Don't do anything
+            // If particle is beyond current limit but still active, finish its cycle
+            if (i >= N_DRAWER) {
+               if (drawerActive.current[i]) {
+                  // Let it complete its current cycle
+                  const elapsed = now - drawerStartTime.current[i];
+                  const progress = elapsed / data.duration;
+
+                  if (progress >= 1) {
+                     endDrawerCycle(i, now);
+                  } else {
+                     const [x, y, z] = interpolatePosition(data.startPos, cylPos, progress);
+                     m.position.set(x, y, z);
+
+                     if (checkCylinderCollision([x, y, z], cylPos)) {
+                        endDrawerCycle(i, now);
+                     }
+                  }
+               }
+               continue;
             }
-         }
 
-         // (b) Warmup frames: keep particle at start position, Trail won't render
-         if (drawerWarmup.current[i] > 0) {
-            drawerWarmup.current[i]--;
-            // Keep particle at exact start position during warmup
-            if (data.startPos) {
-               m.position.set(...data.startPos);
-               m.visible = true;
+            // (a) Check if inactive and should start
+            if (!drawerActive.current[i]) {
+               if (now >= drawerNextStart.current[i]) {
+                  startDrawerCycle(i, now);
+               } else {
+                  continue; // Skip to next particle
+               }
             }
-            return;
-         }
 
-         // (c) Normal movement
-         const elapsed = now - drawerStartTime.current[i];
-         const progress = elapsed / data.duration;
+            // (b) Warmup frames: keep particle at start position, Trail won't render
+            if (drawerWarmup.current[i] > 0) {
+               drawerWarmup.current[i]--;
+               // Keep particle at exact start position during warmup
+               if (data.startPos) {
+                  m.position.set(...data.startPos);
+                  m.visible = true;
+               }
+               continue;
+            }
 
-         if (progress >= 1) {
-            endDrawerCycle(i, now);
-         } else {
-            const [x, y, z] = interpolatePosition(data.startPos, cylinderPosition, progress);
+            // (c) Normal movement
+            const elapsed = now - drawerStartTime.current[i];
+            const progress = elapsed / data.duration;
 
-            // Check cylinder collision
-            if (checkCylinderCollision([x, y, z], cylinderPosition)) {
+            if (progress >= 1) {
                endDrawerCycle(i, now);
-               return;
-            }
-
-            m.position.set(x, y, z);
-
-            // const material = m.material as THREE.MeshStandardMaterial;
-            /*if (progress < 0.1) {
-               material.opacity = progress / 0.1;
-            } else if (progress > 0.9) {
-               material.opacity = (1 - progress) / 0.1;
             } else {
-               material.opacity = 1;
-            }*/
+               const [x, y, z] = interpolatePosition(data.startPos, cylPos, progress);
 
-            m.visible = true;
-         }
-      });
+               // Check cylinder collision
+               if (checkCylinderCollision([x, y, z], cylPos)) {
+                  endDrawerCycle(i, now);
+                  continue;
+               }
 
-      // 2) Cylinder → Host
-      hostParticleRefs.current.forEach((m, i) => {
-         if (!m) return;
-         const data = hostParticleData.current[i];
-         if (!data) return;
-
-         // CAP 내에서만 돈다. 개수 제한은 "새 시작 금지"로만 처리.
-         if (i >= N_HOST && !hostActive.current[i]) {
-            return; // 새로 시작하지 않음(하지만 이미 달리는 건 끝까지 달리게 둠)
-         }
-
-         if (!hostActive.current[i]) {
-            if (now >= hostNextStart.current[i]) {
-               startHostCycle(i, now);
-            } else {
-               return;
-            }
-         }
-
-         if (hostWarmup.current[i] > 0) {
-            hostWarmup.current[i]--;
-            // Keep particle at exact start position during warmup
-            if (data.startPos) {
-               m.position.set(...data.startPos);
+               m.position.set(x, y, z);
                m.visible = true;
             }
-            return;
          }
 
-         const elapsed = now - hostStartTime.current[i];
-         const progress = elapsed / data.duration;
+         // 2) Cylinder → Host - Process all particles but respect N_HOST limit
+         for (let i = 0; i < HOST_CAP; i++) {
+            const m = hostParticleRefs.current[i];
+            if (!m) continue;
+            const data = hostParticleData.current[i];
+            if (!data) continue;
 
-         if (progress >= 1) {
-            endHostCycle(i, now);
-         } else {
-            const [x, y, z] = interpolatePosition(data.startPos, data.endPos, progress);
+            // If particle is beyond current limit but still active, finish its cycle
+            if (i >= N_HOST) {
+               if (hostActive.current[i]) {
+                  // Let it complete its current cycle
+                  const elapsed = now - hostStartTime.current[i];
+                  const progress = elapsed / data.duration;
 
-            m.position.set(x, y, z);
+                  if (progress >= 1) {
+                     endHostCycle(i, now);
+                  } else {
+                     const [x, y, z] = interpolatePosition(data.startPos, data.endPos, progress);
+                     m.position.set(x, y, z);
+                  }
+               }
+               continue;
+            }
 
-            // const material = m.material as THREE.MeshStandardMaterial;
-            /*if (progress < 0.1) {
-               material.opacity = progress / 0.1;
-            } else if (progress > 0.9) {
-               material.opacity = (1 - progress) / 0.1;
+            if (!hostActive.current[i]) {
+               if (now >= hostNextStart.current[i]) {
+                  startHostCycle(i, now);
+               } else {
+                  continue;
+               }
+            }
+
+            if (hostWarmup.current[i] > 0) {
+               hostWarmup.current[i]--;
+               // Keep particle at exact start position during warmup
+               if (data.startPos) {
+                  m.position.set(...data.startPos);
+                  m.visible = true;
+               }
+               continue;
+            }
+
+            const elapsed = now - hostStartTime.current[i];
+            const progress = elapsed / data.duration;
+
+            if (progress >= 1) {
+               endHostCycle(i, now);
             } else {
-               material.opacity = 1;
-            }*/
-
-            m.visible = true;
+               const [x, y, z] = interpolatePosition(data.startPos, data.endPos, progress);
+               m.position.set(x, y, z);
+               m.visible = true;
+            }
          }
-      });
-   });
+      },
+      [N_DRAWER, N_HOST, drawerSpeedMultiplier, hostSpeedMultiplier],
+   );
+
+   useFrame(updateParticles);
 
    return (
       <group position={[0, -5, 0]}>
@@ -990,8 +1019,14 @@ const DataParticles = ({
                ref={ref => {
                   if (ref) drawerParticleRefs.current[i] = ref;
                }}
-               visible={false}
-            />
+               visible={drawerActive.current[i]}
+            >
+               {/* Add actual particle mesh for trail tracking */}
+               <mesh>
+                  <sphereGeometry args={[0.5, 4, 4]} />
+                  <meshBasicMaterial color={Colors.cyan[300]} transparent opacity={0} />
+               </mesh>
+            </group>
          ))}
 
          {/* Host particles */}
@@ -1001,16 +1036,23 @@ const DataParticles = ({
                ref={ref => {
                   if (ref) hostParticleRefs.current[i] = ref;
                }}
-               visible={false}
-            />
+               visible={hostActive.current[i]}
+            >
+               {/* Add actual particle mesh for trail tracking */}
+               <mesh>
+                  <sphereGeometry args={[0.5, 4, 4]} />
+                  <meshBasicMaterial color={Colors.purple[400]} transparent opacity={0} />
+               </mesh>
+            </group>
          ))}
          {/* Cyan: Drawer → Cylinder 꼬리(잔상) - Optimized settings */}
          <GhostTrails
             targetsRef={drawerParticleRefs}
             color={Colors.cyan[300]}
-            maxPer={Math.floor(budget * 0.7)}
-            life={0.2}
-            spawnInterval={0.035}
+            // maxPer={Math.min(12, Math.floor(budget * 0.5))} // Reduced from 0.7 to 0.5 and capped at 8
+            maxPer={budget} // Reduced from 0.7 to 0.5 and capped at 8
+            life={0.15} // Reduced from 0.2
+            spawnInterval={0.05} // Increased from 0.035 to reduce spawn frequency
             sizeStart={6}
             sizeEnd={0}
          />
@@ -1018,10 +1060,11 @@ const DataParticles = ({
          {/* Orange: Cylinder → Host 꼬리(잔상) - Optimized settings */}
          <GhostTrails
             targetsRef={hostParticleRefs}
-            color={Colors.orange[300]}
-            maxPer={Math.floor(budget * 0.7)}
-            life={0.2}
-            spawnInterval={0.035}
+            color={Colors.purple[400]}
+            // maxPer={Math.min(12, Math.floor(budget * 0.5))} // Reduced from 0.7 to 0.5 and capped at 8
+            maxPer={budget} // Reduced from 0.7 to 0.5 and capped at 8
+            life={0.15} // Reduced from 0.2
+            spawnInterval={0.05} // Increased from 0.035 to reduce spawn frequency
             sizeStart={6}
             sizeEnd={0}
          />
@@ -1093,13 +1136,14 @@ const Table = ({
    // Separate positions for different particle flows
    const drawerPositions: [number, number, number][] = drawerData.filter((d, i) => [2, 3].includes(i)).map(d => d.position);
    const hostPositions: [number, number, number][] = serverData.filter((_, i) => i > 0 && i < serverData.length - 1).map(s => s.position);
-   const cylinderPosition: [number, number, number] = [0, 5, 0];
+   const cylinderPosition = useMemo<[number, number, number]>(() => [0, 5, 0], []);
    const texturesRef = useRef<any>({});
    const [textureReady, setTextureReady] = useState(false);
    const poolAnimationRefs = useRef<
       Array<{
          meshRef: RefObject<THREE.Mesh | null>;
          cloudsRef: RefObject<THREE.Mesh | null>;
+         groupRef: RefObject<THREE.Group | null>;
       }>
    >([]);
 
@@ -1117,30 +1161,108 @@ const Table = ({
          // texturesRef.current.rackTop = await loadTexture('/3d/textures/rack-top.jpg');
          texturesRef.current.serverFront = await loadTexture('/3d/textures/rack/server-front-half.png');
 
-         // 디버깅: 텍스처 로드 확인
-         console.log('Loaded textures:', {
-            rackFront: !!texturesRef.current.rackFront,
-            rackSide: !!texturesRef.current.rackSide,
-            serverFront: !!texturesRef.current.serverFront,
-         });
-
          setTextureReady(true);
       })();
    }, []);
 
-   useFrame(() => {
-      poolAnimationRefs.current.forEach(poolRefs => {
+   // Memoize pool animation data to avoid recalculating every frame
+   const poolAnimationData = useMemo(() => {
+      const totalPools = mockTopologyData.pools.length;
+      const remainingPools = totalPools - 1;
+      const middleRingCount = Math.floor(remainingPools * 0.35);
+
+      // Use totalPools count instead of poolAnimationRefs.current which might be empty
+      return Array.from({ length: totalPools }, (_, index) => {
+         if (index === 0) {
+            return { isCenter: true, baseAngle: 0, orbitSpeed: 0, radius: 0 };
+         }
+
+         const isMiddleRing = index <= middleRingCount;
+         if (isMiddleRing) {
+            return {
+               isCenter: false,
+               isMiddleRing: true,
+               baseAngle: ((index - 1) / middleRingCount) * Math.PI * 2,
+               orbitSpeed: -0.3,
+               radius: 15,
+            };
+         } else {
+            const outerIndex = index - middleRingCount - 1;
+            const outerRingCount = remainingPools - middleRingCount;
+            return {
+               isCenter: false,
+               isMiddleRing: false,
+               baseAngle: (outerIndex / outerRingCount) * Math.PI * 2,
+               orbitSpeed: 0.2,
+               radius: 30,
+            };
+         }
+      });
+   }, []);
+
+   useFrame(state => {
+      const time = state.clock.elapsedTime;
+
+      poolAnimationRefs.current.forEach((poolRefs, index) => {
+         // Pool self-rotation
          if (poolRefs.meshRef.current) {
             poolRefs.meshRef.current.rotation.y += 0.002;
          }
          if (poolRefs.cloudsRef.current) {
             poolRefs.cloudsRef.current.rotation.y -= 0.004;
          }
+
+         // Orbital animation for pool groups using pre-calculated data
+         if (poolRefs.groupRef.current && poolAnimationData[index] && !poolAnimationData[index].isCenter) {
+            const data = poolAnimationData[index];
+            const currentAngle = data.baseAngle + time * data.orbitSpeed;
+
+            poolRefs.groupRef.current.position.x = Math.cos(currentAngle) * data.radius;
+            poolRefs.groupRef.current.position.z = Math.sin(currentAngle) * data.radius;
+         }
       });
    });
 
    const allPools = useMemo(() => mockTopologyData.pools.map((_, i) => ({ index: i })), []);
-   const poolPositions = useMemo(() => new AdaptiveLayoutManager().applyLayout(allPools, 'spiral', { spacing: 10 }), []);
+
+   // Custom pool distribution system
+   const poolPositions = useMemo(() => {
+      const totalPools = allPools.length;
+      if (totalPools === 0) return [];
+
+      // 1 pool at center
+      const centerPool = { position: [0, 0, 0] as [number, number, number] };
+
+      if (totalPools === 1) {
+         return [centerPool];
+      }
+
+      const remainingPools = totalPools - 1;
+      const middleRingCount = Math.floor(remainingPools * 0.35); // 35% in middle ring
+      const outerRingCount = remainingPools - middleRingCount; // Rest in outer ring
+
+      const positions = [centerPool]; // Start with center pool
+
+      // Middle ring positions (radius 15 - halfway between center and edge)
+      for (let i = 0; i < middleRingCount; i++) {
+         const angle = (i / middleRingCount) * Math.PI * 2;
+         const radius = 15;
+         positions.push({
+            position: [Math.cos(angle) * radius, 0, Math.sin(angle) * radius] as [number, number, number],
+         });
+      }
+
+      // Outer ring positions (radius 30 - cylinder edge)
+      for (let i = 0; i < outerRingCount; i++) {
+         const angle = (i / outerRingCount) * Math.PI * 2;
+         const radius = 30;
+         positions.push({
+            position: [Math.cos(angle) * radius, 0, Math.sin(angle) * radius] as [number, number, number],
+         });
+      }
+
+      return positions;
+   }, [allPools]);
 
    // 랙 배치를 위한 포지셔닝 헬퍼 함수들
    const outwardFromCenter = (p: [number, number, number]) => {
@@ -1197,13 +1319,15 @@ const Table = ({
             rotation={[0, Math.PI / 6, 0]}
             fontSize={0.7}
             font="/fonts/orbitron/Orbitron-Bold.ttf"
-            fontWeight={700}
-            color={Colors.neutral[400]}
+            fontWeight={900}
+            color={Colors.black}
             // @ts-ignore
             curveRadius={8.5}
             letterSpacing={0.02}
             anchorX="center"
             anchorY="middle"
+            outlineColor={Colors.white}
+            outlineWidth="5%"
          >
             {'     '}IaaS
          </Text3D>
@@ -1213,15 +1337,17 @@ const Table = ({
             rotation={[0, Math.PI / 2.75, 0]}
             fontSize={0.7}
             font="/fonts/orbitron/Orbitron-Bold.ttf"
-            fontWeight={700}
-            color={Colors.neutral[400]}
+            fontWeight={900}
+            color={Colors.black}
             // @ts-ignore
             curveRadius={8.5}
             letterSpacing={0.02}
             anchorX="center"
             anchorY="middle"
+            outlineColor={Colors.white}
+            outlineWidth="5%"
          >
-            {'    '}
+            {'   '}
             PaaS
          </Text3D>
 
@@ -1260,6 +1386,7 @@ const Table = ({
                   poolAnimationRefs.current[index] = {
                      meshRef: { current: null },
                      cloudsRef: { current: null },
+                     groupRef: { current: null },
                   };
                }
                const pos = poolPositions[index].position;
@@ -1280,7 +1407,12 @@ const Table = ({
             radius={cyl_r - 1.5} // 30(실린더 반경)보다 약간 작게
             halfHeight={cyl_h / 2 - 4} // 35~40 높이에 맞춰 여유
             maxCap={160}
-            targetCount={Math.min(40, Math.max(5, Math.floor((writeOps.drawer + writeOps.host) / 10)))}
+            targetCount={useMemo(() => {
+               // Debounce targetCount changes to reduce instability
+               const drawerOpsGroup = Math.floor(writeOps.drawer / 50);
+               const hostOpsGroup = Math.floor(writeOps.host / 50);
+               return Math.min(40, Math.max(5, Math.floor((drawerOpsGroup * 50 + hostOpsGroup * 50) / 10)));
+            }, [Math.floor(writeOps.drawer / 50), Math.floor(writeOps.host / 50)])}
             sphereRadius={1.5}
             color={writeOps.drawer + writeOps.host >= 200 ? '#ef4444' : '#3b82f6'}
             stiffness={0.06} // ↓ 중심 흡인 약화
@@ -1345,10 +1477,15 @@ const GroundPlane = () => {
 
 const WorldTrafficView: FC<Props> = () => {
    const [fxOn, setFxOn] = useState(true);
+   // const [fsFactor, setFsFactor] = useState(0.5);
    const [trailBudget, setTrailBudget] = useState(12);
    const [writeOps, setWriteOps] = useState({ drawer: 100, host: 50 });
    const [showHeader, setShowHeader] = useState(true);
    const [cyl_position, cyl_rarius, cyl_height] = useMemo<[[number, number, number], number, number]>(() => [[0, 15, 0], 30, 35], []);
+   const LOW = 0.4; // Adjusted threshold
+   const HIGH = 0.6; // Adjusted threshold
+   const lastFactorRef = useRef(1);
+
    // Update write ops every 30 seconds
    useEffect(() => {
       const interval = setInterval(() => {
@@ -1358,7 +1495,6 @@ const WorldTrafficView: FC<Props> = () => {
             host: Math.floor(Math.random() * 150) + 25, // 25-175
          });
       }, 30000); // Changed from 10000ms to 30000ms
-
       return () => clearInterval(interval);
    }, []);
 
@@ -1372,8 +1508,8 @@ const WorldTrafficView: FC<Props> = () => {
          {showHeader && <AppHeader />}
          <div className="w-screen h-screen overflow-hidden" onDoubleClick={handleDoubleClick}>
             <Canvas
-               camera={{ position: [-150, 120, 50], fov: 60, near: 0.1, far: 2000 }}
-               dpr={[1, 1.5]}
+               camera={{ position: [-50, 120, 150], fov: 60, near: 0.1, far: 2000 }}
+               dpr={[1, 1.25]}
                gl={{
                   antialias: true,
                   powerPreference: 'high-performance',
@@ -1386,16 +1522,40 @@ const WorldTrafficView: FC<Props> = () => {
             >
                <PerformanceMonitor
                   onChange={({ factor }) => {
-                     setFxOn(factor > 0.8);
-                     setTrailBudget(factor > 0.8 ? 12 : 8);
+                     // Debounce rapid changes
+                     const delta = Math.abs(factor - lastFactorRef.current);
+                     if (delta < 0.1) return; // Ignore small changes
+
+                     lastFactorRef.current = factor;
+                     console.log('##### factor=', factor);
+
+                     // Hysteresis to prevent oscillation
+                     if (fxOn && factor < LOW) {
+                        setFxOn(false);
+                        setTrailBudget(8);
+                     } else if (!fxOn && factor > HIGH) {
+                        setFxOn(true);
+                        setTrailBudget(14);
+                     }
                   }}
                />
-               <OrbitControls enableDamping dampingFactor={0.05} enablePan autoRotate autoRotateSpeed={-0.1} />
+               <OrbitControls
+                  enableDamping
+                  dampingFactor={0.05}
+                  enablePan
+                  autoRotate
+                  autoRotateSpeed={-0.1}
+                  mouseButtons={{
+                     LEFT: THREE.MOUSE.ROTATE,
+                     MIDDLE: THREE.MOUSE.PAN,
+                     RIGHT: THREE.MOUSE.DOLLY,
+                  }}
+               />
                <Environment files="/3d/background/darkcenter.jpg" background backgroundBlurriness={0.05} backgroundIntensity={!fxOn ? 3 : 0.5} />
                {fxOn && (
-                  <EffectComposer>
-                     <Bloom mipmapBlur={false} luminanceThreshold={0.5} intensity={1.0} radius={0.3} />
-                     <BrightnessContrast brightness={0.05} contrast={0.3} />
+                  <EffectComposer multisampling={0} resolutionScale={0.8}>
+                     <Bloom mipmapBlur={false} luminanceThreshold={0.7} intensity={0.7} radius={0.3} />
+                     <BrightnessContrast brightness={0.01} contrast={0.3} />
                   </EffectComposer>
                )}
 
@@ -1404,14 +1564,14 @@ const WorldTrafficView: FC<Props> = () => {
 
                {/* Main directional light */}
                <directionalLight
-                  args={['#ffffff', 1.8]}
+                  args={['#ffffff', fxOn ? 2 : 1.3]}
                   position={[150, 150, 150]}
                   castShadow
-                  shadow-mapSize={[1024, 1024]}
-                  shadow-camera-left={-400}
-                  shadow-camera-right={400}
-                  shadow-camera-top={400}
-                  shadow-camera-bottom={-400}
+                  shadow-mapSize={[512, 512]}
+                  shadow-camera-left={-200}
+                  shadow-camera-right={200}
+                  shadow-camera-top={200}
+                  shadow-camera-bottom={-200}
                   shadow-camera-near={0.1}
                   shadow-camera-far={1000}
                />

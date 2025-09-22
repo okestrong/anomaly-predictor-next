@@ -278,9 +278,8 @@ const DoughnutTable = ({ position = [0, -40, 0] }: { position?: [number, number,
             outerRadius={outerRadius}
             rotation={[0, 0, 0]}
             height={7}
-            castShadow
             bottomText="OKESTRO  *  CONTRABASS  SDS+"
-            bottomTextColor={Colors.neutral[400]}
+            bottomTextColor={Colors.neutral[300]}
             segment={512}
          />
          {/*<BangingGlassBall scale={2.5} useOrbit orbitCenterPosition={[0, -100, 0]} orbitRadius={80} y={-50} angularSpeed={-0.3} />*/}
@@ -292,7 +291,6 @@ const DoughnutTable = ({ position = [0, -40, 0] }: { position?: [number, number,
             outerRadius={innerRadius - 0.2}
             rotation={[0, 0, 0]}
             height={7}
-            castShadow
             segment={256}
          />
          <Text3D
@@ -940,7 +938,7 @@ const ClusterTopologyScene = ({
          {/*<directionalLight position={[-30, 30, -40]} intensity={1.5} castShadow shadow-mapSize={[1024, 1024]}>
             <orthographicCamera args={[-100, 100, -100, 100, 0.1, 200]} />
          </directionalLight>*/}
-         <directionalLight position={[0, -50, 0]} intensity={5} castShadow shadow-mapSize={[1024, 1024]}>
+         <directionalLight position={[0, -50, 0]} intensity={7} shadow-mapSize={[256, 256]}>
             {/*<orthographicCamera args={[-100, 100, -100, 100, 0.1, 200]} />*/}
          </directionalLight>
          {/*{textSphereRef.current && (
@@ -958,7 +956,18 @@ const ClusterTopologyScene = ({
          {/*<hemisphereLight args={['dodgerblue', 'hotpink', 5]} position={[0, 10, 0]} intensity={10} castShadow />*/}
          {/*<pointLight position={[0, -20, 0]} intensity={0.8} distance={150} />*/}
          {/*<directionalLight position={[0, -15, 30]} intensity={0.6} />*/}
-         <OrbitControls enableDamping dampingFactor={0.05} enablePan autoRotate autoRotateSpeed={0.05} />
+         <OrbitControls
+            enableDamping
+            dampingFactor={0.05}
+            enablePan
+            autoRotate
+            autoRotateSpeed={0.01}
+            mouseButtons={{
+               LEFT: THREE.MOUSE.ROTATE,
+               MIDDLE: THREE.MOUSE.PAN,
+               RIGHT: THREE.MOUSE.DOLLY,
+            }}
+         />
 
          {/* Shadow-receiving ground plane */}
          {/*<mesh receiveShadow position={[0, -60, 0]} rotation={[-Math.PI / 2, 0, 0]}>
@@ -2789,8 +2798,8 @@ export default function ClusterTopologyView() {
          if (cameraRef.current && cameraRef.current.position.y >= 0) {
             gsap.to(cameraRef.current.position, {
                x: 0,
-               y: -30,
-               z: 140,
+               y: -20,
+               z: 150,
                duration: 1.5,
                ease: 'power2.inOut',
             });
@@ -3014,6 +3023,10 @@ export default function ClusterTopologyView() {
    const showOSDsForPG = (pgData: any): void => {
       console.log('showOSDsForPG called with pgData:', pgData);
       console.log('Current osdAnimationDataRef size:', osdAnimationDataRef.current.size);
+
+      // Get the list of OSDs for the new PG (if any)
+      const newOSDIds = pgData ? new Set(generateOSDsForPG(pgData)) : new Set<number>();
+
       // Clean up existing PG-OSD connections
       const pgOsdConnections = connectionLinesRef.current.filter(line => line.userData?.type === 'pg-osd');
       pgOsdConnections.forEach(line => {
@@ -3033,88 +3046,92 @@ export default function ClusterTopologyView() {
       });
       trafficParticlesRef.current = trafficParticlesRef.current.filter(particles => particles.userData?.type !== 'pg-osd');
 
-      // If no PG is selected, reset OSDs and return
-      if (!pgData) {
-         // Reset only currently animated OSDs to original state using Map storage
-         let resetCount = 0;
+      // Reset OSDs that are not part of the new PG selection
+      osdNodesRef.current.forEach(osd => {
+         const osdId = osd.userData.id;
+         const animData = osdAnimationDataRef.current.get(osdId);
 
-         osdNodesRef.current.forEach(osd => {
-            const osdId = osd.userData.id;
-            const animData = osdAnimationDataRef.current.get(osdId);
-
-            if (animData) {
-               resetCount++;
-               // Reset position animation to original relative position (0)
-               if (animData.originalY !== undefined) {
-                  gsap.to(osd.position, {
-                     y: 0, // Reset to original relative position within parent group
-                     duration: 1.5, // 0.5 * 3 = 1.5 seconds (1/3 speed)
-                     ease: 'power2.inOut',
-                  });
-               }
-
-               // Reset scale to original size (1x)
-               gsap.to(osd.scale, {
-                  x: 1,
-                  y: 1,
-                  z: 1,
-                  duration: 1.5, // Same duration as position reset
+         // Only reset if OSD has animation data and is NOT part of new PG
+         if (animData && !newOSDIds.has(osdId)) {
+            // Reset position animation to original relative position (0)
+            if (animData.originalY !== undefined) {
+               gsap.to(osd.position, {
+                  y: 0, // Reset to original relative position within parent group
+                  duration: 1.5, // 0.5 * 3 = 1.5 seconds (1/3 speed)
                   ease: 'power2.inOut',
                });
-               // Reset rotation to original angle
-               if (animData.originalRotationY !== undefined) {
-                  gsap.to(osd.rotation, {
-                     y: animData.originalRotationY, // Reset to original rotation angle
-                     duration: 1.5, // 0.5 * 3 = 1.5 seconds (1/3 speed)
-                     ease: 'power2.inOut',
-                  });
-               }
-               // Stop rotation animation
-               if (animData.rotationTween) {
-                  animData.rotationTween.kill();
-                  animData.rotationTween = null;
-               }
-               // Stop opacity animation
-               if (animData.opacityTween) {
-                  animData.opacityTween.kill();
-                  animData.opacityTween = null;
-               }
-               // Remove label if exists
-               if (animData.label) {
-                  osd.remove(animData.label);
-                  animData.label.geometry?.dispose();
-                  animData.label.material?.dispose();
-                  animData.label = null;
-               }
-               // Reset material opacity to original value
-               const mesh = osd.children.find(child => child.type === 'Mesh') as THREE.Mesh;
-               if (mesh && mesh.material && animData.originalOpacity !== undefined) {
-                  const material = mesh.material as any;
-                  gsap.to(material, {
-                     opacity: animData.originalOpacity,
-                     duration: 1.5, // 0.5 * 3 = 1.5 seconds (1/3 speed)
-                     ease: 'power2.inOut',
-                     onUpdate: () => {
-                        material.needsUpdate = true;
-                     },
-                  });
-               } else if (mesh && mesh.material) {
-                  // Fallback to default opacity if original was not stored
-                  const material = mesh.material as any;
-                  gsap.to(material, {
-                     opacity: 0.9,
-                     duration: 1.5,
-                     ease: 'power2.inOut',
-                     onUpdate: () => {
-                        material.needsUpdate = true;
-                     },
-                  });
-               }
-
-               // Clear the animation data from Map
-               osdAnimationDataRef.current.delete(osdId);
             }
-         });
+
+            // Reset scale to original size (1x)
+            gsap.to(osd.scale, {
+               x: 1,
+               y: 1,
+               z: 1,
+               duration: 1.5, // Same duration as position reset
+               ease: 'power2.inOut',
+            });
+
+            // Reset rotation to original angle
+            if (animData.originalRotationY !== undefined) {
+               gsap.to(osd.rotation, {
+                  y: animData.originalRotationY, // Reset to original rotation angle
+                  duration: 1.5, // 0.5 * 3 = 1.5 seconds (1/3 speed)
+                  ease: 'power2.inOut',
+               });
+            }
+
+            // Stop rotation animation
+            if (animData.rotationTween) {
+               animData.rotationTween.kill();
+               animData.rotationTween = null;
+            }
+
+            // Stop opacity animation
+            if (animData.opacityTween) {
+               animData.opacityTween.kill();
+               animData.opacityTween = null;
+            }
+
+            // Remove label if exists
+            if (animData.label) {
+               osd.remove(animData.label);
+               animData.label.geometry?.dispose();
+               animData.label.material?.dispose();
+               animData.label = null;
+            }
+
+            // Reset material opacity to original value
+            const mesh = osd.children.find(child => child.type === 'Mesh') as THREE.Mesh;
+            if (mesh && mesh.material && animData.originalOpacity !== undefined) {
+               const material = mesh.material as any;
+               gsap.to(material, {
+                  opacity: animData.originalOpacity,
+                  duration: 1.5, // 0.5 * 3 = 1.5 seconds (1/3 speed)
+                  ease: 'power2.inOut',
+                  onUpdate: () => {
+                     material.needsUpdate = true;
+                  },
+               });
+            } else if (mesh && mesh.material) {
+               // Fallback to default opacity if original was not stored
+               const material = mesh.material as any;
+               gsap.to(material, {
+                  opacity: 0.9,
+                  duration: 1.5,
+                  ease: 'power2.inOut',
+                  onUpdate: () => {
+                     material.needsUpdate = true;
+                  },
+               });
+            }
+
+            // Clear the animation data from Map
+            osdAnimationDataRef.current.delete(osdId);
+         }
+      });
+
+      // Exit early if no PG is selected
+      if (!pgData) {
          return;
       }
 
@@ -3145,15 +3162,23 @@ export default function ClusterTopologyView() {
 
                // Store original Y position and rotation if not stored yet
                // Use worldY (parent group position) as the original Y position
-               animData.originalY = osdNode.userData.worldY || osdNode.position.y;
-               // Store original rotation angle
-               animData.originalRotationY = osdNode.rotation.y;
+               if (animData.originalY === undefined) {
+                  animData.originalY = osdNode.userData.worldY || osdNode.position.y;
+               }
+               // Store original rotation angle if not stored yet
+               if (animData.originalRotationY === undefined) {
+                  animData.originalRotationY = osdNode.rotation.y;
+               }
+
+               // Check if OSD is already elevated
+               const isAlreadyElevated = (animData as any).isAnimating === true;
+
                // Set animation flag
                (animData as any).isAnimating = true;
 
-               // Animate OSD lifting up by 10 units (relative to current position)
+               // Only animate if not already elevated
                const currentY = osdNode.position.y;
-               const targetY = currentY + 10; // Move 10 units up from current position
+               const targetY = isAlreadyElevated ? currentY : currentY + 10; // Don't move if already elevated
                gsap.to(osdNode.position, {
                   y: targetY,
                   duration: 2.4, // 0.8 * 3 = 2.4 seconds (1/3 speed)
@@ -3834,12 +3859,11 @@ export default function ClusterTopologyView() {
                   highlightNode={highlightNode}
                   toggleAllPanels={toggleAllPanels}
                />
-               {/*<Environment preset="night" />*/}
                <Environment files={'/3d/background/datacenter.jpg'} />
-               {/*<Environment preset="night" />*/}
-               <EffectComposer>
+               {/* EffectComposer -> 성능을 고려하여 체감 비용 줄이기 : multisampling={0} resolutionScale={0.8} (80% 스케일 렌더링) */}
+               <EffectComposer multisampling={0} resolutionScale={0.8}>
                   {/* mipmapBlur 키면 화면 깜빡임 생겨서 false 로 함 */}
-                  <Bloom mipmapBlur={false} luminanceThreshold={0.7} intensity={0.7} radius={0.5} />
+                  <Bloom mipmapBlur={false} luminanceThreshold={0.7} intensity={0.35} radius={0.4} />
                   <BrightnessContrast brightness={0} contrast={0.2} />
                </EffectComposer>
             </Canvas>

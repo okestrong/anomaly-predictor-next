@@ -1,24 +1,17 @@
-import { Metadata } from 'next'
+import { Metadata } from 'next';
+import AppHeader from '@/components/layout/AppHeader';
+import AnomalyDashboard from '@/components/anomaly/AnomalyDashboard';
 
 export const metadata: Metadata = {
-  title: 'Anomaly Detection - Ceph AI Dashboard',
-  description: 'AI 기반 이상 상황 탐지 및 예측'
-}
+  title: 'AI Anomaly Detection - Ceph Cluster',
+  description: 'Real-time ML-powered anomaly detection and behavioral analysis for Ceph cluster monitoring',
+};
 
 export default function AnomalyPage() {
   return (
-    <div className="min-h-screen bg-gradient-to-br from-secondary-900 to-secondary-800 p-6">
-      <div className="max-w-7xl mx-auto">
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold text-white mb-2">Anomaly Detection</h1>
-          <p className="text-secondary-400">AI 기반 이상 상황 탐지 및 예측</p>
-        </div>
-        
-        <div className="bg-secondary-800/50 rounded-lg p-8 text-center">
-          <h2 className="text-xl font-semibold text-white mb-4">Anomaly Detection Dashboard</h2>
-          <p className="text-secondary-400">This page will be implemented in the next migration phase.</p>
-        </div>
-      </div>
+    <div className="min-h-screen bg-gradient-to-br from-slate-950 via-purple-950 to-slate-900">
+      <AppHeader />
+      <AnomalyDashboard />
     </div>
-  )
+  );
 }

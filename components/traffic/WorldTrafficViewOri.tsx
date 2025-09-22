@@ -1,14 +1,13 @@
 'use client';
 
 import { FC, RefObject, useEffect, useMemo, useRef, useState } from 'react';
-import { Canvas, useFrame } from '@react-three/fiber';
+import { Canvas, useFrame, useThree } from '@react-three/fiber';
 import * as THREE from 'three';
 import Colors from '@/utils/color';
-import { Box, Cylinder, Environment, Icosahedron, OrbitControls, Plane, Sphere, useTexture } from '@react-three/drei';
+import { Box, Cylinder, Environment, Icosahedron, OrbitControls, PerformanceMonitor, Plane, useTexture } from '@react-three/drei';
 import RoundMirrorTextTable from '@/components/models/RoundMirrorTextTable';
 import { AppHeader } from '@/components/layout';
 import { mockTopologyData } from '@/public/data/topologyMockData';
-import { Physics, useBox, useSphere } from '@react-three/cannon';
 import { Bloom, BrightnessContrast, EffectComposer } from '@react-three/postprocessing';
 import { AdaptiveLayoutManager } from '@/utils/layouts';
 import Atmosphere from '@/components/models/Atmosphere';
@@ -17,8 +16,7 @@ import { loadTexture } from '@/utils/utils';
 import GhostTrails from '@/components/traffic/GhostTrails';
 import { gsap } from 'gsap';
 import ServerRackModel from '@/components/models/ServerRackModel';
-
-// ------ Server Racks (Door, Servers, HDD, VM Particles) ------
+import InstancedSpheres from '@/components/traffic/InstancedSpheres';
 
 // 간단한 VM 파티클: 반투명 아쿠아 큐브 위에서 사이버 색상의 점들이 공전
 const VMParticles = ({ count = 8, radius = 3.5, speed = 0.8, colors = [0x00e5ff, 0x7c3aed, 0x22d3ee] }) => {
@@ -35,6 +33,7 @@ const VMParticles = ({ count = 8, radius = 3.5, speed = 0.8, colors = [0x00e5ff,
          m.rotation.x += 0.02; // x축 회전도 추가
       });
    });
+
    return (
       <group ref={grp}>
          {Array.from({ length: count }, (_, i) => (
@@ -119,7 +118,7 @@ const ServerUnit = ({
          const baseY = size[1] * 0.2; // 서버 내부 기준점 (서버 높이의 20% 지점)
          const up = THREE.MathUtils.lerp(0, 5, rise.current); // 0에서 4까지 상승
          const forwardZ = THREE.MathUtils.lerp(0, size[2] * 0.75, slide.current); // 서버와 같은 Z 위치
-         vmGroupRef.current.position.set(0, baseY + up, forwardZ);
+         vmGroupRef.current.position.set(0, baseY + up, forwardZ + 2);
          vmGroupRef.current.rotation.y += 0.01 * rise.current; // 천천히 회전
       }
    });
@@ -227,17 +226,6 @@ const ServerRack = ({
    const pointLightRef = useRef<THREE.PointLight>(null);
    const [open, setOpen] = useState(false);
    const [selectedIdx, setSelectedIdx] = useState<number | null>(null);
-
-   // 디버깅: 텍스처 전달 확인
-   useEffect(() => {
-      if (tex) {
-         console.log('ServerRack received textures:', {
-            hasRackSide: !!tex.rackSide,
-            hasRackFront: !!tex.rackFront,
-            hasServerFront: !!tex.serverFront,
-         });
-      }
-   }, [tex]);
 
    // 도어 회전은 GSAP으로 부드럽게 (바깥쪽으로 열리도록)
    useEffect(() => {
@@ -441,6 +429,7 @@ const PoolNode = ({
    animationRefs?: {
       meshRef: RefObject<THREE.Mesh | null>;
       cloudsRef: RefObject<THREE.Mesh | null>;
+      groupRef: RefObject<THREE.Group | null>;
    };
 }) => {
    const meshRef = useRef<THREE.Mesh>(null);
@@ -451,6 +440,7 @@ const PoolNode = ({
       if (animationRefs) {
          animationRefs.meshRef.current = meshRef.current;
          animationRefs.cloudsRef.current = cloudsRef.current;
+         animationRefs.groupRef.current = groupRef.current;
       }
    }, [animationRefs]);
 
@@ -469,7 +459,7 @@ const PoolNode = ({
                <sphereGeometry args={[4.1, 32, 32]} />
                <meshStandardMaterial map={textures?.cloudsMap || undefined} transparent opacity={0.5} depthWrite={false} />
             </mesh>
-            <Atmosphere radius={4} intensity={1.1} power={2.0} color={Colors.emerald[400]} />
+            <Atmosphere radius={4} intensity={1.1} power={2.0} color={Colors.sky[400]} />
          </>
          {/* Pool name text - positioned above the sphere */}
          {/*<Text3D position={[0, 10, 0]} fontSize={1.5} color={0xffffff} anchorX="center" anchorY="top" outlineColor={Colors.blue[600]} outlineWidth={0.1}>
@@ -484,7 +474,7 @@ const Drawer = ({ position, rotation, type }: { position: [number, number, numbe
    const drawerWidth = 40;
    const drawerHeight = 8;
    const drawerDepth = 25;
-   const wallThickness = 0.5;
+   const wallThickness = 0.1;
    const label = type === 'boxes' ? 'OpenStack VMs' : 'Kubernetes Containers';
 
    return (
@@ -520,24 +510,26 @@ const Drawer = ({ position, rotation, type }: { position: [number, number, numbe
          {/* Drawer content */}
          <group position={[0, -drawerHeight / 2 + wallThickness + 2, 0]}>
             {type === 'boxes'
-               ? // 16 boxes arranged in columns (current), max 60 (5x12)
+               ? // 16 boxes arranged from inner side (table center) to outer side
                  Array.from({ length: 16 }, (_, i) => {
-                    const col = Math.floor(i / 5); // 5 columns
+                    const col = Math.floor(i / 5); // 5 per row
                     const row = i % 5;
-                    const x = (col - 1.5) * 4; // 4 columns currently, centered
-                    const z = (row - 2) * 3; // 5 boxes per column, centered
+                    // Start from table center side (right wall, positive x) and go toward outer side (negative x)
+                    const x = drawerWidth / 2 - 4 - col * 4; // Start from table center side, move outward
+                    const z = (row - 2) * 3; // 5 boxes per row, centered along depth
                     return (
                        <Box key={i} args={[2.5, 2.5, 2.5]} position={[x, 0, z]}>
                           <meshStandardMaterial color={Colors.blue[400]} metalness={0.5} roughness={0.5} emissive={Colors.blue[300]} emissiveIntensity={0.1} />
                        </Box>
                     );
                  })
-               : // 35 icosahedrons (current), max 100
+               : // 35 icosahedrons arranged from inner side (table center) to outer side
                  Array.from({ length: 35 }, (_, i) => {
-                    const col = Math.floor(i / 5); // 5 columns
+                    const col = Math.floor(i / 5); // 5 per row
                     const row = i % 5;
-                    const x = (col - 3.5) * 4; // 7 columns currently, centered
-                    const z = (row - 2) * 4; // 5 icosahedrons per column, centered with more spacing
+                    // Start from table center side (right wall, positive x) and go toward outer side (negative x)
+                    const x = drawerWidth / 2 - 3 - col * 3.5; // Start from table center side, move outward
+                    const z = (row - 2) * 4; // 5 icosahedrons per row, centered along depth
                     return (
                        <Icosahedron key={i} args={[1.5]} position={[x, 0, z]}>
                           <meshStandardMaterial
@@ -629,10 +621,12 @@ const DataParticles = ({
    drawerPositions,
    hostPositions,
    cylinderPosition,
+   budget,
 }: {
    drawerPositions: [number, number, number][];
    hostPositions: [number, number, number][];
    cylinderPosition: [number, number, number];
+   budget: number;
 }) => {
    // Fixed capacity pool pattern
    const DRAWER_CAP = 24; // drawer 최대값
@@ -658,11 +652,6 @@ const DataParticles = ({
 
          setDrawerWriteOps(newDrawerOps);
          setHostWriteOps(newHostOps);
-
-         console.log(`[Simulation] Pool Write OPS: ${newDrawerOps}, OSD Write OPS: ${newHostOps}`);
-         console.log(
-            `[Simulation] Drawer Particles: ${Math.min(24, Math.max(4, Math.floor(newDrawerOps / 10)))}, Host Particles: ${Math.min(36, Math.max(8, Math.floor(newHostOps / 5)))}`,
-         );
       }, 10000); // Every 10 seconds
 
       return () => clearInterval(interval);
@@ -1001,358 +990,50 @@ const DataParticles = ({
                visible={false}
             />
          ))}
-         {/* Cyan: Drawer → Cylinder 꼬리(잔상) */}
-         <GhostTrails targetsRef={drawerParticleRefs} color={Colors.cyan[300]} maxPer={14} life={0.2} spawnInterval={0.02} sizeStart={6} sizeEnd={0} />
+         {/* Cyan: Drawer → Cylinder 꼬리(잔상) - Optimized settings */}
+         <GhostTrails
+            targetsRef={drawerParticleRefs}
+            color={Colors.cyan[300]}
+            maxPer={Math.floor(budget * 0.7)}
+            life={0.2}
+            spawnInterval={0.035}
+            sizeStart={6}
+            sizeEnd={0}
+         />
 
-         {/* Orange: Cylinder → Host 꼬리(잔상) */}
-         <GhostTrails targetsRef={hostParticleRefs} color={Colors.orange[300]} maxPer={14} life={0.2} spawnInterval={0.02} sizeStart={6} sizeEnd={0} />
+         {/* Orange: Cylinder → Host 꼬리(잔상) - Optimized settings */}
+         <GhostTrails
+            targetsRef={hostParticleRefs}
+            color={Colors.orange[300]}
+            maxPer={Math.floor(budget * 0.7)}
+            life={0.2}
+            spawnInterval={0.035}
+            sizeStart={6}
+            sizeEnd={0}
+         />
       </group>
    );
 };
 
-// Physics sphere component with central gravity and continuous energy
-const PhysicsSphere = ({
+const Table = ({
    position,
-   color,
-   centerPosition,
+   innerRadius,
+   outerRadius,
+   trailBudget,
+   writeOps,
+   cyl_h,
+   cyl_p,
+   cyl_r,
 }: {
    position: [number, number, number];
-   color: string;
-   centerPosition: [number, number, number];
+   innerRadius: number;
+   outerRadius: number;
+   trailBudget: number;
+   writeOps: { drawer: number; host: number };
+   cyl_h: number;
+   cyl_r: number;
+   cyl_p: [number, number, number];
 }) => {
-   const [ref, api] = useSphere(() => ({
-      mass: 1,
-      position,
-      material: { restitution: 0.98, friction: 0.005 }, // Even higher restitution, lower friction for more energy retention
-      args: [1.5], // radius
-      velocity: [(Math.random() - 0.5) * 8, (Math.random() - 0.5) * 6, (Math.random() - 0.5) * 8], // Doubled initial velocity
-   }));
-
-   const velocityRef = useRef([0, 0, 0]);
-   const frameCount = useRef(0);
-
-   // Subscribe to velocity once to avoid memory leaks
-   useEffect(() => {
-      const unsubscribe = api.velocity.subscribe(v => {
-         velocityRef.current = v;
-      });
-      return unsubscribe;
-   }, [api]);
-
-   // Apply continuous forces to keep spheres moving
-   useFrame(state => {
-      if (ref.current) {
-         const pos = ref.current.position;
-         const center = new THREE.Vector3(...centerPosition);
-         const currentPos = new THREE.Vector3(pos.x, pos.y, pos.z);
-         const time = state.clock.elapsedTime;
-
-         // Check velocity more frequently for more active movement
-         frameCount.current++;
-         if (frameCount.current % 15 === 0) {
-            // Reduced from 30 to 15
-            const velocity = velocityRef.current;
-            const speed = Math.sqrt(velocity[0] * velocity[0] + velocity[1] * velocity[1] + velocity[2] * velocity[2]);
-
-            // If speed is too low, add stronger energy boost
-            if (speed < 3) {
-               // Increased threshold from 2 to 3
-               const boostImpulse = new THREE.Vector3((Math.random() - 0.5) * 5, (Math.random() - 0.5) * 4, (Math.random() - 0.5) * 5);
-               api.applyImpulse([boostImpulse.x, boostImpulse.y, boostImpulse.z], [0, 0, 0]);
-            }
-         }
-
-         // Calculate direction towards center
-         const direction = center.clone().sub(currentPos).normalize();
-         const distance = currentPos.distanceTo(center);
-
-         // Apply forces every frame for more active movement
-         // Apply stronger orbital force (perpendicular to center direction)
-         const perpendicular = new THREE.Vector3(-direction.z, 0, direction.x);
-         const orbitalForce = perpendicular.multiplyScalar(2.5); // Increased from 1.0 to 2.5
-
-         // Apply stronger chaotic forces with more variation
-         const chaoticForce = new THREE.Vector3(
-            Math.sin(time * 5 + pos.x) * 1.2 + Math.cos(time * 7) * 0.8,
-            Math.sin(time * 4 + pos.y) * 1.0 + Math.cos(time * 6) * 0.6,
-            Math.cos(time * 6 + pos.z) * 1.2 + Math.sin(time * 8) * 0.8,
-         );
-
-         // Apply central gravity with more strength
-         const gravityStrength = Math.min(distance * 0.08, 1.5); // Increased multiplier and max
-         const centralForce = direction.multiplyScalar(gravityStrength);
-
-         // Add stronger upward force with variation
-         const antiGravity = new THREE.Vector3(0, 1.0 + Math.sin(time * 3) * 0.5, 0);
-
-         // Add turbulence for more chaotic movement
-         const turbulence = new THREE.Vector3(
-            Math.sin(time * 4 + distance) * 0.8,
-            Math.cos(time * 3.5 + distance) * 0.6,
-            Math.sin(time * 5.5 + distance) * 0.8,
-         );
-
-         // Combine all forces
-         const totalForce = orbitalForce.add(chaoticForce).add(centralForce).add(antiGravity).add(turbulence);
-
-         api.applyForce([totalForce.x, totalForce.y, totalForce.z], [0, 0, 0]);
-
-         // More frequent and stronger random impulses
-         if (Math.random() < 0.008) {
-            // Increased from 0.003 to 0.008
-            const impulse = new THREE.Vector3(
-               (Math.random() - 0.5) * 4, // Increased from 2 to 4
-               (Math.random() - 0.5) * 3, // Increased from 1.5 to 3
-               (Math.random() - 0.5) * 4, // Increased from 2 to 4
-            );
-            api.applyImpulse([impulse.x, impulse.y, impulse.z], [0, 0, 0]);
-         }
-      }
-   });
-
-   return (
-      <Sphere ref={ref as any} args={[1.5]} castShadow>
-         <meshStandardMaterial color={color} emissive={color} emissiveIntensity={0.2} metalness={0.6} roughness={0.4} />
-      </Sphere>
-   );
-};
-
-// Physics cylinder boundary using individual box walls
-const CylinderBoundary = ({ position }: { position: [number, number, number] }) => {
-   const cylinderRadius = 24; // Smaller radius to keep spheres well inside
-   const cylinderHeight = 35; // Taller walls
-   const wallThickness = 8; // Much thicker walls
-
-   // Create 16 walls in a circle - each wall must be declared separately
-   const angle0 = (0 / 16) * Math.PI * 2;
-   useBox(() => ({
-      mass: 0,
-      position: [position[0] + Math.cos(angle0) * cylinderRadius, position[1], position[2] + Math.sin(angle0) * cylinderRadius],
-      args: [wallThickness, cylinderHeight, wallThickness * 2],
-      material: { restitution: 0.95, friction: 0.01 },
-      type: 'Static',
-      rotation: [0, angle0, 0],
-   }));
-
-   const angle1 = (1 / 16) * Math.PI * 2;
-   useBox(() => ({
-      mass: 0,
-      position: [position[0] + Math.cos(angle1) * cylinderRadius, position[1], position[2] + Math.sin(angle1) * cylinderRadius],
-      args: [wallThickness, cylinderHeight, wallThickness * 2],
-      material: { restitution: 0.95, friction: 0.01 },
-      type: 'Static',
-      rotation: [0, angle1, 0],
-   }));
-
-   const angle2 = (2 / 16) * Math.PI * 2;
-   useBox(() => ({
-      mass: 0,
-      position: [position[0] + Math.cos(angle2) * cylinderRadius, position[1], position[2] + Math.sin(angle2) * cylinderRadius],
-      args: [wallThickness, cylinderHeight, wallThickness * 2],
-      material: { restitution: 0.95, friction: 0.01 },
-      type: 'Static',
-      rotation: [0, angle2, 0],
-   }));
-
-   const angle3 = (3 / 16) * Math.PI * 2;
-   useBox(() => ({
-      mass: 0,
-      position: [position[0] + Math.cos(angle3) * cylinderRadius, position[1], position[2] + Math.sin(angle3) * cylinderRadius],
-      args: [wallThickness, cylinderHeight, wallThickness * 2],
-      material: { restitution: 0.95, friction: 0.01 },
-      type: 'Static',
-      rotation: [0, angle3, 0],
-   }));
-
-   const angle4 = (4 / 16) * Math.PI * 2;
-   useBox(() => ({
-      mass: 0,
-      position: [position[0] + Math.cos(angle4) * cylinderRadius, position[1], position[2] + Math.sin(angle4) * cylinderRadius],
-      args: [wallThickness, cylinderHeight, wallThickness * 2],
-      material: { restitution: 0.95, friction: 0.01 },
-      type: 'Static',
-      rotation: [0, angle4, 0],
-   }));
-
-   const angle5 = (5 / 16) * Math.PI * 2;
-   useBox(() => ({
-      mass: 0,
-      position: [position[0] + Math.cos(angle5) * cylinderRadius, position[1], position[2] + Math.sin(angle5) * cylinderRadius],
-      args: [wallThickness, cylinderHeight, wallThickness * 2],
-      material: { restitution: 0.95, friction: 0.01 },
-      type: 'Static',
-      rotation: [0, angle5, 0],
-   }));
-
-   const angle6 = (6 / 16) * Math.PI * 2;
-   useBox(() => ({
-      mass: 0,
-      position: [position[0] + Math.cos(angle6) * cylinderRadius, position[1], position[2] + Math.sin(angle6) * cylinderRadius],
-      args: [wallThickness, cylinderHeight, wallThickness * 2],
-      material: { restitution: 0.95, friction: 0.01 },
-      type: 'Static',
-      rotation: [0, angle6, 0],
-   }));
-
-   const angle7 = (7 / 16) * Math.PI * 2;
-   useBox(() => ({
-      mass: 0,
-      position: [position[0] + Math.cos(angle7) * cylinderRadius, position[1], position[2] + Math.sin(angle7) * cylinderRadius],
-      args: [wallThickness, cylinderHeight, wallThickness * 2],
-      material: { restitution: 0.95, friction: 0.01 },
-      type: 'Static',
-      rotation: [0, angle7, 0],
-   }));
-
-   const angle8 = (8 / 16) * Math.PI * 2;
-   useBox(() => ({
-      mass: 0,
-      position: [position[0] + Math.cos(angle8) * cylinderRadius, position[1], position[2] + Math.sin(angle8) * cylinderRadius],
-      args: [wallThickness, cylinderHeight, wallThickness * 2],
-      material: { restitution: 0.95, friction: 0.01 },
-      type: 'Static',
-      rotation: [0, angle8, 0],
-   }));
-
-   const angle9 = (9 / 16) * Math.PI * 2;
-   useBox(() => ({
-      mass: 0,
-      position: [position[0] + Math.cos(angle9) * cylinderRadius, position[1], position[2] + Math.sin(angle9) * cylinderRadius],
-      args: [wallThickness, cylinderHeight, wallThickness * 2],
-      material: { restitution: 0.95, friction: 0.01 },
-      type: 'Static',
-      rotation: [0, angle9, 0],
-   }));
-
-   const angle10 = (10 / 16) * Math.PI * 2;
-   useBox(() => ({
-      mass: 0,
-      position: [position[0] + Math.cos(angle10) * cylinderRadius, position[1], position[2] + Math.sin(angle10) * cylinderRadius],
-      args: [wallThickness, cylinderHeight, wallThickness * 2],
-      material: { restitution: 0.95, friction: 0.01 },
-      type: 'Static',
-      rotation: [0, angle10, 0],
-   }));
-
-   const angle11 = (11 / 16) * Math.PI * 2;
-   useBox(() => ({
-      mass: 0,
-      position: [position[0] + Math.cos(angle11) * cylinderRadius, position[1], position[2] + Math.sin(angle11) * cylinderRadius],
-      args: [wallThickness, cylinderHeight, wallThickness * 2],
-      material: { restitution: 0.95, friction: 0.01 },
-      type: 'Static',
-      rotation: [0, angle11, 0],
-   }));
-
-   const angle12 = (12 / 16) * Math.PI * 2;
-   useBox(() => ({
-      mass: 0,
-      position: [position[0] + Math.cos(angle12) * cylinderRadius, position[1], position[2] + Math.sin(angle12) * cylinderRadius],
-      args: [wallThickness, cylinderHeight, wallThickness * 2],
-      material: { restitution: 0.95, friction: 0.01 },
-      type: 'Static',
-      rotation: [0, angle12, 0],
-   }));
-
-   const angle13 = (13 / 16) * Math.PI * 2;
-   useBox(() => ({
-      mass: 0,
-      position: [position[0] + Math.cos(angle13) * cylinderRadius, position[1], position[2] + Math.sin(angle13) * cylinderRadius],
-      args: [wallThickness, cylinderHeight, wallThickness * 2],
-      material: { restitution: 0.95, friction: 0.01 },
-      type: 'Static',
-      rotation: [0, angle13, 0],
-   }));
-
-   const angle14 = (14 / 16) * Math.PI * 2;
-   useBox(() => ({
-      mass: 0,
-      position: [position[0] + Math.cos(angle14) * cylinderRadius, position[1], position[2] + Math.sin(angle14) * cylinderRadius],
-      args: [wallThickness, cylinderHeight, wallThickness * 2],
-      material: { restitution: 0.95, friction: 0.01 },
-      type: 'Static',
-      rotation: [0, angle14, 0],
-   }));
-
-   const angle15 = (15 / 16) * Math.PI * 2;
-   useBox(() => ({
-      mass: 0,
-      position: [position[0] + Math.cos(angle15) * cylinderRadius, position[1], position[2] + Math.sin(angle15) * cylinderRadius],
-      args: [wallThickness, cylinderHeight, wallThickness * 2],
-      material: { restitution: 0.95, friction: 0.01 },
-      type: 'Static',
-      rotation: [0, angle15, 0],
-   }));
-
-   // Bottom floor
-   useBox(() => ({
-      mass: 0,
-      position: [position[0], position[1] - cylinderHeight / 2 - 1 - 3, position[2]],
-      args: [cylinderRadius * 2, 2, cylinderRadius * 2],
-      material: { restitution: 0.95, friction: 0.01 },
-      type: 'Static',
-   }));
-
-   // Top ceiling (lowered by 5 units)
-   useBox(() => ({
-      mass: 0,
-      position: [position[0], position[1] + cylinderHeight / 2 + 1 - 5, position[2]],
-      args: [cylinderRadius * 2, 2, cylinderRadius * 2],
-      material: { restitution: 0.95, friction: 0.01 },
-      type: 'Static',
-   }));
-
-   return null;
-};
-
-// Physics spheres container
-const PhysicsSpheresContainer = ({ centerPosition }: { centerPosition: [number, number, number] }) => {
-   const sphereColors = [
-      Colors.red[400],
-      Colors.blue[400],
-      Colors.green[400],
-      Colors.yellow[400],
-      Colors.purple[400],
-      Colors.cyan[400],
-      Colors.orange[400],
-      Colors.pink[400],
-      Colors.teal[400],
-      Colors.indigo[400],
-      Colors.lime[400],
-      Colors.amber[400],
-      Colors.emerald[400],
-      Colors.violet[400],
-      Colors.sky[400],
-      Colors.rose[400],
-      Colors.fuchsia[400],
-      Colors.slate[400],
-      Colors.zinc[400],
-      Colors.stone[400],
-   ];
-
-   return (
-      <group>
-         <CylinderBoundary position={centerPosition} />
-         {Array.from({ length: 20 }, (_, i) => {
-            // Random position safely inside cylinder boundary
-            const angle = Math.random() * Math.PI * 2;
-            const radius = Math.random() * 20; // Well inside wall boundary (24)
-            const height = (Math.random() - 0.5) * 25; // Reduced height range
-
-            return (
-               <PhysicsSphere
-                  key={i}
-                  position={[centerPosition[0] + Math.cos(angle) * radius, centerPosition[1] + height, centerPosition[2] + Math.sin(angle) * radius]}
-                  color={Colors.blue[500]}
-                  centerPosition={centerPosition}
-               />
-            );
-         })}
-      </group>
-   );
-};
-
-const Table = ({ position, innerRadius, outerRadius }: { position: [number, number, number]; innerRadius: number; outerRadius: number }) => {
    // Calculate positions and rotations for drawers - similar to server cases layout
    const drawerWidth = 25; // This becomes the depth when rotated
    const drawerDepth = 15; // This becomes the width when rotated
@@ -1405,6 +1086,7 @@ const Table = ({ position, innerRadius, outerRadius }: { position: [number, numb
       Array<{
          meshRef: RefObject<THREE.Mesh | null>;
          cloudsRef: RefObject<THREE.Mesh | null>;
+         groupRef: RefObject<THREE.Group | null>;
       }>
    >([]);
 
@@ -1422,30 +1104,94 @@ const Table = ({ position, innerRadius, outerRadius }: { position: [number, numb
          // texturesRef.current.rackTop = await loadTexture('/3d/textures/rack-top.jpg');
          texturesRef.current.serverFront = await loadTexture('/3d/textures/rack/server-front-half.png');
 
-         // 디버깅: 텍스처 로드 확인
-         console.log('Loaded textures:', {
-            rackFront: !!texturesRef.current.rackFront,
-            rackSide: !!texturesRef.current.rackSide,
-            serverFront: !!texturesRef.current.serverFront,
-         });
-
          setTextureReady(true);
       })();
    }, []);
 
-   useFrame(() => {
-      poolAnimationRefs.current.forEach(poolRefs => {
+   useFrame(state => {
+      const time = state.clock.elapsedTime;
+
+      poolAnimationRefs.current.forEach((poolRefs, index) => {
+         // Pool self-rotation
          if (poolRefs.meshRef.current) {
             poolRefs.meshRef.current.rotation.y += 0.002;
          }
          if (poolRefs.cloudsRef.current) {
             poolRefs.cloudsRef.current.rotation.y -= 0.004;
          }
+
+         // Orbital animation for pool groups
+         if (poolRefs.groupRef.current && index > 0) {
+            // Skip center pool (index 0)
+            const totalPools = mockTopologyData.pools.length;
+            const remainingPools = totalPools - 1;
+            const middleRingCount = Math.floor(remainingPools * 0.35);
+
+            if (index <= middleRingCount) {
+               // Middle ring - counter-clockwise orbit
+               const baseAngle = ((index - 1) / middleRingCount) * Math.PI * 2;
+               const orbitSpeed = -0.3; // Negative for counter-clockwise
+               const currentAngle = baseAngle + time * orbitSpeed;
+               const radius = 15;
+
+               poolRefs.groupRef.current.position.x = Math.cos(currentAngle) * radius;
+               poolRefs.groupRef.current.position.z = Math.sin(currentAngle) * radius;
+            } else {
+               // Outer ring - clockwise orbit
+               const outerIndex = index - middleRingCount - 1;
+               const outerRingCount = remainingPools - middleRingCount;
+               const baseAngle = (outerIndex / outerRingCount) * Math.PI * 2;
+               const orbitSpeed = 0.2; // Positive for clockwise
+               const currentAngle = baseAngle + time * orbitSpeed;
+               const radius = 30;
+
+               poolRefs.groupRef.current.position.x = Math.cos(currentAngle) * radius;
+               poolRefs.groupRef.current.position.z = Math.sin(currentAngle) * radius;
+            }
+         }
       });
    });
 
    const allPools = useMemo(() => mockTopologyData.pools.map((_, i) => ({ index: i })), []);
-   const poolPositions = useMemo(() => new AdaptiveLayoutManager().applyLayout(allPools, 'spiral', { spacing: 10 }), []);
+
+   // Custom pool distribution system
+   const poolPositions = useMemo(() => {
+      const totalPools = allPools.length;
+      if (totalPools === 0) return [];
+
+      // 1 pool at center
+      const centerPool = { position: [0, 0, 0] as [number, number, number] };
+
+      if (totalPools === 1) {
+         return [centerPool];
+      }
+
+      const remainingPools = totalPools - 1;
+      const middleRingCount = Math.floor(remainingPools * 0.35); // 35% in middle ring
+      const outerRingCount = remainingPools - middleRingCount; // Rest in outer ring
+
+      const positions = [centerPool]; // Start with center pool
+
+      // Middle ring positions (radius 15 - halfway between center and edge)
+      for (let i = 0; i < middleRingCount; i++) {
+         const angle = (i / middleRingCount) * Math.PI * 2;
+         const radius = 15;
+         positions.push({
+            position: [Math.cos(angle) * radius, 0, Math.sin(angle) * radius] as [number, number, number],
+         });
+      }
+
+      // Outer ring positions (radius 30 - cylinder edge)
+      for (let i = 0; i < outerRingCount; i++) {
+         const angle = (i / outerRingCount) * Math.PI * 2;
+         const radius = 30;
+         positions.push({
+            position: [Math.cos(angle) * radius, 0, Math.sin(angle) * radius] as [number, number, number],
+         });
+      }
+
+      return positions;
+   }, [allPools]);
 
    // 랙 배치를 위한 포지셔닝 헬퍼 함수들
    const outwardFromCenter = (p: [number, number, number]) => {
@@ -1502,13 +1248,15 @@ const Table = ({ position, innerRadius, outerRadius }: { position: [number, numb
             rotation={[0, Math.PI / 6, 0]}
             fontSize={0.7}
             font="/fonts/orbitron/Orbitron-Bold.ttf"
-            fontWeight={700}
-            color={Colors.neutral[400]}
+            fontWeight={900}
+            color={Colors.black}
             // @ts-ignore
             curveRadius={8.5}
             letterSpacing={0.02}
             anchorX="center"
             anchorY="middle"
+            outlineColor={Colors.white}
+            outlineWidth="5%"
          >
             {'     '}IaaS
          </Text3D>
@@ -1518,15 +1266,17 @@ const Table = ({ position, innerRadius, outerRadius }: { position: [number, numb
             rotation={[0, Math.PI / 2.75, 0]}
             fontSize={0.7}
             font="/fonts/orbitron/Orbitron-Bold.ttf"
-            fontWeight={700}
-            color={Colors.neutral[400]}
+            fontWeight={900}
+            color={Colors.black}
             // @ts-ignore
             curveRadius={8.5}
             letterSpacing={0.02}
             anchorX="center"
             anchorY="middle"
+            outlineColor={Colors.white}
+            outlineWidth="5%"
          >
-            {'    '}
+            {'   '}
             PaaS
          </Text3D>
 
@@ -1565,6 +1315,7 @@ const Table = ({ position, innerRadius, outerRadius }: { position: [number, numb
                   poolAnimationRefs.current[index] = {
                      meshRef: { current: null },
                      cloudsRef: { current: null },
+                     groupRef: { current: null },
                   };
                }
                const pos = poolPositions[index].position;
@@ -1579,13 +1330,23 @@ const Table = ({ position, innerRadius, outerRadius }: { position: [number, numb
                );
             })}
 
-         {/* Physics spheres inside cylinder */}
-         <Physics gravity={[0, 0, 0]} broadphase="SAP">
-            <PhysicsSpheresContainer centerPosition={[0, 10, 0]} />
-         </Physics>
+         {/* High-performance instanced spheres - replaces physics system */}
+         <InstancedSpheres
+            center={[cyl_p[0], cyl_p[1] - 8, cyl_p[2]]}
+            radius={cyl_r - 1.5} // 30(실린더 반경)보다 약간 작게
+            halfHeight={cyl_h / 2 - 4} // 35~40 높이에 맞춰 여유
+            maxCap={160}
+            targetCount={Math.min(40, Math.max(5, Math.floor((writeOps.drawer + writeOps.host) / 10)))}
+            sphereRadius={1.5}
+            color={writeOps.drawer + writeOps.host >= 200 ? '#ef4444' : '#3b82f6'}
+            stiffness={0.06} // ↓ 중심 흡인 약화
+            swirl={0.45} // ↓ 동일 궤도화 약화
+            noise={1.1} // ↑ 난류 증가로 경로 분산
+            drag={0.995} // ↑ 관성 유지로 활기 강화
+         />
 
          {/* Flying data particles */}
-         <DataParticles drawerPositions={drawerPositions} hostPositions={hostPositions} cylinderPosition={cylinderPosition} />
+         <DataParticles budget={trailBudget} drawerPositions={drawerPositions} hostPositions={hostPositions} cylinderPosition={cylinderPosition} />
       </group>
    );
 };
@@ -1639,62 +1400,138 @@ const GroundPlane = () => {
 };
 
 const WorldTrafficView: FC<Props> = () => {
+   const [fxOn, setFxOn] = useState(true);
+   // const [fsFactor, setFsFactor] = useState(0.5);
+   const [trailBudget, setTrailBudget] = useState(12);
+   const [writeOps, setWriteOps] = useState({ drawer: 100, host: 50 });
+   const [showHeader, setShowHeader] = useState(true);
+   const [cyl_position, cyl_rarius, cyl_height] = useMemo<[[number, number, number], number, number]>(() => [[0, 15, 0], 30, 35], []);
+   const LOW = 0.6;
+   const HIGH = 0.8;
+   const fxRef = useRef(true);
+
+   // Update write ops every 30 seconds
+   useEffect(() => {
+      const interval = setInterval(() => {
+         // Simulate varying write load
+         setWriteOps({
+            drawer: Math.floor(Math.random() * 200) + 50, // 50-250
+            host: Math.floor(Math.random() * 150) + 25, // 25-175
+         });
+      }, 30000); // Changed from 10000ms to 30000ms
+      return () => clearInterval(interval);
+   }, []);
+
+   // Handle double click to toggle header
+   const handleDoubleClick = () => {
+      setShowHeader(prev => !prev);
+   };
+
    return (
       <>
-         <AppHeader />
-         <div className="w-screen h-screen overflow-hidden">
+         {showHeader && <AppHeader />}
+         <div className="w-screen h-screen overflow-hidden" onDoubleClick={handleDoubleClick}>
             <Canvas
                camera={{ position: [-150, 120, 50], fov: 60, near: 0.1, far: 2000 }}
-               dpr={[1, 1.5]}
-               gl={{ antialias: true, toneMapping: THREE.ACESFilmicToneMapping, outputColorSpace: THREE.SRGBColorSpace }}
+               dpr={[1, 1.25]}
+               gl={{
+                  antialias: true,
+                  powerPreference: 'high-performance',
+                  precision: 'mediump',
+                  toneMapping: THREE.ACESFilmicToneMapping,
+                  outputColorSpace: THREE.SRGBColorSpace,
+               }}
                shadows
                style={{ background: Colors.neutral[900] }}
             >
-               <OrbitControls enableDamping dampingFactor={0.05} enablePan autoRotate autoRotateSpeed={-0.1} />
-               <Environment files="/3d/background/darkcenter.jpg" background backgroundBlurriness={0.05} backgroundIntensity={0.5} />
-               <EffectComposer>
-                  <Bloom mipmapBlur={false} luminanceThreshold={0.5} intensity={0.7} radius={0.3} />
-                  <BrightnessContrast brightness={0.03} contrast={0.3} />
-               </EffectComposer>
+               <PerformanceMonitor
+                  onChange={({ factor }) => {
+                     if (fxRef.current) {
+                        if (factor < LOW) {
+                           fxRef.current = false;
+                           setFxOn(false);
+                           setTrailBudget(8);
+                        } else {
+                           if (factor > HIGH) {
+                              fxRef.current = true;
+                              setFxOn(true);
+                              setTrailBudget(12);
+                           }
+                        }
+                     }
+                  }}
+               />
+               <OrbitControls
+                  enableDamping
+                  dampingFactor={0.05}
+                  enablePan
+                  mouseButtons={{
+                     LEFT: THREE.MOUSE.ROTATE,
+                     MIDDLE: THREE.MOUSE.PAN,
+                     RIGHT: THREE.MOUSE.DOLLY,
+                  }}
+               />
+               <Environment files="/3d/background/darkcenter.jpg" background backgroundBlurriness={0.05} backgroundIntensity={!fxOn ? 3 : 0.5} />
+               {fxOn && (
+                  <EffectComposer multisampling={0} resolutionScale={0.8}>
+                     <Bloom mipmapBlur={false} luminanceThreshold={0.7} intensity={0.5} radius={0.3} />
+                     <BrightnessContrast brightness={0.01} contrast={0.3} />
+                  </EffectComposer>
+               )}
 
                {/* Ambient light for overall illumination */}
                {/*<ambientLight intensity={0.3} color={Colors.blue[100]} />*/}
 
                {/* Main directional light */}
                <directionalLight
-                  args={['#ffffff', 3]}
+                  args={['#ffffff', fxOn ? 1.8 : 1.3]}
                   position={[150, 150, 150]}
                   castShadow
-                  shadow-mapSize={[2048, 2048]}
-                  shadow-camera-left={-400}
-                  shadow-camera-right={400}
-                  shadow-camera-top={400}
-                  shadow-camera-bottom={-400}
+                  shadow-mapSize={[512, 512]}
+                  shadow-camera-left={-200}
+                  shadow-camera-right={200}
+                  shadow-camera-top={200}
+                  shadow-camera-bottom={-200}
                   shadow-camera-near={0.1}
                   shadow-camera-far={1000}
                />
-
+               <pointLight args={['#ffffff', 50, 200, 0]} position={[0, -20, 0]} intensity={10} />
                {/* Additional point lights for atmosphere */}
                {/*<pointLight args={[Colors.blue[300], 2, 100]} position={[0, 50, 0]} />
                <pointLight args={[Colors.cyan[300], 1, 80]} position={[-100, 30, -100]} />
                <pointLight args={[Colors.teal[300], 1, 80]} position={[100, 30, 100]} />*/}
 
                {/* Main table and components */}
-               <Table position={[0, 10, 0]} innerRadius={100} outerRadius={130} />
+               <Table
+                  cyl_p={cyl_position}
+                  cyl_r={cyl_rarius}
+                  cyl_h={cyl_height}
+                  position={[0, 10, 0]}
+                  innerRadius={100}
+                  outerRadius={130}
+                  trailBudget={trailBudget}
+                  writeOps={writeOps}
+               />
 
                {/* Central cylinder */}
-               <Cylinder args={[30, 30, 35, 32]} position={[0, 15, 0]}>
+               <Cylinder args={[cyl_rarius, cyl_rarius, cyl_height, 32]} position={cyl_position}>
                   <meshPhysicalMaterial
                      color={Colors.neutral[200]}
                      metalness={0.8}
                      roughness={0.2}
                      transparent
-                     opacity={0.4}
+                     opacity={0.5}
                      transmission={0.6}
                      thickness={2}
+                     emissive={Colors.cyan[400]}
+                     emissiveIntensity={0.08}
                   />
                </Cylinder>
                <mesh position={[0, 32.5, 0]} rotation={[Math.PI / 2, 0, 0]}>
+                  <torusGeometry args={[30, 0.2, 8, 64]} />
+                  <meshStandardMaterial color={0x06b6d4} emissive={0x06b6d4} emissiveIntensity={1.0} transparent={false} />
+               </mesh>
+               <mesh position={[0, 0, 0]} rotation={[Math.PI / 2, 0, 0]}>
                   <torusGeometry args={[30, 0.2, 8, 64]} />
                   <meshStandardMaterial color={0x06b6d4} emissive={0x06b6d4} emissiveIntensity={1.0} transparent={false} />
                </mesh>
