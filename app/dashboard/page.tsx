@@ -90,7 +90,7 @@ export default function DashboardPage() {
                loop
                playsInline
             >
-               <source src="/videos/digital_greenhole.mp4" type="video/mp4" />
+               <source src="/videos/digital_purplehole.mp4" type="video/mp4" />
             </video>
             {/* 비디오 위에 오버레이 */}
             <div className="absolute inset-0 bg-gradient-to-br from-secondary-900/85 via-ai-neural/75 to-secondary-800/85"></div>

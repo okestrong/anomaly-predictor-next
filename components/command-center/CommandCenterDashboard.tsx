@@ -300,7 +300,7 @@ function HoloCard({ children, title, icon: Icon, color = 'primary', className = 
 
    return (
       <motion.div
-         className={`relative group ${className}`}
+         className={`relative group rounded-2xl ${className}`}
          whileHover={{
             boxShadow: `0 20px 60px -15px ${gradientColors[0]}80, 0 10px 40px -10px ${gradientColors[1]}60`,
          }}
@@ -1964,7 +1964,10 @@ export default function CommandCenterDashboard() {
                <div className="col-span-12 lg:col-span-4 space-y-6">
                   {/* CommandInterface Integration - Full Component */}
                   <HoloCard title="Cyberpunk Command Interface" icon={CpuChipIcon} gradient={9} className="overflow-hidden">
-                     <div className="bg-gradient-to-br from-slate-950 via-slate-900 to-purple-950 p-6 relative overflow-hidden min-h-[calc(100vh-83px)]">
+                     <div
+                        className="p-6 relative overflow-hidden min-h-[calc(100vh-83px)]"
+                        style={{ background: 'rgba(15, 23, 42, 0.15)', backdropFilter: 'blur(10px)' }}
+                     >
                         {/* Neural network background */}
                         {/*<NeuralNetworkConnections />*/}
 
@@ -1991,7 +1994,7 @@ export default function CommandCenterDashboard() {
                                  <motion.button
                                     key={mode.key}
                                     onClick={() => setActiveMode(mode.key as any)}
-                                    className={`p-4 rounded-xl border backdrop-blur-sm transition-all duration-300 ${
+                                    className={`p-4 cursor-pointer rounded-xl border backdrop-blur-sm transition-all duration-300 ${
                                        activeMode === mode.key
                                           ? 'border-cyan-400/50 bg-cyan-400/10 shadow-cyan-400/20'
                                           : 'border-white/10 bg-white/5 hover:border-white/20'
