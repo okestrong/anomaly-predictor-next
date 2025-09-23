@@ -2111,7 +2111,7 @@ export default function CommandCenterDashboard() {
                                     </div>
                                     <div className="p-6">
                                        <h2 className="text-xl font-semibold text-white mb-4">Neural Network Visualization</h2>
-                                       <div className="min-h-[600px] h-[840px] bg-black/20 rounded-lg relative overflow-hidden">
+                                       <div className="min-h-[200px] aspect-[1.3/1] bg-black/20 rounded-lg relative overflow-hidden">
                                           <NeuralNetworkConnections width={800} height={600} className="w-full h-full" />
                                           <div className="absolute top-4 left-4 pointer-events-none">
                                              <div className="text-left">
@@ -2130,7 +2130,7 @@ export default function CommandCenterDashboard() {
                               {activeMode === 'neural' && (
                                  <div className="p-6">
                                     <h2 className="text-xl font-semibold text-white mb-4">Neural Network Visualization</h2>
-                                    <div className="min-h-[600px] h-[840px] bg-black/20 rounded-lg relative overflow-hidden">
+                                    <div className="min-h-[200px] aspect-[1.3/1]  bg-black/20 rounded-lg relative overflow-hidden">
                                        <NeuralNetworkConnections width={800} height={600} className="w-full h-full" />
                                        <div className="absolute top-4 left-4 pointer-events-none">
                                           <div className="text-left">

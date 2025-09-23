@@ -43,8 +43,8 @@ export function WebSocketProvider({
 
   // Store actions
   const { setConnectionStatus: setRealtimeStatus, setChartMetrics, updateSingleMetric } = useRealtimeStore();
-  const { updateClusterStatus, updateNodes, updatePools } = useClusterStore();
-  const { addAnomaly, updateAnomalyScore } = useAnomalyStore();
+  const { setStatus: updateClusterStatus, setOSDs: updateNodes, setPools: updatePools } = useClusterStore();
+  const { addAnomalyAlert: addAnomaly, setAnomalyScore: updateAnomalyScore } = useAnomalyStore();
 
   const connect = (wsUrl: string = url) => {
     if (socketRef.current?.readyState === WebSocket.OPEN) {
@@ -248,8 +248,9 @@ export function WebSocketProvider({
         score: anomaly.score || 0,
         severity: anomaly.severity || 'medium',
         message: anomaly.message || 'Anomaly detected',
+        type: anomaly.type || 'detection',
         component: anomaly.component || 'system',
-        status: 'active'
+        resolved: false
       });
     }
   };

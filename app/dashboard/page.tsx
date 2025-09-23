@@ -93,7 +93,7 @@ export default function DashboardPage() {
                <source src="/videos/digital_purplehole.mp4" type="video/mp4" />
             </video>
             {/* 비디오 위에 오버레이 */}
-            <div className="absolute inset-0 bg-gradient-to-br from-secondary-900/85 via-ai-neural/75 to-secondary-800/85"></div>
+            <div className="absolute inset-0 bg-gradient-to-br from-secondary-900/90 via-ai-neural/70 to-secondary-800/90"></div>
          </div>
 
          {/* 메인 컨텐츠 */}
