@@ -16,7 +16,8 @@
       "Bash(open:*)",
       "Bash(pnpm dev:*)",
       "Bash(pnpm build:*)",
-      "Bash(git restore:*)"
+      "Bash(git restore:*)",
+      "Read(//Users/jclee/Documents/Okestro/Projects/DevSw/anomaly-predictor-api/**)"
     ],
     "deny": [],
     "ask": []

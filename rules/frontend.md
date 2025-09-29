@@ -2,6 +2,25 @@
 
 ## 프로젝트 개요 (Project Overview)
 
+### 연관 프로젝트들
+#### 1. predictor-api
+- 현재 프로젝트(predictor-next) 의 백엔드를 담당하는 프로젝트
+- Java21 에 Spring Boot 3.5.4 기반으로 만들어진 REST Api 들을 제공
+- vLLM 을 통해 LLM (GPT-OSS 모델) 을 이용하고, 이를 통해 ceph 에서 수집한 data 를 기반으로 ceph 의 장애를 예측하고 조치사항을 추천해주고, 이상을 탐지하고, 최적의 PG 개수를 알려주는 등의 인공지능을 사용한다.
+- 인공지능 기능을 사용시 정확도 향상을 위해 RAG 기능을 이용하는데, 이때 ceph-doc-crawler 프로젝트의 Qdrant 의 정보를 조회한다.
+- 위치 : /Users/jclee/Documents/Okestro/Projects/DevSw/anomaly-predictor-api
+- 참고문서 : 위에 언급한 위치에 rules 폴더가 있고 하위에 PRD.md 와 backend.md 를 참고하면 된다.
+#### 2. predictor
+- go-ceph 를 이용하여 ceph 의 metric 등의 data 들을 주기적으로 prometheus 로 수집하고, 직접적으로 REST Api 로도 제공하는 프로젝트
+- ceph 내부에 custom service 로 등록된다.
+- 위치 : /Users/jclee/Documents/Okestro/Projects/DevSw/anomaly-predictor
+- 참고문서 : 위에 언급한 위치에 rules 폴더가 있고 하위에 Guide.md 를 참고하면 된다.
+#### 3. ceph-doc-crawler
+- ceph 공식문서를 크롤링하고 이를 임베딩 하여 Qdrant 에 저장하는 프로젝트
+- predictor-api 에서 RAG 기능으로 Qdrant 의 정보를 참고한다.
+- 위치 : /Users/jclee/Documents/Okestro/Projects/DevSw/ceph-doc-crawler
+- 참고문서 : 위에 언급한 위치에 rules 폴더가 있고 하위에 PRD.md 와 requirements.md 를 참고하면 된다.
+
 ### 프로젝트 정보
 - **프로젝트명**: Anomaly Predictor Next
 - **목적**: Ceph 클러스터의 AI 기반 장애 예측 및 운영 최적화 대시보드 (Vue 3 → Next.js 15 마이그레이션)

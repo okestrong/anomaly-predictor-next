@@ -921,7 +921,7 @@ const ClusterTopologyScene = ({
    if (!texturesLoaded) {
       return (
          <>
-            <Stars radius={300} depth={100} count={10000} factor={4} saturation={0} fade />
+            <Stars radius={300} depth={100} count={1000} factor={4} saturation={0} fade />
             <Text3D position={[0, 0, 0]} fontSize={8} color={0xffffff} anchorX="center" anchorY="middle">
                Loading Textures...
             </Text3D>
@@ -931,8 +931,8 @@ const ClusterTopologyScene = ({
 
    return (
       <>
-         <Stars radius={30} depth={100} count={3000} factor={4} saturation={0} fade />
-         <Stars radius={100} depth={100} count={3000} factor={4} saturation={0} fade />
+         <Stars radius={30} depth={100} count={1000} factor={4} saturation={0} fade />
+         <Stars radius={100} depth={100} count={500} factor={4} saturation={0} fade />
          {/*<ambientLight intensity={0.3} />*/}
          {/*<directionalLight position={[100, 80, 60]} intensity={3} castShadow shadow-mapSize={[1024, 1024]} />*/}
          {/*<directionalLight position={[-30, 30, -40]} intensity={1.5} castShadow shadow-mapSize={[1024, 1024]}>
@@ -961,7 +961,7 @@ const ClusterTopologyScene = ({
             dampingFactor={0.05}
             enablePan
             autoRotate
-            autoRotateSpeed={0.01}
+            autoRotateSpeed={0.02}
             mouseButtons={{
                LEFT: THREE.MOUSE.ROTATE,
                MIDDLE: THREE.MOUSE.PAN,
@@ -997,7 +997,7 @@ const ClusterTopologyScene = ({
                   ref={poolRefs[index]}
                   key={pool.id}
                   poolData={pool}
-                  position={[pos[0], 50, pos[2]]}
+                  position={[pos[0], 70, pos[2]]}
                   textures={texturesRef.current}
                   onPoolClick={handlePoolClick}
                   selectedPoolIdRef={selectedPoolIdRef}
@@ -3829,7 +3829,7 @@ export default function ClusterTopologyView() {
                ref={canvasRef}
                camera={{ position: [0, 360, 0], fov: 60, near: 0.1, far: 2000 }}
                dpr={[1, 1.5]}
-               gl={{ antialias: false, toneMapping: THREE.ACESFilmicToneMapping, outputColorSpace: THREE.SRGBColorSpace }}
+               gl={{ antialias: true, toneMapping: THREE.ACESFilmicToneMapping, outputColorSpace: THREE.SRGBColorSpace }}
                shadows={false}
                style={{ background: Colors.neutral[900] }}
                className="topology-canvas"

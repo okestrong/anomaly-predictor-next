@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useRef, useEffect } from 'react';
+import React, { useRef, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Card, Button } from '@/components/common';
 import { AppHeader } from '@/components/layout';
@@ -19,6 +19,8 @@ import CapacityStatus from '@/components/dashboard/CapacityStatus';
 import ClusterStatus from '@/components/dashboard/ClusterStatus';
 import RiskPanel from '@/components/dashboard/RiskPanel';
 import AlertCenter from '@/components/dashboard/AlertCenter';
+import { useWebSocket } from '@/providers/WebSocketProvider';
+import { useAnomalyStore } from '@/stores/anomaly';
 
 interface AIInsight {
    id: number;
@@ -31,6 +33,11 @@ interface AIInsight {
 export default function DashboardPage() {
    const backgroundVideoRef = useRef<HTMLVideoElement>(null);
    const router = useRouter();
+   const { isConnected, connectionStatus } = useWebSocket();
+   const { recentAnomalies: alerts } = useAnomalyStore();
+
+   // State for AI insights from backend
+   const [aiInsights, setAiInsights] = useState<AIInsight[]>([]);
 
    useEffect(() => {
       if (backgroundVideoRef.current) {
@@ -38,37 +45,69 @@ export default function DashboardPage() {
       }
    }, []);
 
-   // AI 인사이트 데이터
-   const aiInsights: AIInsight[] = [
-      {
-         id: 1,
-         title: 'Performance optimization opportunity detected',
-         description: 'OSD redistribution could improve cluster performance by 12%',
-         timestamp: '2 minutes ago',
-         severityColor: 'bg-info-500',
-      },
-      {
-         id: 2,
-         title: 'Potential storage capacity issue',
-         description: 'Current growth rate suggests capacity limit in 45 days',
-         timestamp: '15 minutes ago',
-         severityColor: 'bg-warning-500',
-      },
-      {
-         id: 3,
-         title: 'Network latency anomaly resolved',
-         description: 'Automatic load balancing resolved the detected latency spike',
-         timestamp: '1 hour ago',
-         severityColor: 'bg-success-500',
-      },
-      {
-         id: 4,
-         title: 'Predictive maintenance alert',
-         description: 'Hardware replacement recommended for node-05 in 30 days',
-         timestamp: '2 hours ago',
-         severityColor: 'bg-ai-circuit',
-      },
-   ];
+   // Convert anomaly alerts to AI insights for display
+   useEffect(() => {
+      // Guard against undefined alerts
+      if (!alerts || !Array.isArray(alerts)) {
+         setAiInsights([
+            {
+               id: 1,
+               title: 'Waiting for backend connection...',
+               description: 'Connecting to predictor-api for real-time insights',
+               timestamp: 'now',
+               severityColor: connectionStatus === 'connected' ? 'bg-success-500' : 'bg-warning-500',
+            }
+         ]);
+         return;
+      }
+
+      const insights = alerts
+         .filter(alert => alert.type === 'ai_insight' || alert.type === 'risk')
+         .slice(0, 4) // Show only the 4 most recent insights
+         .map((alert, index) => ({
+            id: index + 1,
+            title: alert.message,
+            description: `Detected via ${alert.component} analysis`,
+            timestamp: getRelativeTime(alert.timestamp),
+            severityColor: getSeverityColor(alert.severity)
+         }));
+
+      // If no real insights available, use fallback data
+      if (insights.length === 0) {
+         setAiInsights([
+            {
+               id: 1,
+               title: connectionStatus === 'connected' ? 'No insights available' : 'Waiting for backend connection...',
+               description: connectionStatus === 'connected' ? 'System is running normally' : 'Connecting to predictor-api for real-time insights',
+               timestamp: 'now',
+               severityColor: connectionStatus === 'connected' ? 'bg-success-500' : 'bg-warning-500',
+            }
+         ]);
+      } else {
+         setAiInsights(insights);
+      }
+   }, [alerts, connectionStatus]);
+
+   const getSeverityColor = (severity: string) => {
+      switch (severity) {
+         case 'critical': return 'bg-danger-500';
+         case 'warning': return 'bg-warning-500';
+         case 'info': return 'bg-info-500';
+         default: return 'bg-ai-circuit';
+      }
+   };
+
+   const getRelativeTime = (timestamp: Date) => {
+      const now = new Date();
+      const diff = now.getTime() - timestamp.getTime();
+      const minutes = Math.floor(diff / 60000);
+      const hours = Math.floor(diff / 3600000);
+
+      if (minutes < 1) return 'just now';
+      if (minutes < 60) return `${minutes} minutes ago`;
+      if (hours < 24) return `${hours} hours ago`;
+      return timestamp.toLocaleDateString();
+   };
 
    const navigateToPage = (routeName: string) => {
       console.log(`Navigate to ${routeName}`);
@@ -148,7 +187,15 @@ export default function DashboardPage() {
                      variant="cyber"
                      header={
                         <div className="flex items-center justify-between">
-                           <h3 className="text-lg font-semibold text-white">AI Insights</h3>
+                           <div className="flex items-center space-x-2">
+                              <h3 className="text-lg font-semibold text-white">AI Insights</h3>
+                              {/* WebSocket Connection Status Indicator */}
+                              <div className={`w-2 h-2 rounded-full ${
+                                 connectionStatus === 'connected' ? 'bg-success-500' :
+                                 connectionStatus === 'connecting' ? 'bg-warning-500' :
+                                 connectionStatus === 'error' ? 'bg-danger-500' : 'bg-secondary-500'
+                              }`} title={`Backend connection: ${connectionStatus}`}></div>
+                           </div>
                            <Button variant="ai" size="xs" onClick={() => navigateToPage('prediction')}>
                               View All
                            </Button>

@@ -1413,7 +1413,7 @@ const Table = ({
                const hostOpsGroup = Math.floor(writeOps.host / 50);
                return Math.min(40, Math.max(5, Math.floor((drawerOpsGroup * 50 + hostOpsGroup * 50) / 10)));
             }, [Math.floor(writeOps.drawer / 50), Math.floor(writeOps.host / 50)])}
-            sphereRadius={1.5}
+            sphereRadius={1.0}
             color={writeOps.drawer + writeOps.host >= 200 ? '#ef4444' : '#3b82f6'}
             stiffness={0.06} // ↓ 중심 흡인 약화
             swirl={0.45} // ↓ 동일 궤도화 약화

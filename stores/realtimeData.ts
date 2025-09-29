@@ -17,6 +17,11 @@ export interface ChartMetrics {
   pgInconsistency: MetricDataPoint[]
   networkErrors: MetricDataPoint[]
   osdPerformance: MetricDataPoint[]
+  iops_read: MetricDataPoint[]
+  iops_write: MetricDataPoint[]
+  capacity_total: MetricDataPoint[]
+  capacity_used: MetricDataPoint[]
+  capacity_usage_percent: MetricDataPoint[]
 }
 
 export interface MetricConfig {

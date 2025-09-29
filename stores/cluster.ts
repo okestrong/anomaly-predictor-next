@@ -17,6 +17,8 @@ export interface ClusterStatus {
   lastUpdated: string
   fsid?: string
   epoch?: number
+  clusterName?: string
+  timestamp?: number
 }
 
 export interface Monitor {

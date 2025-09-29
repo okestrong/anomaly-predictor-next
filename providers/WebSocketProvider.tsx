@@ -67,12 +67,31 @@ export function WebSocketProvider({
         setRealtimeStatus('connected');
         reconnectAttempts.current = 0;
 
-        // Send initial connection message
+        // Send initial connection message and subscribe to dashboard topics
         ws.send(JSON.stringify({
           type: 'connection',
           client: 'anomaly-predictor-dashboard',
           timestamp: Date.now()
         }));
+
+        // Subscribe to dashboard data topics from predictor-api backend
+        const subscribeMessage = {
+          type: 'subscribe',
+          topics: [
+            '/topic/dashboard/cluster-status',
+            '/topic/dashboard/capacity',
+            '/topic/dashboard/metrics',
+            '/topic/dashboard/risks',
+            '/topic/dashboard/insights'
+          ],
+          client: 'anomaly-predictor-dashboard',
+          timestamp: Date.now()
+        };
+
+        // Send subscription request after a brief delay to ensure connection is established
+        setTimeout(() => {
+          ws.send(JSON.stringify(subscribeMessage));
+        }, 500);
       };
 
       ws.onmessage = (event) => {
@@ -100,7 +119,11 @@ export function WebSocketProvider({
       };
 
       ws.onerror = (error) => {
-        console.error('❌ WebSocket error:', error);
+        console.warn('⚠️ WebSocket connection failed - Backend may not be running:', {
+          url: wsUrl,
+          readyState: ws.readyState,
+          error: error
+        });
         setConnectionStatus('error');
         setRealtimeStatus('error');
         scheduleReconnect();
@@ -158,6 +181,28 @@ export function WebSocketProvider({
     const { type, payload, timestamp } = data;
 
     switch (type) {
+      // Dashboard data types from predictor-api backend
+      case 'CLUSTER_STATUS':
+        handleDashboardClusterStatus(payload);
+        break;
+
+      case 'CAPACITY_STATUS':
+        handleDashboardCapacity(payload);
+        break;
+
+      case 'CHART_METRICS':
+        handleDashboardMetrics(payload);
+        break;
+
+      case 'RISK_STATUS':
+        handleDashboardRisks(payload);
+        break;
+
+      case 'AI_INSIGHTS':
+        handleDashboardInsights(payload);
+        break;
+
+      // Legacy message types
       case 'metrics':
         handleMetricsUpdate(payload);
         break;
@@ -262,6 +307,180 @@ export function WebSocketProvider({
         updateSingleMetric(key as any, value);
       }
     });
+  };
+
+  // Dashboard data handlers for predictor-api backend
+  const handleDashboardClusterStatus = (data: any) => {
+    console.log('📊 Received cluster status from backend:', data);
+
+    // Update cluster store with comprehensive status data
+    updateClusterStatus({
+      health: data.health || 'HEALTH_OK',
+      version: data.version || '18.2.0',
+      fsid: data.fsid || '',
+      clusterName: data.clusterName || 'Ceph Cluster',
+      timestamp: data.timestamp || Date.now(),
+      osds: {
+        up: data.osds?.up || 0,
+        in: data.osds?.in || 0,
+        down: data.osds?.down || 0,
+        out: data.osds?.out || 0,
+        total: data.osds?.total || 0
+      },
+      monitors: data.monitors || [],
+      lastUpdated: new Date(data.timestamp || Date.now()).toISOString()
+    });
+
+    // Update OSDs data if available
+    if (data.osds) {
+      const osdNodes = Array.from({ length: data.osds.total }, (_, i) => ({
+        id: i,
+        name: `osd.${i}`,
+        health: (i < data.osds.up ? 'healthy' : 'down') as 'healthy' | 'warning' | 'error' | 'down',
+        in: i < data.osds.in,
+        up: i < data.osds.up,
+        weight: 1.0,
+        primaryAffinity: 1.0,
+        utilization: Math.floor(Math.random() * 80) + 10,
+        variance: 1.0,
+        pgCount: Math.floor(Math.random() * 100) + 50,
+        host: `node-${Math.floor(i / 3) + 1}`,
+        rack: `rack-${Math.floor(i / 9) + 1}`,
+        root: 'default'
+      }));
+      updateNodes(osdNodes);
+    }
+
+    // Update performance metrics in realtime store
+    if (data.performance) {
+      updateSingleMetric('iops_read', [{
+        timestamp: data.timestamp || Date.now(),
+        value: data.performance.iops_read,
+        label: new Date().toLocaleTimeString()
+      }]);
+      updateSingleMetric('iops_write', [{
+        timestamp: data.timestamp || Date.now(),
+        value: data.performance.iops_write,
+        label: new Date().toLocaleTimeString()
+      }]);
+      updateSingleMetric('latency', [{
+        timestamp: data.timestamp || Date.now(),
+        value: data.performance.latency_ms,
+        label: new Date().toLocaleTimeString()
+      }]);
+    }
+  };
+
+  const handleDashboardCapacity = (data: any) => {
+    console.log('💾 Received capacity data from backend:', data);
+
+    // Update pools data
+    if (data.pools && Array.isArray(data.pools)) {
+      const poolsData = data.pools.map((pool: any, index: number) => ({
+        id: index + 1,
+        name: pool.name,
+        size: Math.floor(pool.used_gb * 1024 * 1024 * 1024), // Convert GB to bytes
+        used: Math.floor(pool.used_gb * 0.8 * 1024 * 1024 * 1024), // Mock 80% usage
+        available: Math.floor(pool.used_gb * 0.2 * 1024 * 1024 * 1024),
+        objects: pool.objects || 0,
+        pgCount: pool.pg_count || 128,
+        status: 'active'
+      }));
+      updatePools(poolsData);
+    }
+
+    // Update capacity metrics in realtime store
+    updateSingleMetric('capacity_total', [{
+      timestamp: data.timestamp || Date.now(),
+      value: data.total_tb || 0,
+      label: new Date().toLocaleTimeString()
+    }]);
+    updateSingleMetric('capacity_used', [{
+      timestamp: data.timestamp || Date.now(),
+      value: data.used_tb || 0,
+      label: new Date().toLocaleTimeString()
+    }]);
+    updateSingleMetric('capacity_usage_percent', [{
+      timestamp: data.timestamp || Date.now(),
+      value: data.usage_percent || 0,
+      label: new Date().toLocaleTimeString()
+    }]);
+  };
+
+  const handleDashboardMetrics = (data: any) => {
+    console.log('📈 Received chart metrics from backend:', data);
+
+    // Update chart metrics with real backend data
+    const chartMetrics: any = {};
+
+    // Map backend metric history to frontend chart format
+    Object.entries(data).forEach(([metricName, history]) => {
+      if (Array.isArray(history)) {
+        chartMetrics[metricName] = history.map((point: any) => ({
+          timestamp: point.timestamp,
+          value: point.value,
+          label: point.label || new Date(point.timestamp).toLocaleTimeString()
+        }));
+      }
+    });
+
+    setChartMetrics(chartMetrics);
+  };
+
+  const handleDashboardRisks = (data: any) => {
+    console.log('⚠️ Received risk data from backend:', data);
+
+    // Process risk data and convert to anomaly alerts
+    if (data.risks && Array.isArray(data.risks)) {
+      data.risks.forEach((risk: any) => {
+        // Convert risk to anomaly alert format
+        const severity = risk.level === 'high' ? 'critical' :
+                        risk.level === 'medium' ? 'high' :
+                        'medium';
+
+        addAnomaly({
+          id: `risk-${Date.now()}-${Math.random()}`,
+          timestamp: new Date(data.timestamp || Date.now()),
+          score: risk.level === 'high' ? 85 : risk.level === 'medium' ? 65 : 45,
+          severity: severity as 'low' | 'medium' | 'high' | 'critical',
+          message: risk.description || risk.title,
+          type: 'risk',
+          component: 'cluster',
+          resolved: false
+        });
+      });
+    }
+
+    // Update anomaly score based on overall risk assessment
+    const totalRisks = data.total_risks || 0;
+    const highRisks = data.high_risks || 0;
+    const riskScore = Math.min(100, (highRisks * 30) + ((totalRisks - highRisks) * 10));
+    updateAnomalyScore(riskScore);
+  };
+
+  const handleDashboardInsights = (data: any) => {
+    console.log('🤖 Received AI insights from backend:', data);
+
+    // Process AI insights and convert to appropriate store updates
+    if (Array.isArray(data)) {
+      data.forEach((insight: any) => {
+        // Convert insights to anomaly alerts with info severity
+        if (insight.severity === 'warning' || insight.severity === 'error') {
+          const severity = insight.severity === 'error' ? 'high' : 'medium';
+
+          addAnomaly({
+            id: `insight-${Date.now()}-${Math.random()}`,
+            timestamp: new Date(),
+            score: insight.severity === 'error' ? 75 : 50,
+            severity: severity as 'low' | 'medium' | 'high' | 'critical',
+            message: insight.description || insight.title,
+            type: 'ai_insight',
+            component: 'predictor',
+            resolved: false
+          });
+        }
+      });
+    }
   };
 
   // Auto-connect on mount

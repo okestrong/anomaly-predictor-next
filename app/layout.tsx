@@ -8,6 +8,7 @@ import '@fontsource/orbitron/700.css';
 import '@fontsource/orbitron/800.css';
 import '@fontsource/orbitron/900.css';
 import { ReactNode } from 'react';
+import { WebSocketProvider } from '@/providers/WebSocketProvider';
 
 const inter = Inter({
    variable: '--font-inter',
@@ -28,7 +29,9 @@ export default function RootLayout({
    return (
       <html lang="ko" className="dark">
          <body className={`${inter.variable} font-sans antialiased`}>
-            {children}
+            <WebSocketProvider>
+               {children}
+            </WebSocketProvider>
          </body>
       </html>
    );
