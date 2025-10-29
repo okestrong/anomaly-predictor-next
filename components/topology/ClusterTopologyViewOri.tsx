@@ -152,9 +152,9 @@ const PoolNode = forwardRef<
                         bumpScale={0.03}
                         metalness={0.1}
                         metalnessMap={textures.oceanMap}
-                        emissiveMap={textures.lightsMap}
-                        emissive={new THREE.Color(isSelected ? 0xffff00 : 0xffff88)}
-                        emissiveIntensity={isSelected ? 0.8 : 0.5}
+                        // emissiveMap={textures.lightsMap}
+                        // emissive={new THREE.Color(isSelected ? 0xffff00 : 0xffff88)}
+                        // emissiveIntensity={isSelected ? 0.8 : 0.5}
                      />
                   ) : (
                      <meshStandardMaterial
@@ -278,9 +278,8 @@ const DoughnutTable = ({ position = [0, -40, 0] }: { position?: [number, number,
             outerRadius={outerRadius}
             rotation={[0, 0, 0]}
             height={7}
-            castShadow
             bottomText="OKESTRO  *  CONTRABASS  SDS+"
-            bottomTextColor={Colors.neutral[400]}
+            bottomTextColor={Colors.neutral[300]}
             segment={512}
          />
          {/*<BangingGlassBall scale={2.5} useOrbit orbitCenterPosition={[0, -100, 0]} orbitRadius={80} y={-50} angularSpeed={-0.3} />*/}
@@ -292,7 +291,6 @@ const DoughnutTable = ({ position = [0, -40, 0] }: { position?: [number, number,
             outerRadius={innerRadius - 0.2}
             rotation={[0, 0, 0]}
             height={7}
-            castShadow
             segment={256}
          />
          <Text3D
@@ -835,14 +833,14 @@ const ClusterTopologyScene = ({
          texturesRef.current.albedoMap = await loadTexture('/3d/textures/earth/Albedo.jpg');
          texturesRef.current.bumpMap = await loadTexture('/3d/textures/earth/Bump.jpg');
          texturesRef.current.oceanMap = await loadTexture('/3d/textures/earth/Ocean.png');
-         texturesRef.current.lightsMap = await loadTexture('/3d/textures/earth/night_lights_modified.png');
+         // texturesRef.current.lightsMap = await loadTexture('/3d/textures/earth/night_lights_modified.png');
          texturesRef.current.cloudsMap = await loadTexture('/3d/textures/earth/Clouds.png');
 
-         const textureLoader = new THREE.TextureLoader();
-         texturesRef.current.metalPlanetMap = textureLoader.load('/3d/textures/planet/Various_AluminiumFoil01_header.jpg');
-         texturesRef.current.yellowMap = textureLoader.load('/3d/textures/planet/Metal_RedHotSteel_header.jpg');
-         texturesRef.current.redMap = textureLoader.load('/3d/textures/cube/Leather_Tufted_header_red.jpg');
-         texturesRef.current.hostMap = textureLoader.load('/3d/textures/planet/silver-metal-pattern-steel.webp');
+         // const textureLoader = new THREE.TextureLoader();
+         // texturesRef.current.metalPlanetMap = textureLoader.load('/3d/textures/planet/Various_AluminiumFoil01_header.jpg');
+         // texturesRef.current.yellowMap = textureLoader.load('/3d/textures/planet/Metal_RedHotSteel_header.jpg');
+         // texturesRef.current.redMap = textureLoader.load('/3d/textures/cube/Leather_Tufted_header_red.jpg');
+         // texturesRef.current.hostMap = textureLoader.load('/3d/textures/planet/silver-metal-pattern-steel.webp');
 
          // Mark textures as loaded and loading as complete
          setTexturesLoaded(true);
@@ -940,7 +938,7 @@ const ClusterTopologyScene = ({
          {/*<directionalLight position={[-30, 30, -40]} intensity={1.5} castShadow shadow-mapSize={[1024, 1024]}>
             <orthographicCamera args={[-100, 100, -100, 100, 0.1, 200]} />
          </directionalLight>*/}
-         <directionalLight position={[0, -50, 0]} intensity={5} castShadow shadow-mapSize={[1024, 1024]}>
+         <directionalLight position={[0, -50, 0]} intensity={7} shadow-mapSize={[256, 256]}>
             {/*<orthographicCamera args={[-100, 100, -100, 100, 0.1, 200]} />*/}
          </directionalLight>
          {/*{textSphereRef.current && (
@@ -958,7 +956,18 @@ const ClusterTopologyScene = ({
          {/*<hemisphereLight args={['dodgerblue', 'hotpink', 5]} position={[0, 10, 0]} intensity={10} castShadow />*/}
          {/*<pointLight position={[0, -20, 0]} intensity={0.8} distance={150} />*/}
          {/*<directionalLight position={[0, -15, 30]} intensity={0.6} />*/}
-         <OrbitControls enableDamping dampingFactor={0.05} enablePan autoRotate autoRotateSpeed={0.05} />
+         <OrbitControls
+            enableDamping
+            dampingFactor={0.05}
+            enablePan
+            autoRotate
+            autoRotateSpeed={0.01}
+            mouseButtons={{
+               LEFT: THREE.MOUSE.ROTATE,
+               MIDDLE: THREE.MOUSE.PAN,
+               RIGHT: THREE.MOUSE.DOLLY,
+            }}
+         />
 
          {/* Shadow-receiving ground plane */}
          {/*<mesh receiveShadow position={[0, -60, 0]} rotation={[-Math.PI / 2, 0, 0]}>
@@ -1011,7 +1020,7 @@ const ClusterTopologyScene = ({
 
          {/*Bubble 주변 조명*/}
          <rectAreaLight
-            args={['#ffffff', 2, 50, 50]}
+            args={['#ffffff', 3, 50, 50]}
             position={[0, -28, 0]}
             rotation-x={-Math.PI / 2} // -> 조명이 밑에서 위로 (위에서 아래로 비추려면 : Math.PI / 2)
          />
@@ -1019,8 +1028,8 @@ const ClusterTopologyScene = ({
          {/*<pointLight args={['#ffffff', 50, 50, 1]} position={[0, -33, -13]} />*/}
          {/*<pointLight args={['#ffffff', 50, 50, 1]} position={[13, -33, 0]} />*/}
          {/*<pointLight args={['#ffffff', 50, 50, 1]} position={[-13, -33, 0]} />*/}
-         <Bubble position={[0, -35, 0]} scale={3} color={Colors.slate[200]} useBubble />
-         <TextSphere ref={textSphereRef} position={[0, -36, 0]} scale={4} text="OKESTRO  OKESTRO" bgColor={Colors.white} textColor={Colors.blue[500]} />
+         <Bubble position={[0, -35, 0]} scale={3} color={Colors.white} useBubble />
+         <TextSphere ref={textSphereRef} position={[0, -36, 0]} scale={4} text="OKESTRO  OKESTRO" bgColor={Colors.pink[300]} textColor={Colors.blue[500]} />
          {/*Portal 상단 조명*/}
          {/*<rectAreaLight args={['#ffffff', 3, 30, 20]} position={[0, -45, 0]} rotation-x={Math.PI / 2} />*/}
          {/*<pointLight args={['#ffffff', 40, 20, 0.5]} position={[0, -50, 0]} />*/}
@@ -2789,8 +2798,8 @@ export default function ClusterTopologyView() {
          if (cameraRef.current && cameraRef.current.position.y >= 0) {
             gsap.to(cameraRef.current.position, {
                x: 0,
-               y: -30,
-               z: 140,
+               y: -20,
+               z: 150,
                duration: 1.5,
                ease: 'power2.inOut',
             });
@@ -3834,12 +3843,11 @@ export default function ClusterTopologyView() {
                   highlightNode={highlightNode}
                   toggleAllPanels={toggleAllPanels}
                />
-               {/*<Environment preset="night" />*/}
-               <Environment files={'/3d/background/datacenter-blue.jpg'} />
-               {/*<Environment preset="night" />*/}
-               <EffectComposer>
+               <Environment files={'/3d/background/datacenter.jpg'} />
+               {/* EffectComposer -> 성능을 고려하여 체감 비용 줄이기 : multisampling={0} resolutionScale={0.8} (80% 스케일 렌더링) */}
+               <EffectComposer multisampling={0} resolutionScale={0.8}>
                   {/* mipmapBlur 키면 화면 깜빡임 생겨서 false 로 함 */}
-                  <Bloom mipmapBlur={false} luminanceThreshold={0.7} intensity={0.7} radius={0.5} />
+                  <Bloom mipmapBlur={false} luminanceThreshold={0.7} intensity={0.35} radius={0.4} />
                   <BrightnessContrast brightness={0} contrast={0.2} />
                </EffectComposer>
             </Canvas>

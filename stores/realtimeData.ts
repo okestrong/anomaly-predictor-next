@@ -127,6 +127,51 @@ const metricConfigs: Record<keyof ChartMetrics, MetricConfig> = {
     unit: '%',
     warningThreshold: 80,
     criticalThreshold: 90
+  },
+  iops_read: {
+    min: 500,
+    max: 25000,
+    variance: 0.15,
+    trend: 0,
+    unit: 'ops/s',
+    warningThreshold: 20000,
+    criticalThreshold: 22500
+  },
+  iops_write: {
+    min: 400,
+    max: 20000,
+    variance: 0.15,
+    trend: 0,
+    unit: 'ops/s',
+    warningThreshold: 16000,
+    criticalThreshold: 18000
+  },
+  capacity_total: {
+    min: 10000,
+    max: 100000,
+    variance: 0.01,
+    trend: 0.001,
+    unit: 'GB',
+    warningThreshold: 80000,
+    criticalThreshold: 90000
+  },
+  capacity_used: {
+    min: 1000,
+    max: 75000,
+    variance: 0.05,
+    trend: 0.002,
+    unit: 'GB',
+    warningThreshold: 60000,
+    criticalThreshold: 70000
+  },
+  capacity_usage_percent: {
+    min: 10,
+    max: 95,
+    variance: 0.03,
+    trend: 0.001,
+    unit: '%',
+    warningThreshold: 75,
+    criticalThreshold: 85
   }
 }
 
@@ -170,7 +215,12 @@ export const useRealtimeStore = create<RealtimeStore>()(
         scrubErrors: generateInitialData(metricConfigs.scrubErrors),
         pgInconsistency: generateInitialData(metricConfigs.pgInconsistency),
         networkErrors: generateInitialData(metricConfigs.networkErrors),
-        osdPerformance: generateInitialData(metricConfigs.osdPerformance)
+        osdPerformance: generateInitialData(metricConfigs.osdPerformance),
+        iops_read: generateInitialData(metricConfigs.iops_read),
+        iops_write: generateInitialData(metricConfigs.iops_write),
+        capacity_total: generateInitialData(metricConfigs.capacity_total),
+        capacity_used: generateInitialData(metricConfigs.capacity_used),
+        capacity_usage_percent: generateInitialData(metricConfigs.capacity_usage_percent)
       },
       lastUpdate: new Date(),
       connectionStatus: 'disconnected',

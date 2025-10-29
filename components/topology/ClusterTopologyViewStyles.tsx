@@ -88,8 +88,10 @@ export default createGlobalStyle`
 
    .loading-spinner {
       position: relative;
-      width: 120px;
-      height: 120px;
+      //width: 120px;
+      //height: 120px;
+      width: 240px;
+      height: 240px;
    }
 
    .spinner-ring {

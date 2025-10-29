@@ -6,7 +6,7 @@
 #### 1. predictor-api
 - 현재 프로젝트(predictor-next) 의 백엔드를 담당하는 프로젝트
 - Java21 에 Spring Boot 3.5.4 기반으로 만들어진 REST Api 들을 제공
-- vLLM 을 통해 LLM (GPT-OSS 모델) 을 이용하고, 이를 통해 ceph 에서 수집한 data 를 기반으로 ceph 의 장애를 예측하고 조치사항을 추천해주고, 이상을 탐지하고, 최적의 PG 개수를 알려주는 등의 인공지능을 사용한다.
+- vLLM (https://vllm.hotk.co.kr) 을 통해 LLM (openai/gpt-oss-20b 모델) 을 이용하고, 이를 통해 ceph 에서 수집한 data 를 기반으로 ceph 의 장애를 예측하고 조치사항을 추천해주고, 이상을 탐지하고, 최적의 PG 개수를 알려주는 등의 인공지능을 사용한다.
 - 인공지능 기능을 사용시 정확도 향상을 위해 RAG 기능을 이용하는데, 이때 ceph-doc-crawler 프로젝트의 Qdrant 의 정보를 조회한다.
 - 위치 : /Users/jclee/Documents/Okestro/Projects/DevSw/anomaly-predictor-api
 - 참고문서 : 위에 언급한 위치에 rules 폴더가 있고 하위에 PRD.md 와 backend.md 를 참고하면 된다.
@@ -16,10 +16,11 @@
 - 위치 : /Users/jclee/Documents/Okestro/Projects/DevSw/anomaly-predictor
 - 참고문서 : 위에 언급한 위치에 rules 폴더가 있고 하위에 Guide.md 를 참고하면 된다.
 #### 3. ceph-doc-crawler
-- ceph 공식문서를 크롤링하고 이를 임베딩 하여 Qdrant 에 저장하는 프로젝트
+- ceph 공식문서를 크롤링하고 ollama (nomic-embed-text-v1.5) 를 이용하여 임베딩하여 Qdrant 에 저장하는 프로젝트
 - predictor-api 에서 RAG 기능으로 Qdrant 의 정보를 참고한다.
 - 위치 : /Users/jclee/Documents/Okestro/Projects/DevSw/ceph-doc-crawler
 - 참고문서 : 위에 언급한 위치에 rules 폴더가 있고 하위에 PRD.md 와 requirements.md 를 참고하면 된다.
+#### [주의] 위에 언급한 연관 프로젝트들에 대한 설명과 위치를 메모리에 기억해놔라!!
 
 ### 프로젝트 정보
 - **프로젝트명**: Anomaly Predictor Next
@@ -41,7 +42,7 @@ Vue 3 원본 프로젝트에서 Next.js 15로의 모든 기능 마이그레이�
 ### 핵심 기능
 1. **실시간 클러스터 모니터링**: 8개 차트 + 3D 토폴로지
 2. **AI 기반 장애 예측**: 12개 예측 카테고리
-3. **RAG 기반 조치 가이드**: ceph-doc-crawler + sentence-transformers
+3. **RAG 기반 조치 가이드**: ceph-doc-crawler + ollama (nomic-embed-text-v1.5)
 4. **ML 실시간 이상감지**: 이상 점수 + 히트맵 + 모델 성능
 5. **PG 최적화 도구**: 계산기 + 분포 분석 + 시뮬레이션
 6. **3D 클러스터 토폴로지**: 우주 환경 + 4계층 노드 + 인터랙션
@@ -1807,6 +1808,22 @@ export interface ClusterStatus {
   - [x] 데이터 파티클 시스템 (서랍→실린더→호스트)
   - [x] VM/Container 파티클 애니메이션
   - [x] 더블클릭 헤더 토글 기능
+- ✅ **토폴로지 실제 데이터 연동 (2025-01-20)**
+  - [x] **Backend 구현**
+    - [x] 7개 DTO 클래스 (HostDataDto, OSDDataDto, PGDataDto, PoolDataDto, ClusterInfoDto, SummaryDto, TopologyResponseDto)
+    - [x] TopologyService (392 lines) - 5분 캐시, Jackson 파싱, 에러 처리
+    - [x] TopologyController (185 lines) - 4개 REST 엔드포인트
+  - [x] **Frontend 구현**
+    - [x] TypeScript 타입 정의 (types/topology.ts)
+    - [x] Topology API 클라이언트 (lib/api/topologyApi.ts)
+    - [x] Topology Zustand 스토어 (stores/topology.ts) - 캐시 인식 초기화
+    - [x] TopologyProvider (providers/TopologyProvider.tsx) - Early fetch 메커니즘
+    - [x] 데이터 변환 레이어 (lib/transformTopologyData.ts) - 애니메이션 호환성
+    - [x] ClusterTopologyView 실제 데이터 통합
+  - [ ] **테스트 및 검증**
+    - [ ] 브라우저에서 애니메이션 및 인터랙션 동작 확인
+    - [ ] 다양한 페이지 진입 경로에서 Early fetch 동작 테스트
+    - [ ] 에러 시나리오 테스트 (API 실패, 타임아웃 등)
 
 ### Phase 4: 상태 관리 및 서비스 구조 ✅ 완료
 - ✅ Zustand 스토어 구조 설계 (기본 UIStore 구현)
@@ -2089,5 +2106,3 @@ export interface ClusterStatus {
 - **애니메이션**: Framer Motion + Canvas 조합
 - **타이포그래피**: 그라데이션 텍스트 및 글로우 효과
 - **인터랙션**: 홀로그래픽 호버 및 클릭 피드백
-
-이 문서는 Vue 3에서 Next.js 15로의 마이그레이션이 **완료된** 프로젝트의 최종 개발 가이드입니다. 모든 기능이 성공적으로 이전되었으며, Next.js 15의 최신 기능을 활용하여 더욱 최적화된 버전으로 구현되었습니다.

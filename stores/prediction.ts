@@ -1,6 +1,7 @@
 import { create } from 'zustand'
 import { devtools } from 'zustand/middleware'
 import { immer } from 'zustand/middleware/immer'
+import { PredictionAPI, type PredictionResponse as APIPredictionResponse, type PredictionSummary } from '@/lib/api/predictionApi'
 
 // 12 prediction categories from PRD
 export type PredictionCategory =
@@ -22,6 +23,7 @@ export interface Prediction {
   category: PredictionCategory
   name: string
   description: string
+  aiAnalysis?: string // AI-generated analysis summary from backend
   probability: number // 0-1
   severity: 'low' | 'medium' | 'high' | 'critical'
   timeToImpact: number // hours
@@ -33,6 +35,7 @@ export interface Prediction {
   lastUpdated: Date
   trend: 'improving' | 'stable' | 'worsening'
   historicalAccuracy: number
+  isLoading?: boolean // Loading state for individual predictions
 }
 
 export interface PredictionTimeline {
@@ -48,6 +51,7 @@ interface PredictionStore {
   // State
   predictions: Record<PredictionCategory, Prediction>
   timelines: Record<PredictionCategory, PredictionTimeline>
+  summary: PredictionSummary | null
   isUpdating: boolean
   lastModelRun: Date | null
   modelVersion: string
@@ -55,12 +59,14 @@ interface PredictionStore {
   // Actions
   updatePrediction: (category: PredictionCategory, prediction: Partial<Prediction>) => void
   updateAllPredictions: () => Promise<void>
+  updateSummary: () => Promise<void>
   addTimelinePoint: (category: PredictionCategory, point: { probability: number; confidence: number }) => void
 
   // Computed
   getHighRiskPredictions: () => Prediction[]
   getImminentFailures: () => Prediction[]
   getOverallRiskScore: () => number
+  getImminentFailuresCount: () => number
   getPredictionsByComponent: (component: string) => Prediction[]
 }
 
@@ -315,6 +321,7 @@ export const usePredictionStore = create<PredictionStore>()(
       // Initial state
       predictions: generateInitialPredictions(),
       timelines: {} as Record<PredictionCategory, PredictionTimeline>,
+      summary: null,
       isUpdating: false,
       lastModelRun: new Date(),
       modelVersion: 'v5.0.0-reef',
@@ -330,38 +337,104 @@ export const usePredictionStore = create<PredictionStore>()(
       },
 
       updateAllPredictions: async () => {
-        set((state) => { state.isUpdating = true })
+        set((state) => {
+          state.isUpdating = true
+          // Set all predictions to loading state
+          Object.keys(state.predictions).forEach((key) => {
+            state.predictions[key as PredictionCategory].isLoading = true
+          })
+        })
 
-        try {
-          // Simulate ML model inference
-          await new Promise(resolve => setTimeout(resolve, 1500))
+        // Define all categories
+        const categories: PredictionCategory[] = [
+          'osd-failure',
+          'capacity-exhaustion',
+          'performance-degradation',
+          'pg-imbalance',
+          'network-bottleneck',
+          'memory-shortage',
+          'rebalancing-needed',
+          'hotspot-osd',
+          'cluster-expansion',
+          'smart-disk-failure',
+          'metric-disk-failure',
+          'comprehensive'
+        ]
 
-          set((state) => {
-            Object.keys(state.predictions).forEach((key) => {
-              const category = key as PredictionCategory
-              const pred = state.predictions[category]
+        // Function to update individual prediction
+        const updatePredictionCategory = async (category: PredictionCategory) => {
+          try {
+            const apiPred = await PredictionAPI.getPrediction(category)
 
-              // Update with some randomness to simulate real predictions
-              const delta = (Math.random() - 0.5) * 0.1
-              pred.probability = Math.max(0, Math.min(1, pred.probability + delta))
-              pred.confidence = 0.7 + Math.random() * 0.3
-              pred.timeToImpact = Math.floor((1 - pred.probability) * 168)
-              pred.severity =
-                pred.probability > 0.7 ? 'critical' :
-                pred.probability > 0.5 ? 'high' :
-                pred.probability > 0.3 ? 'medium' : 'low'
-
-              // Update trend
-              const trendRandom = Math.random()
-              pred.trend = trendRandom > 0.7 ? 'worsening' : trendRandom > 0.3 ? 'stable' : 'improving'
-
-              pred.lastUpdated = new Date()
+            // Update state immediately when this prediction completes
+            set((state) => {
+              const existingPred = state.predictions[category]
+              if (existingPred) {
+                existingPred.category = category
+                existingPred.name = apiPred.categoryName
+                existingPred.description = predictionConfigs[category].description
+                existingPred.aiAnalysis = apiPred.aiAnalysis
+                existingPred.probability = apiPred.riskScore
+                existingPred.severity = convertRiskLevelToSeverity(apiPred.riskLevel)
+                existingPred.timeToImpact = parseTimeToFailure(apiPred.predictedTimeToFailure)
+                existingPred.confidence = apiPred.confidence
+                existingPred.affectedComponents = apiPred.affectedResources
+                existingPred.rootCauses = apiPred.rootCauses
+                existingPred.recommendedActions = apiPred.recommendedActions
+                existingPred.mlModel = apiPred.modelInfo.modelName
+                existingPred.lastUpdated = new Date(apiPred.timestamp)
+                existingPred.trend = apiPred.trend as 'improving' | 'stable' | 'worsening'
+                existingPred.historicalAccuracy = apiPred.modelInfo.accuracy
+                existingPred.isLoading = false
+              }
             })
+          } catch (error) {
+            console.warn(`⚠️ Prediction failed for ${category}, using fallback`)
+            // Mark as not loading even on error
+            set((state) => {
+              if (state.predictions[category]) {
+                state.predictions[category].isLoading = false
+              }
+            })
+          }
+        }
 
+        // Launch all prediction requests independently (non-blocking)
+        // Each prediction will update state as soon as it completes
+        const predictionPromises = categories.map(cat => updatePredictionCategory(cat))
+
+        // Fetch summary separately
+        const summaryPromise = PredictionAPI.getPredictionSummary()
+          .then(apiSummary => {
+            set((state) => {
+              state.summary = apiSummary
+            })
+          })
+          .catch(error => {
+            console.warn('⚠️ Summary unavailable, using fallback')
+          })
+
+        // Wait for all to complete (but each updates independently as they finish)
+        try {
+          await Promise.all([...predictionPromises, summaryPromise])
+          set((state) => {
             state.lastModelRun = new Date()
           })
         } finally {
-          set((state) => { state.isUpdating = false })
+          set((state) => {
+            state.isUpdating = false
+          })
+        }
+      },
+
+      updateSummary: async () => {
+        try {
+          const apiSummary = await PredictionAPI.getPredictionSummary()
+          set((state) => {
+            state.summary = apiSummary
+          })
+        } catch (error) {
+          console.error('Failed to fetch prediction summary:', error)
         }
       },
 
@@ -388,6 +461,16 @@ export const usePredictionStore = create<PredictionStore>()(
 
       // Computed values
       getHighRiskPredictions: () => {
+        const { summary } = get()
+        // Prefer summary data if available
+        if (summary && summary.high_risk_categories !== undefined) {
+          const predictions = Object.values(get().predictions)
+          return predictions
+            .filter(p => p.severity === 'high' || p.severity === 'critical')
+            .sort((a, b) => b.probability - a.probability)
+        }
+
+        // Fallback to client-side calculation
         const predictions = Object.values(get().predictions)
         return predictions
           .filter(p => p.probability > 0.5)
@@ -402,6 +485,13 @@ export const usePredictionStore = create<PredictionStore>()(
       },
 
       getOverallRiskScore: () => {
+        const { summary } = get()
+        // Prefer backend summary data
+        if (summary && summary.overall_risk_score !== undefined) {
+          return summary.overall_risk_score * 100 // Convert to percentage
+        }
+
+        // Fallback to client-side calculation
         const predictions = Object.values(get().predictions)
         const weightedSum = predictions.reduce((sum, p) => {
           const weight = p.severity === 'critical' ? 4 :
@@ -412,6 +502,17 @@ export const usePredictionStore = create<PredictionStore>()(
 
         const maxPossible = predictions.length * 4 // All critical with 100% prob and confidence
         return (weightedSum / maxPossible) * 100
+      },
+
+      getImminentFailuresCount: () => {
+        const { summary } = get()
+        // Prefer backend summary data
+        if (summary && summary.imminent_failures !== undefined) {
+          return summary.imminent_failures
+        }
+
+        // Fallback to client-side calculation
+        return get().getImminentFailures().length
       },
 
       getPredictionsByComponent: (component) => {
@@ -425,9 +526,61 @@ export const usePredictionStore = create<PredictionStore>()(
   )
 )
 
-// Auto-update predictions in development
-if (process.env.NODE_ENV === 'development') {
-  setInterval(() => {
-    usePredictionStore.getState().updateAllPredictions()
-  }, 30000) // Every 30 seconds
+// Helper functions for converting backend data to frontend format
+
+/**
+ * Convert backend risk level to frontend severity
+ */
+function convertRiskLevelToSeverity(riskLevel: string): 'low' | 'medium' | 'high' | 'critical' {
+  const normalized = riskLevel.toUpperCase()
+  switch (normalized) {
+    case 'CRITICAL':
+      return 'critical'
+    case 'HIGH':
+      return 'high'
+    case 'MEDIUM':
+      return 'medium'
+    case 'LOW':
+    case 'MINIMAL':
+      return 'low'
+    default:
+      return 'medium'
+  }
 }
+
+/**
+ * Parse backend predictedTimeToFailure string to hours
+ * Examples: "3 days" -> 72, "2 weeks" -> 336, "1-2 months" -> 1080, "N/A" -> 168
+ */
+function parseTimeToFailure(timeString: string): number {
+  if (!timeString || timeString === 'N/A' || timeString === '6+ months') {
+    return 168 * 6 // 6 months
+  }
+
+  // Extract first number from string
+  const match = timeString.match(/(\d+)/)
+  if (!match) return 168 // Default to 1 week
+
+  const value = parseInt(match[1], 10)
+
+  // Check for unit
+  if (timeString.includes('day')) {
+    return value * 24
+  } else if (timeString.includes('week')) {
+    return value * 24 * 7
+  } else if (timeString.includes('month')) {
+    return value * 24 * 30
+  } else if (timeString.includes('hour') || timeString.includes('h')) {
+    return value
+  }
+
+  return value * 24 // Default to days
+}
+
+// Auto-update predictions disabled to prevent card re-mounting animation
+// Use the Auto-refresh button in the UI instead
+// if (process.env.NODE_ENV === 'development') {
+//   setInterval(() => {
+//     usePredictionStore.getState().updateAllPredictions()
+//   }, 30000) // Every 30 seconds
+// }

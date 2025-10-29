@@ -4,207 +4,180 @@ import { useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { usePredictionStore } from '@/stores/prediction';
 import { useAnomalyStore } from '@/stores/anomaly';
-import {
-  ExclamationTriangleIcon,
-  BoltIcon,
-  SparklesIcon,
-} from '@heroicons/react/24/outline';
+import { ExclamationTriangleIcon, BoltIcon, SparklesIcon } from '@heroicons/react/24/outline';
 import { cn } from '@/lib/utils';
 import NeuralNetwork from './NeuralNetwork';
 import RiskMeter from './RiskMeter';
 import PredictionCard from './PredictionCard';
 
 export default function PredictionDashboard() {
-  const {
-    predictions,
-    isUpdating,
-    updateAllPredictions,
-    getHighRiskPredictions,
-    getImminentFailures,
-    getOverallRiskScore
-  } = usePredictionStore();
+   const { predictions, isUpdating, updateAllPredictions, getHighRiskPredictions, getImminentFailures, getOverallRiskScore, getImminentFailuresCount } = usePredictionStore();
 
-  const { aiStatus, anomalyScore } = useAnomalyStore();
+   const { aiStatus, anomalyScore } = useAnomalyStore();
 
-  const [selectedCategory, setSelectedCategory] = useState<string>('all');
-  const [autoRefresh, setAutoRefresh] = useState(true);
+   const [selectedCategory, setSelectedCategory] = useState<string>('all');
+   const [autoRefresh, setAutoRefresh] = useState(true);
+   const [mounted, setMounted] = useState(false);
 
-  useEffect(() => {
-    // Initial prediction update
-    updateAllPredictions();
+   useEffect(() => {
+      // Set mounted to avoid hydration mismatch
+      setMounted(true);
 
-    // Auto-refresh every 30 seconds if enabled
-    const interval = autoRefresh ? setInterval(() => {
+      // Initial prediction update
       updateAllPredictions();
-    }, 30000) : null;
 
-    return () => {
-      if (interval) clearInterval(interval);
-    };
-  }, [autoRefresh, updateAllPredictions]);
+      // Auto-refresh every 30 seconds if enabled
+      const interval = autoRefresh
+         ? setInterval(() => {
+              updateAllPredictions();
+           }, 300000)
+         : null;
 
-  const highRiskPredictions = getHighRiskPredictions();
-  const imminentFailures = getImminentFailures();
-  const overallRisk = getOverallRiskScore();
+      return () => {
+         if (interval) clearInterval(interval);
+      };
+   }, [autoRefresh, updateAllPredictions]);
 
-  const filteredPredictions = selectedCategory === 'all'
-    ? Object.values(predictions)
-    : Object.values(predictions).filter(p => p.severity === selectedCategory);
+   // Use empty data until mounted to avoid hydration mismatch
+   const highRiskPredictions = mounted ? getHighRiskPredictions() : [];
+   const imminentFailures = mounted ? getImminentFailures() : [];
+   const imminentFailuresCount = mounted ? getImminentFailuresCount() : 0;
+   const overallRisk = mounted ? getOverallRiskScore() : 0;
 
-  return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-blue-950 p-6 relative">
-      <NeuralNetwork />
+   const filteredPredictions = mounted
+      ? (selectedCategory === 'all' ? Object.values(predictions) : Object.values(predictions).filter(p => p.severity === selectedCategory))
+      : [];
 
-      {/* Header with AI status */}
-      <div className="max-w-7xl mx-auto mb-8 relative z-10">
-        <div className="flex items-center justify-between mb-6">
-          <div>
-            <h1 className="text-3xl font-bold text-white mb-2">
-              AI Failure Prediction
-            </h1>
-            <p className="text-gray-400">
-              ML-powered predictive analytics for proactive cluster management
-            </p>
-          </div>
+   return (
+      <div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-blue-950 p-6 relative">
+         <NeuralNetwork />
 
-          <div className="flex items-center space-x-4">
-            {/* AI Status Indicator */}
-            <div className="flex items-center space-x-2 px-4 py-2 bg-black/30 rounded-lg border border-ai-circuit/20">
-              <div className={cn("w-2 h-2 rounded-full", {
-                'bg-green-400 animate-pulse': aiStatus === 'analyzing',
-                'bg-blue-400': aiStatus === 'idle',
-                'bg-yellow-400 animate-pulse': aiStatus === 'learning',
-                'bg-purple-400 animate-pulse': aiStatus === 'predicting'
-              })} />
-              <span className="text-sm text-ai-circuit font-medium">
-                AI {aiStatus.charAt(0).toUpperCase() + aiStatus.slice(1)}
-              </span>
+         {/* Header with AI status */}
+         <div className="max-w-[1800px] mx-auto mb-8 relative z-10">
+            <div className="flex items-center justify-between mb-6">
+               <div>
+                  <h1 className="text-3xl font-bold text-white mb-2">AI Failure Prediction</h1>
+                  <p className="text-gray-400">ML-powered predictive analytics for proactive cluster management</p>
+               </div>
+
+               <div className="flex items-center space-x-4">
+                  {/* AI Status Indicator */}
+                  <div className="flex items-center space-x-2 px-4 py-2 bg-black/30 rounded-lg border border-ai-circuit/20">
+                     <div
+                        className={cn('w-2 h-2 rounded-full', {
+                           'bg-green-400 animate-pulse': aiStatus === 'analyzing',
+                           'bg-blue-400': aiStatus === 'idle',
+                           'bg-yellow-400 animate-pulse': aiStatus === 'learning',
+                           'bg-purple-400 animate-pulse': aiStatus === 'predicting',
+                        })}
+                     />
+                     <span className="text-sm text-ai-circuit font-medium">AI {aiStatus.charAt(0).toUpperCase() + aiStatus.slice(1)}</span>
+                  </div>
+
+                  {/* Auto-refresh toggle */}
+                  <button
+                     onClick={() => setAutoRefresh(!autoRefresh)}
+                     className={cn(
+                        'px-4 py-2 rounded-lg transition-all',
+                        autoRefresh ? 'bg-ai-circuit/20 text-ai-circuit border border-ai-circuit/30' : 'bg-black/20 text-gray-400 border border-gray-700',
+                     )}
+                  >
+                     {autoRefresh ? 'Auto-refresh ON' : 'Auto-refresh OFF'}
+                  </button>
+               </div>
             </div>
 
-            {/* Auto-refresh toggle */}
-            <button
-              onClick={() => setAutoRefresh(!autoRefresh)}
-              className={cn(
-                "px-4 py-2 rounded-lg transition-all",
-                autoRefresh
-                  ? "bg-ai-circuit/20 text-ai-circuit border border-ai-circuit/30"
-                  : "bg-black/20 text-gray-400 border border-gray-700"
-              )}
-            >
-              {autoRefresh ? 'Auto-refresh ON' : 'Auto-refresh OFF'}
-            </button>
-          </div>
-        </div>
+            {/* Risk Overview Cards */}
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
+               {/* Overall Risk */}
+               <div className="bg-black/30 backdrop-blur-sm rounded-xl border border-white/10 p-6">
+                  <RiskMeter score={overallRisk} />
+               </div>
 
-        {/* Risk Overview Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
-          {/* Overall Risk */}
-          <div className="bg-black/30 backdrop-blur-sm rounded-xl border border-white/10 p-6">
-            <RiskMeter score={overallRisk} />
-          </div>
+               {/* Anomaly Score */}
+               <div className="bg-black/30 backdrop-blur-sm rounded-xl border border-white/10 p-6">
+                  <div className="flex items-center justify-between mb-4">
+                     <SparklesIcon className="w-5 h-5 text-purple-400" />
+                     <span className="text-xs text-gray-400">Live</span>
+                  </div>
+                  <div className="text-2xl font-bold text-purple-400 mb-1">{(anomalyScore * 100).toFixed(1)}%</div>
+                  <div className="text-xs text-gray-400">Anomaly Score</div>
+                  <div className="mt-3 h-1 bg-black/30 rounded-full overflow-hidden">
+                     <motion.div
+                        className="h-full bg-gradient-to-r from-purple-500 to-purple-400"
+                        initial={{ width: 0 }}
+                        animate={{ width: `${anomalyScore * 100}%` }}
+                     />
+                  </div>
+               </div>
 
-          {/* Anomaly Score */}
-          <div className="bg-black/30 backdrop-blur-sm rounded-xl border border-white/10 p-6">
-            <div className="flex items-center justify-between mb-4">
-              <SparklesIcon className="w-5 h-5 text-purple-400" />
-              <span className="text-xs text-gray-400">Live</span>
-            </div>
-            <div className="text-2xl font-bold text-purple-400 mb-1">
-              {(anomalyScore * 100).toFixed(1)}%
-            </div>
-            <div className="text-xs text-gray-400">Anomaly Score</div>
-            <div className="mt-3 h-1 bg-black/30 rounded-full overflow-hidden">
-              <motion.div
-                className="h-full bg-gradient-to-r from-purple-500 to-purple-400"
-                initial={{ width: 0 }}
-                animate={{ width: `${anomalyScore * 100}%` }}
-              />
-            </div>
-          </div>
+               {/* High Risk Count */}
+               <div className="bg-black/30 backdrop-blur-sm rounded-xl border border-white/10 p-6">
+                  <div className="flex items-center justify-between mb-4">
+                     <ExclamationTriangleIcon className="w-5 h-5 text-orange-400" />
+                     <span className="text-xs text-gray-400">Active</span>
+                  </div>
+                  <div className="text-2xl font-bold text-orange-400 mb-1">{highRiskPredictions.length}</div>
+                  <div className="text-xs text-gray-400">High Risk Predictions</div>
+                  <div className="mt-3 flex space-x-1">
+                     {Array.from({ length: 5 }, (_, i) => (
+                        <div key={i} className={cn('flex-1 h-1 rounded-full', i < highRiskPredictions.length ? 'bg-orange-400' : 'bg-black/30')} />
+                     ))}
+                  </div>
+               </div>
 
-          {/* High Risk Count */}
-          <div className="bg-black/30 backdrop-blur-sm rounded-xl border border-white/10 p-6">
-            <div className="flex items-center justify-between mb-4">
-              <ExclamationTriangleIcon className="w-5 h-5 text-orange-400" />
-              <span className="text-xs text-gray-400">Active</span>
+               {/* Imminent Failures */}
+               <div className="bg-black/30 backdrop-blur-sm rounded-xl border border-white/10 p-6">
+                  <div className="flex items-center justify-between mb-4">
+                     <BoltIcon className="w-5 h-5 text-red-400" />
+                     <span className="text-xs text-gray-400">24h</span>
+                  </div>
+                  <div className="text-2xl font-bold text-red-400 mb-1">{imminentFailuresCount}</div>
+                  <div className="text-xs text-gray-400">Imminent Failures</div>
+                  <div className="mt-3">
+                     {imminentFailures.length > 0 && <div className="text-xs text-red-400">Next in {imminentFailures[0]?.timeToImpact}h</div>}
+                  </div>
+               </div>
             </div>
-            <div className="text-2xl font-bold text-orange-400 mb-1">
-              {highRiskPredictions.length}
-            </div>
-            <div className="text-xs text-gray-400">High Risk Predictions</div>
-            <div className="mt-3 flex space-x-1">
-              {Array.from({ length: 5 }, (_, i) => (
-                <div
-                  key={i}
-                  className={cn(
-                    "flex-1 h-1 rounded-full",
-                    i < highRiskPredictions.length
-                      ? "bg-orange-400"
-                      : "bg-black/30"
-                  )}
-                />
-              ))}
-            </div>
-          </div>
 
-          {/* Imminent Failures */}
-          <div className="bg-black/30 backdrop-blur-sm rounded-xl border border-white/10 p-6">
-            <div className="flex items-center justify-between mb-4">
-              <BoltIcon className="w-5 h-5 text-red-400" />
-              <span className="text-xs text-gray-400">24h</span>
+            {/* Category Filter */}
+            <div className="flex items-center space-x-2 mb-6">
+               <span className="text-sm text-gray-400">Filter:</span>
+               {['all', 'critical', 'high', 'medium', 'low'].map(cat => (
+                  <button
+                     key={cat}
+                     onClick={() => setSelectedCategory(cat)}
+                     className={cn(
+                        'px-3 py-1 rounded-lg text-sm transition-all',
+                        selectedCategory === cat
+                           ? 'bg-ai-circuit/20 text-ai-circuit border border-ai-circuit/30'
+                           : 'bg-black/20 text-gray-400 border border-gray-700 hover:border-gray-600',
+                     )}
+                  >
+                     {cat.charAt(0).toUpperCase() + cat.slice(1)}
+                  </button>
+               ))}
             </div>
-            <div className="text-2xl font-bold text-red-400 mb-1">
-              {imminentFailures.length}
-            </div>
-            <div className="text-xs text-gray-400">Imminent Failures</div>
-            <div className="mt-3">
-              {imminentFailures.length > 0 && (
-                <div className="text-xs text-red-400">
-                  Next in {imminentFailures[0]?.timeToImpact}h
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
 
-        {/* Category Filter */}
-        <div className="flex items-center space-x-2 mb-6">
-          <span className="text-sm text-gray-400">Filter:</span>
-          {['all', 'critical', 'high', 'medium', 'low'].map((cat) => (
-            <button
-              key={cat}
-              onClick={() => setSelectedCategory(cat)}
-              className={cn(
-                "px-3 py-1 rounded-lg text-sm transition-all",
-                selectedCategory === cat
-                  ? "bg-ai-circuit/20 text-ai-circuit border border-ai-circuit/30"
-                  : "bg-black/20 text-gray-400 border border-gray-700 hover:border-gray-600"
-              )}
-            >
-              {cat.charAt(0).toUpperCase() + cat.slice(1)}
-            </button>
-          ))}
-        </div>
-
-        {/* Predictions Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-          <AnimatePresence mode="popLayout">
-            {filteredPredictions.map((prediction) => (
-              <PredictionCard key={prediction.id} prediction={prediction} />
-            ))}
-          </AnimatePresence>
-        </div>
-
-        {/* Update indicator */}
-        {isUpdating && (
-          <div className="fixed bottom-8 right-8 px-4 py-2 bg-black/80 backdrop-blur-sm rounded-lg border border-ai-circuit/30">
-            <div className="flex items-center space-x-2">
-              <div className="w-2 h-2 bg-ai-circuit rounded-full animate-pulse" />
-              <span className="text-sm text-ai-circuit">Updating predictions...</span>
+            {/* Predictions Grid */}
+            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+               <AnimatePresence mode="popLayout">
+                  {filteredPredictions.map(prediction => (
+                     <PredictionCard key={prediction.id} prediction={prediction} />
+                  ))}
+               </AnimatePresence>
             </div>
-          </div>
-        )}
+
+            {/* Update indicator */}
+            {isUpdating && (
+               <div className="fixed bottom-8 right-8 px-4 py-2 bg-black/80 backdrop-blur-sm rounded-lg border border-ai-circuit/30">
+                  <div className="flex items-center space-x-2">
+                     <div className="w-2 h-2 bg-ai-circuit rounded-full animate-pulse" />
+                     <span className="text-sm text-ai-circuit">Updating predictions...</span>
+                  </div>
+               </div>
+            )}
+         </div>
       </div>
-    </div>
-  );
+   );
 }

@@ -9,6 +9,8 @@ import '@fontsource/orbitron/800.css';
 import '@fontsource/orbitron/900.css';
 import { ReactNode } from 'react';
 import { WebSocketProvider } from '@/providers/WebSocketProvider';
+import { TopologyProvider } from '@/providers/TopologyProvider';
+import ToastProvider from '@/providers/ToastProvider';
 
 const inter = Inter({
    variable: '--font-inter',
@@ -29,8 +31,9 @@ export default function RootLayout({
    return (
       <html lang="ko" className="dark">
          <body className={`${inter.variable} font-sans antialiased`}>
-            <WebSocketProvider>
-               {children}
+            <ToastProvider />
+            <WebSocketProvider autoConnect={false}>
+               <TopologyProvider autoInitialize={true}>{children}</TopologyProvider>
             </WebSocketProvider>
          </body>
       </html>

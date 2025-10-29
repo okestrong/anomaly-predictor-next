@@ -17,7 +17,20 @@
       "Bash(pnpm dev:*)",
       "Bash(pnpm build:*)",
       "Bash(git restore:*)",
-      "Read(//Users/jclee/Documents/Okestro/Projects/DevSw/anomaly-predictor-api/**)"
+      "Read(//Users/jclee/Documents/Okestro/Projects/DevSw/anomaly-predictor-api/**)",
+      "Read(//Users/jclee/Documents/Okestro/Projects/DevSw/anomaly-predictor/**)",
+      "Bash(file:*)",
+      "Bash(pnpm list:*)",
+      "Bash(pnpm exec tsc:*)",
+      "Bash(./gradlew build:*)",
+      "Read(//Users/jclee/Documents/Okestro/Projects/DevSw/ceph-ai-dashboard/**)",
+      "Bash(./gradlew clean build -x test)",
+      "Read(//Users/jclee/Documents/Okestro/Projects/DevSw/anomaly-predictor-pdf-service/**)",
+      "Bash(lsof -ti:3001)",
+      "Bash(xargs kill -9)",
+      "Bash(cat /Users/jclee/Documents/Okestro/Projects/DevSw/anomaly-predictor-next/app/reports/predictions/page.tsx)",
+      "Bash(cat /Users/jclee/Documents/Okestro/Projects/DevSw/anomaly-predictor-next/app/reports/performance/page.tsx)",
+      "Bash(cat:*)"
     ],
     "deny": [],
     "ask": []

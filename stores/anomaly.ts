@@ -367,19 +367,20 @@ export const useAnomalyStore = create<AnomalyStore>()(
 )
 
 // Auto-generate anomalies in development
-if (process.env.NODE_ENV === 'development') {
-  setInterval(() => {
-    const store = useAnomalyStore.getState()
+// Temporarily disabled to fix 10-second animation freeze issue
+// if (process.env.NODE_ENV === 'development') {
+//   setInterval(() => {
+//     const store = useAnomalyStore.getState()
 
-    // Randomly update anomaly score
-    const currentScore = store.anomalyScore
-    const delta = (Math.random() - 0.5) * 0.1
-    const newScore = Math.max(0, Math.min(1, currentScore + delta))
-    store.setAnomalyScore(newScore)
+//     // Randomly update anomaly score
+//     const currentScore = store.anomalyScore
+//     const delta = (Math.random() - 0.5) * 0.1
+//     const newScore = Math.max(0, Math.min(1, currentScore + delta))
+//     store.setAnomalyScore(newScore)
 
-    // Occasionally generate new patterns
-    if (Math.random() > 0.95) {
-      store.analyzeClusterBehavior()
-    }
-  }, 10000) // Every 10 seconds
-}
+//     // Occasionally generate new patterns
+//     if (Math.random() > 0.95) {
+//       store.analyzeClusterBehavior()
+//     }
+//   }, 10000) // Every 10 seconds
+// }

@@ -2,7 +2,9 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
 import { ExclamationTriangleIcon, SparklesIcon, CheckCircleIcon, CpuChipIcon, CircleStackIcon, WifiIcon, ClockIcon } from '@heroicons/react/24/outline';
-import { Button, Card } from '@/components/common';
+import { Button, Card, FuturisticSpinner } from '@/components/common';
+import { useDashboardStore } from '@/stores/dashboard';
+import { useShallow } from 'zustand/react/shallow';
 
 interface RiskFactor {
    id: number;
@@ -21,72 +23,69 @@ interface Recommendation {
 }
 
 export default function RiskPanel() {
+   const { dashboardData, isLoading, refreshDashboard } = useDashboardStore(
+      useShallow(state => ({
+         dashboardData: state.dashboardData,
+         isLoading: state.isLoading,
+         refreshDashboard: state.refreshDashboard,
+      })),
+   );
    const [activeTab, setActiveTab] = useState<'risks' | 'recommendations'>('risks');
-   const [overallRiskScore] = useState(73);
-   const [lastAnalysis, setLastAnalysis] = useState('2 minutes ago');
    const [isHovered, setIsHovered] = useState(false);
 
-   const [riskFactors] = useState<RiskFactor[]>([
-      {
-         id: 1,
-         title: 'OSD Failure Prediction',
-         description: 'High probability of OSD.12 failure within 48 hours',
-         severity: 'critical',
-         impact: 85,
-         eta: '2 days',
-         icon: CircleStackIcon,
-      },
-      {
-         id: 2,
-         title: 'Memory Usage Spike',
-         description: 'Abnormal memory usage pattern on MON nodes',
-         severity: 'high',
-         impact: 65,
-         eta: '6 hours',
-         icon: CpuChipIcon,
-      },
-      {
-         id: 3,
-         title: 'Network Latency',
-         description: 'Increasing network latency between nodes',
-         severity: 'medium',
-         impact: 45,
-         eta: '12 hours',
-         icon: WifiIcon,
-      },
-      {
-         id: 4,
-         title: 'Scrub Performance',
-         description: 'Deep scrub operations taking longer than usual',
-         severity: 'low',
-         impact: 25,
-         eta: '1 week',
-         icon: ClockIcon,
-      },
-   ]);
+   // Extract risk assessment data from dashboard store
+   const riskAssessment = dashboardData?.riskAssessment;
+   const overallRiskScore = riskAssessment?.riskScore || 0;
+   const lastAnalysis = riskAssessment?.lastAnalysisTime || new Date().toLocaleTimeString();
 
-   const [recommendations] = useState<Recommendation[]>([
-      {
-         id: 1,
-         action: 'Replace OSD.12 before predicted failure',
-         priority: 'High',
-      },
-      {
-         id: 2,
-         action: 'Increase memory allocation for MON services',
-         priority: 'Medium',
-      },
-      {
-         id: 3,
-         action: 'Optimize network configuration between racks',
-         priority: 'Medium',
-      },
-      {
-         id: 4,
-         action: 'Schedule scrub operations during off-peak hours',
-         priority: 'Low',
-      },
-   ]);
+   // Get icon for risk factor type
+   const getRiskIcon = (type: string): React.ComponentType<{ className?: string }> => {
+      switch (type.toLowerCase()) {
+         case 'osd':
+         case 'storage':
+            return CircleStackIcon;
+         case 'memory':
+         case 'cpu':
+            return CpuChipIcon;
+         case 'network':
+            return WifiIcon;
+         case 'scrub':
+         case 'performance':
+            return ClockIcon;
+         default:
+            return ExclamationTriangleIcon;
+      }
+   };
+
+   // Convert backend riskFactors or fallback to risks
+   const riskFactors: RiskFactor[] =
+      riskAssessment?.riskFactors?.map((risk, index) => ({
+         id: index + 1,
+         title: risk.title,
+         description: risk.description,
+         severity: risk.severity as 'critical' | 'high' | 'medium' | 'low',
+         impact: risk.impact,
+         eta: risk.eta,
+         icon: getRiskIcon(risk.type),
+      })) ||
+      // Fallback: Convert RiskItem[] to RiskFactor[] if riskFactors not provided
+      riskAssessment?.risks?.map((risk, index) => ({
+         id: index + 1,
+         title: risk.title,
+         description: risk.description,
+         severity: risk.level as 'critical' | 'high' | 'medium' | 'low',
+         impact: risk.level === 'critical' ? 90 : risk.level === 'high' ? 70 : risk.level === 'medium' ? 50 : 30,
+         eta: 'Unknown',
+         icon: getRiskIcon(risk.category),
+      })) ||
+      [];
+
+   const recommendations: Recommendation[] =
+      riskAssessment?.recommendations?.map((rec, index) => ({
+         id: index + 1,
+         action: rec.action,
+         priority: rec.priority as 'High' | 'Medium' | 'Low',
+      })) || [];
 
    // Auto tab switching
    useEffect(() => {
@@ -189,8 +188,8 @@ export default function RiskPanel() {
       }
    };
 
-   const getPriorityColor = (priority: string) => {
-      switch (priority.toLowerCase()) {
+   const getPriorityColor = (priority?: string) => {
+      switch (priority?.toLowerCase()) {
          case 'high':
             return 'bg-danger-500/20 text-danger-400';
          case 'medium':
@@ -202,8 +201,8 @@ export default function RiskPanel() {
       }
    };
 
-   const getConfidence = (priority: string) => {
-      switch (priority.toLowerCase()) {
+   const getConfidence = (priority?: string) => {
+      switch (priority?.toLowerCase()) {
          case 'high':
             return 95;
          case 'medium':
@@ -217,8 +216,7 @@ export default function RiskPanel() {
 
    // Event handlers
    const runRiskAnalysis = () => {
-      console.log('Running AI risk analysis...');
-      setLastAnalysis('Just now');
+      refreshDashboard();
    };
 
    const viewRiskDetails = (risk: RiskFactor) => {
@@ -253,8 +251,8 @@ export default function RiskPanel() {
                         <SparklesIcon className="w-4 h-4 text-ai-neon neural-pulse" />
                         <span className="text-xs text-ai-neon">AI Powered</span>
                      </div>
-                     <Button size="xs" variant="ai" onClick={runRiskAnalysis}>
-                        Analyze
+                     <Button size="xs" variant="ai" onClick={runRiskAnalysis} disabled={isLoading}>
+                        {isLoading ? 'Analyzing...' : 'Analyze'}
                      </Button>
                   </div>
                </div>
@@ -282,7 +280,7 @@ export default function RiskPanel() {
                   </div>
                </div>
                <p className={`mt-3 text-sm font-medium ${overallRiskTextColor}`}>{overallRiskLevel} Risk</p>
-               <p className="text-xs text-secondary-400 mt-1">Based on {riskFactors.length} factors</p>
+               <p className="text-xs text-secondary-400 mt-1">{isLoading ? 'Loading risk data...' : `Based on ${riskFactors.length} factors`}</p>
             </div>
 
             {/* AI-powered tab navigation */}
@@ -339,55 +337,69 @@ export default function RiskPanel() {
                   }`}
                >
                   <div className="space-y-3 pb-2">
-                     {riskFactors.map(risk => (
-                        <div
-                           key={risk.id}
-                           className={`group flex items-start space-x-3 p-3 bg-secondary-800/30 rounded-lg border-l-2 transition-all duration-300 hover:bg-secondary-800/50 hover:scale-[1.01] hover:shadow-lg hover:shadow-ai-circuit/10 ${getRiskBorderColor(risk.severity)}`}
-                        >
-                           <div className="flex-shrink-0 mt-1">
-                              <risk.icon className={`w-4 h-4 transition-colors duration-300 ${getRiskIconColor(risk.severity)}`} />
+                     {isLoading ? (
+                        <div className="flex items-center justify-center h-32">
+                           <FuturisticSpinner size="md" label="Analyzing risk factors..." />
+                        </div>
+                     ) : riskFactors.length > 0 ? (
+                        riskFactors.map(risk => (
+                           <div
+                              key={risk.id}
+                              className={`group flex items-start space-x-3 p-3 bg-secondary-800/30 rounded-lg border-l-2 transition-all duration-300 hover:bg-secondary-800/50 hover:scale-[1.01] hover:shadow-lg hover:shadow-ai-circuit/10 ${getRiskBorderColor(risk.severity)}`}
+                           >
+                              <div className="flex-shrink-0 mt-1">
+                                 <risk.icon className={`w-4 h-4 transition-colors duration-300 ${getRiskIconColor(risk.severity)}`} />
+                              </div>
+
+                              <div className="flex-1 min-w-0">
+                                 <div className="flex items-center justify-between">
+                                    <p className="text-sm font-medium text-white truncate">{risk.title}</p>
+                                    <span
+                                       className={`px-2 py-1 text-xs font-medium rounded-full transition-all duration-300 group-hover:scale-105 ${getRiskBadgeColor(risk.severity)}`}
+                                    >
+                                       {risk.severity}
+                                    </span>
+                                 </div>
+                                 <p className="text-xs text-secondary-400 mt-1">{risk.description}</p>
+
+                                 {/* Risk progress */}
+                                 <div className="mt-2">
+                                    <div className="flex items-center justify-between text-xs text-secondary-400 mb-1">
+                                       <span>Impact Level</span>
+                                       <span>{risk.impact}%</span>
+                                    </div>
+                                    <div className="w-full bg-secondary-700 rounded-full h-1">
+                                       <div
+                                          className={`h-1 rounded-full transition-all duration-500 ${getRiskProgressColor(risk.severity)}`}
+                                          style={{ width: `${risk.impact}%` }}
+                                       />
+                                    </div>
+                                 </div>
+
+                                 {/* ETA */}
+                                 <div className="flex items-center justify-between mt-2 text-xs">
+                                    <span className="text-secondary-400">ETA: {risk.eta}</span>
+                                    <Button
+                                       size="xs"
+                                       variant="secondary"
+                                       onClick={() => viewRiskDetails(risk)}
+                                       className="opacity-80 group-hover:opacity-100 transition-opacity"
+                                    >
+                                       Details
+                                    </Button>
+                                 </div>
+                              </div>
                            </div>
-
-                           <div className="flex-1 min-w-0">
-                              <div className="flex items-center justify-between">
-                                 <p className="text-sm font-medium text-white truncate">{risk.title}</p>
-                                 <span
-                                    className={`px-2 py-1 text-xs font-medium rounded-full transition-all duration-300 group-hover:scale-105 ${getRiskBadgeColor(risk.severity)}`}
-                                 >
-                                    {risk.severity}
-                                 </span>
-                              </div>
-                              <p className="text-xs text-secondary-400 mt-1">{risk.description}</p>
-
-                              {/* Risk progress */}
-                              <div className="mt-2">
-                                 <div className="flex items-center justify-between text-xs text-secondary-400 mb-1">
-                                    <span>Impact Level</span>
-                                    <span>{risk.impact}%</span>
-                                 </div>
-                                 <div className="w-full bg-secondary-700 rounded-full h-1">
-                                    <div
-                                       className={`h-1 rounded-full transition-all duration-500 ${getRiskProgressColor(risk.severity)}`}
-                                       style={{ width: `${risk.impact}%` }}
-                                    />
-                                 </div>
-                              </div>
-
-                              {/* ETA */}
-                              <div className="flex items-center justify-between mt-2 text-xs">
-                                 <span className="text-secondary-400">ETA: {risk.eta}</span>
-                                 <Button
-                                    size="xs"
-                                    variant="secondary"
-                                    onClick={() => viewRiskDetails(risk)}
-                                    className="opacity-80 group-hover:opacity-100 transition-opacity"
-                                 >
-                                    Details
-                                 </Button>
-                              </div>
+                        ))
+                     ) : (
+                        <div className="flex items-center justify-center h-32 text-secondary-400">
+                           <div className="text-center">
+                              <ExclamationTriangleIcon className="w-8 h-8 mx-auto mb-2 text-secondary-500" />
+                              <p className="text-sm">No risk factors detected</p>
+                              <p className="text-xs mt-1">System is operating normally</p>
                            </div>
                         </div>
-                     ))}
+                     )}
                   </div>
                </div>
 
@@ -398,39 +410,53 @@ export default function RiskPanel() {
                   }`}
                >
                   <div className="space-y-3 pb-2">
-                     {recommendations.map((recommendation, index) => (
-                        <div
-                           key={recommendation.id}
-                           className="group flex items-start space-x-3 p-3 bg-gradient-to-r from-ai-glow/5 to-ai-cyber/5 rounded-lg border border-ai-glow/20 transition-all duration-300 hover:from-ai-glow/10 hover:to-ai-cyber/10 hover:border-ai-glow/30 hover:scale-[1.01] hover:shadow-lg hover:shadow-ai-glow/10"
-                           style={{ animationDelay: `${index * 100}ms` }}
-                        >
-                           <div className="flex-shrink-0 mt-1">
-                              <CheckCircleIcon className="w-4 h-4 text-ai-neon neural-pulse transition-transform duration-300 group-hover:scale-110" />
-                           </div>
+                     {isLoading ? (
+                        <div className="flex items-center justify-center h-32">
+                           <FuturisticSpinner size="md" label="Generating AI recommendations..." />
+                        </div>
+                     ) : recommendations.length > 0 ? (
+                        recommendations.map((recommendation, index) => (
+                           <div
+                              key={recommendation.id}
+                              className="group flex items-start space-x-3 p-3 bg-gradient-to-r from-ai-glow/5 to-ai-cyber/5 rounded-lg border border-ai-glow/20 transition-all duration-300 hover:from-ai-glow/10 hover:to-ai-cyber/10 hover:border-ai-glow/30 hover:scale-[1.01] hover:shadow-lg hover:shadow-ai-glow/10"
+                              style={{ animationDelay: `${index * 100}ms` }}
+                           >
+                              <div className="flex-shrink-0 mt-1">
+                                 <CheckCircleIcon className="w-4 h-4 text-ai-neon neural-pulse transition-transform duration-300 group-hover:scale-110" />
+                              </div>
 
-                           <div className="flex-1">
-                              <div className="flex items-start justify-between">
-                                 <p className="text-sm text-white font-medium leading-relaxed">{recommendation.action}</p>
-                                 <span
-                                    className={`ml-3 px-2 py-1 text-xs font-medium rounded-full whitespace-nowrap transition-all duration-300 group-hover:scale-105 ${getPriorityColor(recommendation.priority)}`}
-                                 >
-                                    {recommendation.priority}
-                                 </span>
+                              <div className="flex-1">
+                                 <div className="flex items-start justify-between">
+                                    <p className="text-sm text-white font-medium leading-relaxed">{recommendation.action}</p>
+                                    <span
+                                       className={`ml-3 px-2 py-1 text-xs font-medium rounded-full whitespace-nowrap transition-all duration-300 group-hover:scale-105 ${getPriorityColor(recommendation.priority)}`}
+                                    >
+                                       {recommendation.priority}
+                                    </span>
+                                 </div>
+                                 <div className="flex items-center justify-between mt-2">
+                                    <p className="text-xs text-ai-circuit">AI Confidence: {getConfidence(recommendation.priority)}%</p>
+                                    <Button
+                                       size="xs"
+                                       variant="ai"
+                                       onClick={() => implementRecommendation(recommendation)}
+                                       className="opacity-80 group-hover:opacity-100 transition-all duration-300"
+                                    >
+                                       Apply
+                                    </Button>
+                                 </div>
                               </div>
-                              <div className="flex items-center justify-between mt-2">
-                                 <p className="text-xs text-ai-circuit">AI Confidence: {getConfidence(recommendation.priority)}%</p>
-                                 <Button
-                                    size="xs"
-                                    variant="ai"
-                                    onClick={() => implementRecommendation(recommendation)}
-                                    className="opacity-80 group-hover:opacity-100 transition-all duration-300"
-                                 >
-                                    Apply
-                                 </Button>
-                              </div>
+                           </div>
+                        ))
+                     ) : (
+                        <div className="flex items-center justify-center h-32 text-secondary-400">
+                           <div className="text-center">
+                              <CheckCircleIcon className="w-8 h-8 mx-auto mb-2 text-success-500" />
+                              <p className="text-sm">No recommendations available</p>
+                              <p className="text-xs mt-1">System is optimally configured</p>
                            </div>
                         </div>
-                     ))}
+                     )}
                   </div>
                </div>
             </div>

@@ -1023,7 +1023,7 @@ const DataParticles = ({
             >
                {/* Add actual particle mesh for trail tracking */}
                <mesh>
-                  <sphereGeometry args={[0.5, 4, 4]} />
+                  <sphereGeometry args={[1.2, 8, 8]} />
                   <meshBasicMaterial color={Colors.cyan[300]} transparent opacity={0} />
                </mesh>
             </group>
@@ -1040,7 +1040,7 @@ const DataParticles = ({
             >
                {/* Add actual particle mesh for trail tracking */}
                <mesh>
-                  <sphereGeometry args={[0.5, 4, 4]} />
+                  <sphereGeometry args={[1.2, 8, 8]} />
                   <meshBasicMaterial color={Colors.purple[400]} transparent opacity={0} />
                </mesh>
             </group>
@@ -1051,8 +1051,8 @@ const DataParticles = ({
             color={Colors.cyan[300]}
             // maxPer={Math.min(12, Math.floor(budget * 0.5))} // Reduced from 0.7 to 0.5 and capped at 8
             maxPer={budget} // Reduced from 0.7 to 0.5 and capped at 8
-            life={0.15} // Reduced from 0.2
-            spawnInterval={0.05} // Increased from 0.035 to reduce spawn frequency
+            life={0.2} // Reduced from 0.2
+            spawnInterval={0.035} // Increased from 0.035 to reduce spawn frequency
             sizeStart={6}
             sizeEnd={0}
          />
@@ -1063,8 +1063,8 @@ const DataParticles = ({
             color={Colors.purple[400]}
             // maxPer={Math.min(12, Math.floor(budget * 0.5))} // Reduced from 0.7 to 0.5 and capped at 8
             maxPer={budget} // Reduced from 0.7 to 0.5 and capped at 8
-            life={0.15} // Reduced from 0.2
-            spawnInterval={0.05} // Increased from 0.035 to reduce spawn frequency
+            life={0.2} // Reduced from 0.2
+            spawnInterval={0.035} // Increased from 0.035 to reduce spawn frequency
             sizeStart={6}
             sizeEnd={0}
          />
@@ -1552,12 +1552,12 @@ const WorldTrafficView: FC<Props> = () => {
                   }}
                />
                <Environment files="/3d/background/darkcenter.jpg" background backgroundBlurriness={0.05} backgroundIntensity={!fxOn ? 3 : 0.5} />
-               {fxOn && (
-                  <EffectComposer multisampling={0} resolutionScale={0.8}>
-                     <Bloom mipmapBlur={false} luminanceThreshold={0.7} intensity={0.7} radius={0.3} />
-                     <BrightnessContrast brightness={0.01} contrast={0.3} />
-                  </EffectComposer>
-               )}
+               {/*{fxOn && (*/}
+               <EffectComposer multisampling={0} resolutionScale={0.8}>
+                  <Bloom mipmapBlur={false} luminanceThreshold={0.7} intensity={0.7} radius={0.3} />
+                  <BrightnessContrast brightness={0.01} contrast={0.3} />
+               </EffectComposer>
+               {/*)}*/}
 
                {/* Ambient light for overall illumination */}
                {/*<ambientLight intensity={0.3} color={Colors.blue[100]} />*/}
@@ -1575,7 +1575,7 @@ const WorldTrafficView: FC<Props> = () => {
                   shadow-camera-near={0.1}
                   shadow-camera-far={1000}
                />
-               <pointLight args={['#ffffff', 50, 200, 0]} position={[0, -20, 0]} intensity={10} />
+               <pointLight args={['#ffffff', 50, 200, 0]} position={[0, -20, 0]} intensity={1} />
                {/* Additional point lights for atmosphere */}
                {/*<pointLight args={[Colors.blue[300], 2, 100]} position={[0, 50, 0]} />
                <pointLight args={[Colors.cyan[300], 1, 80]} position={[-100, 30, -100]} />
@@ -1593,28 +1593,47 @@ const WorldTrafficView: FC<Props> = () => {
                   writeOps={writeOps}
                />
 
-               {/* Central cylinder */}
-               <Cylinder args={[cyl_rarius, cyl_rarius, cyl_height, 32]} position={cyl_position}>
-                  <meshPhysicalMaterial
-                     color={Colors.neutral[200]}
-                     metalness={0.8}
-                     roughness={0.2}
-                     transparent
-                     opacity={0.5}
-                     transmission={0.6}
-                     thickness={2}
-                     emissive={Colors.cyan[400]}
-                     emissiveIntensity={0.08}
-                  />
-               </Cylinder>
-               <mesh position={[0, 32.5, 0]} rotation={[Math.PI / 2, 0, 0]}>
+               {/* Central cylinder - 옆면만 불투명 */}
+               <group position={cyl_position}>
+                  {/* 실린더 옆면 (불투명) */}
+                  <mesh>
+                     <cylinderGeometry args={[cyl_rarius, cyl_rarius, cyl_height, 32, 1, true]} />
+                     <meshPhysicalMaterial
+                        color={Colors.neutral[200]}
+                        metalness={0.8}
+                        roughness={0.2}
+                        transparent={false}
+                        opacity={1.0}
+                        emissive={Colors.cyan[400]}
+                        emissiveIntensity={0.08}
+                        side={THREE.DoubleSide}
+                     />
+                  </mesh>
+                  {/* 실린더 윗면 (반투명, 수평) */}
+                  <mesh position={[0, cyl_height / 2, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+                     <circleGeometry args={[cyl_rarius, 32]} />
+                     <meshPhysicalMaterial
+                        color={Colors.neutral[200]}
+                        metalness={0.8}
+                        roughness={0.2}
+                        transparent={true}
+                        opacity={0.5}
+                        transmission={0.4}
+                        thickness={1}
+                        emissive={Colors.cyan[400]}
+                        emissiveIntensity={0.5}
+                        side={THREE.DoubleSide}
+                     />
+                  </mesh>
+               </group>
+               {/*<mesh position={[0, 32.5, 0]} rotation={[Math.PI / 2, 0, 0]}>
+                  <torusGeometry args={[30, 0.1, 8, 64]} />
+                  <meshStandardMaterial color={0x06b6d4} emissive={0x06b6d4} emissiveIntensity={1.0} transparent={false} />
+               </mesh>*/}
+               {/*<mesh position={[0, 0, 0]} rotation={[Math.PI / 2, 0, 0]}>
                   <torusGeometry args={[30, 0.2, 8, 64]} />
                   <meshStandardMaterial color={0x06b6d4} emissive={0x06b6d4} emissiveIntensity={1.0} transparent={false} />
-               </mesh>
-               <mesh position={[0, 0, 0]} rotation={[Math.PI / 2, 0, 0]}>
-                  <torusGeometry args={[30, 0.2, 8, 64]} />
-                  <meshStandardMaterial color={0x06b6d4} emissive={0x06b6d4} emissiveIntensity={1.0} transparent={false} />
-               </mesh>
+               </mesh>*/}
                <mesh position={[0, 15, 0]} rotation={[Math.PI / 2, 0, 0]}>
                   <torusGeometry args={[100, 0.2, 8, 64]} />
                   <meshStandardMaterial color={0x06b6d4} emissive={0x06b6d4} emissiveIntensity={1.0} transparent={false} />

@@ -91,6 +91,27 @@ const PoolNode = forwardRef<
          animationRefs.healthRingRef.current = healthRingRef.current;
          animationRefs.poolData = poolData;
       }
+
+      // Cache references in userData for performance optimization
+      if (groupRef.current) {
+         const group = groupRef.current;
+         group.userData.earthSphere = meshRef.current;
+         group.userData.clouds = cloudsRef.current;
+         group.userData.ring = healthRingRef.current;
+
+         // Pre-calculate random values for rotation speeds
+         if (cloudsRef.current && cloudsRef.current.userData.rotationSpeed === undefined) {
+            cloudsRef.current.userData.rotationSpeed = 0.2 + Math.random() * 0.3;
+         }
+         if (healthRingRef.current) {
+            if (healthRingRef.current.userData.rx === undefined) {
+               healthRingRef.current.userData.rx = 0.1 + Math.random() * 0.9;
+            }
+            if (healthRingRef.current.userData.ry === undefined) {
+               healthRingRef.current.userData.ry = 0.5 + Math.random();
+            }
+         }
+      }
    }, [animationRefs, poolData]);
 
    const handleClick = (event: any) => {
@@ -591,7 +612,13 @@ const ClusterTopologyScene = ({
    hostPlaneRefs,
    selectedHostIdRef,
    osdNodesRef,
-   initialAnimate,
+   poolNodesRef,
+   pgNodesRef,
+   trafficParticlesRef,
+   selectedPGIdRef,
+   osdAnimationDataRef,
+   searchedOSDIdsRef,
+   searchIngRef,
    updatePgSearchOption,
    highlightNode,
    toggleAllPanels,
@@ -610,12 +637,199 @@ const ClusterTopologyScene = ({
    hostPlaneRefs: RefObject<THREE.Mesh[]>;
    selectedHostIdRef: RefObject<string | null>;
    osdNodesRef: RefObject<THREE.Group[]>;
-   initialAnimate: () => void;
+   poolNodesRef: RefObject<THREE.Group[]>;
+   pgNodesRef: RefObject<THREE.Group[]>;
+   trafficParticlesRef: RefObject<THREE.Group[]>;
+   selectedPGIdRef: RefObject<string | null>;
+   osdAnimationDataRef: RefObject<Map<number, any>>;
+   searchedOSDIdsRef: RefObject<Set<number>>;
+   searchIngRef: RefObject<boolean>;
    updatePgSearchOption: (enabled: boolean) => void;
    highlightNode: (node: any) => void;
    toggleAllPanels: () => void;
 }) => {
    const { scene, camera, mouse, viewport } = useThree();
+
+   // Cache all nodes to avoid array creation in useFrame
+   const allNodesRef = useRef<THREE.Group[]>([]);
+
+   // Update allNodes when node arrays change
+   useEffect(() => {
+      allNodesRef.current = [...poolNodesRef.current, ...pgNodesRef.current, ...osdNodesRef.current];
+   }, [poolNodesRef.current.length, pgNodesRef.current.length, osdNodesRef.current.length]);
+
+   // Animation loop integrated with R3F useFrame
+   useFrame((state, delta) => {
+      const elapsedTime = state.clock.elapsedTime;
+
+      // Health ring shader material time updates and mesh rotation
+      for (const node of allNodesRef.current) {
+         // Use cached references instead of children.find()
+         const ring = node.userData.ring as THREE.Mesh;
+         if (ring && ring.userData.material) {
+            const shaderMaterial = ring.userData.material as THREE.ShaderMaterial;
+            if (shaderMaterial.uniforms && shaderMaterial.uniforms.time) {
+               shaderMaterial.uniforms.time.value = elapsedTime;
+            }
+
+            // Use pre-calculated random values stored in userData
+            const rx = ring.userData.rx ?? 0.2;
+            const ry = ring.userData.ry ?? 0.7;
+            ring.rotation.x += delta * rx;
+            ring.rotation.y += delta * ry;
+         }
+
+         // Update Holographic HUD animations
+         const hudGroup = node.userData.hud as THREE.Group;
+         if (hudGroup) {
+            hudGroup.traverse(child => {
+               if (child instanceof THREE.Mesh && child.userData.material) {
+                  const material = child.userData.material as THREE.ShaderMaterial;
+                  if (material.uniforms && material.uniforms.time) {
+                     material.uniforms.time.value = elapsedTime;
+                  }
+               }
+            });
+
+            // Rotate HUD ring slowly
+            const hudRing = hudGroup.children[0];
+            if (hudRing) {
+               hudRing.rotation.z += delta * 0.5;
+            }
+         }
+
+         // Enhanced OSD animations - pulse, float, rotation, and shader updates
+         if (node.userData.type === 'OSD') {
+            const animData = osdAnimationDataRef.current.get(node.userData.id);
+            const mesh = node.children.find(child => child.type === 'Mesh') as THREE.Mesh;
+
+            if (mesh && mesh.material) {
+               const material = mesh.material as THREE.MeshPhongMaterial;
+               const ing = searchIngRef.current;
+               // Subtle rotation animation for all OSDs
+               mesh.rotation.x += delta * 0.1;
+               mesh.rotation.y += delta * 0.15;
+
+               // Enhanced animations for selected OSDs
+               if (animData && (animData as any).isAnimating) {
+                  // Enhanced emissive glow for selected OSDs
+                  material.emissiveIntensity = 0.8 + Math.sin(elapsedTime * 4.0) * 0.3;
+
+                  // Scale pulsing for selected OSDs
+                  const scalePulse = 1.0 + Math.sin(elapsedTime * 4.0) * 0.1;
+                  node.scale.setScalar(scalePulse);
+               } else if (ing) {
+                  // Check if this OSD is being searched - if so, don't apply floating animation
+                  const isBeingSearched = searchedOSDIdsRef?.current?.has(node.userData.id) || false;
+                  const isCurrentlyFloating = node.position.y > 10;
+
+                  if (!isBeingSearched && !isCurrentlyFloating) {
+                     // Floating animation only for non-searched, non-floating OSDs at original position
+                     const floatOffset = Math.sin(elapsedTime * 1.5 + node.userData.id * 0.1) * 0.2;
+                     node.position.y = (node.userData.originalY || 0) + floatOffset;
+                  }
+
+                  // Reset to normal state for non-selected OSDs
+                  if (node.userData.status === 'up' && node.userData.health === 'healthy') {
+                     material.emissiveIntensity = 0.5;
+                  } else {
+                     material.emissiveIntensity = 0.3;
+                  }
+                  node.scale.setScalar(1.0);
+               }
+            }
+         }
+
+         // Enhanced PG animations
+         if (node.userData.type === 'PG') {
+            // Find main mesh
+            const pgMesh = node.children.find(child => child instanceof THREE.Mesh && !(child as any).name) as THREE.Mesh;
+
+            // Update HUD animations
+            const hudGroup = node.children.find(child => child.name === 'pg-holographic-hud') as THREE.Group;
+            if (hudGroup) {
+               hudGroup.traverse(child => {
+                  if (child instanceof THREE.Mesh && child.userData.material) {
+                     const material = child.userData.material as THREE.ShaderMaterial;
+                     if (material.uniforms && material.uniforms.time) {
+                        material.uniforms.time.value = elapsedTime;
+                     }
+                  }
+               });
+
+               // Slow rotation for HUD ring
+               const hudRing = hudGroup.children[0];
+               if (hudRing) {
+                  hudRing.rotation.z += delta * 0.3;
+               }
+            }
+
+            // Update energy field animation
+            const energyField = node.children.find(child => child.name === 'energy-field') as THREE.Mesh;
+            if (energyField && energyField.userData.material) {
+               const material = energyField.userData.material as THREE.ShaderMaterial;
+               if (material.uniforms && material.uniforms.time) {
+                  material.uniforms.time.value = elapsedTime;
+               }
+            }
+
+            // Selected PG enhanced effects
+            if (selectedPGIdRef.current === node.userData.id) {
+               if (pgMesh && pgMesh.material) {
+                  const material = pgMesh.material as THREE.MeshPhysicalMaterial;
+
+                  // Enhanced emissive pulsing
+                  material.emissiveIntensity = 0.5 + Math.sin(elapsedTime * 4) * 0.3;
+
+                  // Dynamic color shift for crystalline effect
+                  if (node.userData.state === 'active+clean') {
+                     const hue = Math.sin(elapsedTime * 2) * 0.1 + 0.5;
+                     // Reuse existing color object instead of creating new one
+                     if (!material.userData.tempColor) {
+                        material.userData.tempColor = new THREE.Color();
+                     }
+                     material.emissive = material.userData.tempColor.setHSL(hue, 1, 0.3);
+                  }
+
+                  // Scale pulsing
+                  const scale = 1.2 + Math.sin(elapsedTime * 3) * 0.15;
+                  node.scale.setScalar(scale);
+               }
+            } else {
+               // Reset for non-selected PGs
+               if (pgMesh && pgMesh.material) {
+                  const material = pgMesh.material as THREE.MeshPhysicalMaterial;
+                  material.emissiveIntensity = node.userData.state === 'active+clean' ? 0.3 : node.userData.state === 'degraded' ? 0.4 : 0.5;
+               }
+               node.scale.setScalar(1.0);
+            }
+         }
+
+         // Pool rotation effects
+         if (node.userData.type === 'Pool') {
+            const earthSphere = node.userData.earthSphere as THREE.Mesh;
+            if (earthSphere) {
+               earthSphere.rotation.y += delta * 0.1;
+            }
+
+            const clouds = node.userData.clouds as THREE.Mesh;
+            if (clouds) {
+               // Use cached rotation speed
+               const rotationSpeed = clouds.userData.rotationSpeed ?? 0.35;
+               clouds.rotation.y += delta * rotationSpeed;
+            }
+         }
+      }
+
+      // Traffic particle animations
+      for (const particleGroup of trafficParticlesRef.current) {
+         for (let i = 0; i < particleGroup.children.length; i++) {
+            const particle = particleGroup.children[i];
+            const scale = 1 + Math.sin(elapsedTime * 3 + i) * 0.2;
+            particle.scale.set(scale, scale, scale);
+         }
+      }
+   });
    const [texturesLoaded, setTexturesLoaded] = useState(false);
    const textSphereRef = useRef<THREE.Object3D>(null);
    const allPools = useMemo(() => mockTopologyData.pools.map((_, i) => ({ index: i })), []);
@@ -907,7 +1121,7 @@ const ClusterTopologyScene = ({
                toggleAllPanels();
             }, 5100);
 
-            initialAnimate();
+            // Animation loop moved to useFrame - removed initialAnimate()
 
             // Generate OSD nodes after hosts are positioned
             /*setTimeout(() => {
@@ -921,7 +1135,7 @@ const ClusterTopologyScene = ({
    if (!texturesLoaded) {
       return (
          <>
-            <Stars radius={300} depth={100} count={10000} factor={4} saturation={0} fade />
+            <Stars radius={300} depth={100} count={1000} factor={4} saturation={0} fade />
             <Text3D position={[0, 0, 0]} fontSize={8} color={0xffffff} anchorX="center" anchorY="middle">
                Loading Textures...
             </Text3D>
@@ -931,8 +1145,8 @@ const ClusterTopologyScene = ({
 
    return (
       <>
-         <Stars radius={30} depth={100} count={3000} factor={4} saturation={0} fade />
-         <Stars radius={100} depth={100} count={3000} factor={4} saturation={0} fade />
+         <Stars radius={30} depth={100} count={1000} factor={4} saturation={0} fade />
+         <Stars radius={100} depth={100} count={500} factor={4} saturation={0} fade />
          {/*<ambientLight intensity={0.3} />*/}
          {/*<directionalLight position={[100, 80, 60]} intensity={3} castShadow shadow-mapSize={[1024, 1024]} />*/}
          {/*<directionalLight position={[-30, 30, -40]} intensity={1.5} castShadow shadow-mapSize={[1024, 1024]}>
@@ -961,7 +1175,7 @@ const ClusterTopologyScene = ({
             dampingFactor={0.05}
             enablePan
             autoRotate
-            autoRotateSpeed={0.01}
+            autoRotateSpeed={0.02}
             mouseButtons={{
                LEFT: THREE.MOUSE.ROTATE,
                MIDDLE: THREE.MOUSE.PAN,
@@ -997,7 +1211,7 @@ const ClusterTopologyScene = ({
                   ref={poolRefs[index]}
                   key={pool.id}
                   poolData={pool}
-                  position={[pos[0], 50, pos[2]]}
+                  position={[pos[0], 70, pos[2]]}
                   textures={texturesRef.current}
                   onPoolClick={handlePoolClick}
                   selectedPoolIdRef={selectedPoolIdRef}
@@ -1326,6 +1540,9 @@ export default function ClusterTopologyView() {
    // const starFieldRef = useRef<THREE.Points | null>(null);
    const trafficParticlesRef = useRef<THREE.Group[]>([]);
 
+   // Search state for performance optimization (avoids DOM queries in useFrame)
+   const searchIngRef = useRef(false);
+
    // PG search enabled state - managed via DOM manipulation
    const updatePgSearchOption = (enabled: boolean) => {
       const pgOption = document.querySelector('.search-select option[value="pg"]') as HTMLOptionElement;
@@ -1423,16 +1640,7 @@ export default function ClusterTopologyView() {
 
       // useRef로 상태 확인 (리렌더링 없음)
       const allCollapsed = targetPositions.every(pos => panelsRef.current[pos].collapsed);
-      console.log('toggleAllPanels 호출됨, allCollapsed:', allCollapsed);
-      console.log('현재 패널 상태:', {
-         top: panelsRef.current.top.collapsed,
-         left: panelsRef.current.left.collapsed,
-         bottom: panelsRef.current.bottom.collapsed,
-         right: panelsRef.current.right.collapsed,
-      });
-
       if (allCollapsed) {
-         console.log('패널 열기 시작');
          // 패널 열기: useRef 상태만 변경 (리렌더링 없음)
          targetPositions.forEach(pos => {
             panelsRef.current[pos].collapsed = false;
@@ -1441,9 +1649,7 @@ export default function ClusterTopologyView() {
          // DOM 직접 조작으로 패널 표시
          targetPositions.forEach((position, index) => {
             const panelElement = document.querySelector(`.panel-${position}`) as HTMLElement;
-            console.log(`패널 ${position} 요소 찾기:`, !!panelElement);
             if (panelElement) {
-               console.log(`패널 ${position} 표시 및 애니메이션 시작`);
                // 패널 표시
                panelElement.style.display = 'block';
 
@@ -1462,7 +1668,7 @@ export default function ClusterTopologyView() {
                   // delay: index * 0.05,
                   ease: 'power2.out',
                   onComplete: () => {
-                     console.log(`패널 ${position} 애니메이션 완료`);
+                     // console.log(`패널 ${position} 애니메이션 완료`);
                   },
                });
             }
@@ -1508,7 +1714,6 @@ export default function ClusterTopologyView() {
    };
 
    const pulseNode = (node: THREE.Group | THREE.Object3D, poolId?: number) => {
-      console.log('PulseNode called with node:', node, 'poolId:', poolId);
       gsap.killTweensOf(node.scale);
       // Set initial scale to 0.8
       node.scale.set(0.8, 0.8, 0.8);
@@ -1534,6 +1739,7 @@ export default function ClusterTopologyView() {
 
    const clearSearch = () => {
       searchQueryRef.current = '';
+      searchIngRef.current = false;
       (document.querySelector('.search-panel') as HTMLElement).setAttribute('ing', '0');
       // Return any floating searched OSDs to their original positions
       // But skip OSDs that are selected by PG
@@ -1612,15 +1818,15 @@ export default function ClusterTopologyView() {
    };
 
    const performSearch = () => {
-      console.log('performSearch called with query:', searchQueryRef.current, 'type:', searchTypeRef.current);
       if (!searchQueryRef.current.trim()) {
+         searchIngRef.current = false;
          (document.querySelector('.search-panel') as HTMLElement).setAttribute('ing', '0');
          return;
       }
+      searchIngRef.current = true;
       (document.querySelector('.search-panel') as HTMLElement).setAttribute('ing', '1');
       const query = searchQueryRef.current.toLowerCase().trim();
       let matchCount = 0;
-      console.log('Starting search for:', query);
 
       // Clear existing animations and searched IDs
       searchedPoolIdsRef.current.clear();
@@ -1655,10 +1861,8 @@ export default function ClusterTopologyView() {
                if (ref.current) {
                   const poolData = mockTopologyData.pools[index];
                   const poolName = poolData.name?.toLowerCase() || '';
-                  console.log(`Searching pool: ${poolName}, query: ${query}, includes: ${poolName.includes(query)}`);
                   if (poolName.includes(query)) {
                      const poolObject = ref.current as THREE.Object3D;
-                     console.log(`Found matching pool: ${poolName}, applying pulse animation`);
                      // Store searched pool ID
                      searchedPoolIdsRef.current.add(poolData.id);
                      pulseNode(poolObject, poolData.id);
@@ -1833,10 +2037,77 @@ export default function ClusterTopologyView() {
    };
 
    useEffect(() => {
+      let clockIntervalId: NodeJS.Timeout;
+
+      const loadClock = () => {
+         const canvas = document.getElementById('clock') as HTMLCanvasElement;
+         if (!canvas) return;
+
+         const ctx = canvas.getContext('2d')!;
+         ctx.strokeStyle = '#00ffff';
+         ctx.lineWidth = 6;
+         ctx.shadowBlur = 8;
+         ctx.shadowColor = '#00ffff';
+
+         function degToRad(degree: number) {
+            return (degree / 180) * Math.PI;
+         }
+
+         function renderTime() {
+            const now = new Date();
+            const today = now.toDateString();
+            const time = now.toLocaleTimeString();
+            const hrs = now.getHours() % 12;
+            const mins = now.getMinutes();
+            const secs = now.getSeconds();
+
+            const smoothsec = secs + now.getMilliseconds() / 1000;
+            const smoothmin = mins + smoothsec / 60;
+
+            ctx.fillStyle = 'rgba(00, 00, 00, 0.1)';
+            ctx.fillRect(0, 0, 160, 160);
+
+            ctx.strokeStyle = '#00ffff';
+            ctx.lineWidth = 15;
+            ctx.lineCap = 'round';
+
+            ctx.beginPath();
+            ctx.arc(80, 80, 64, degToRad(270), degToRad(hrs * 30 - 90));
+            ctx.stroke();
+
+            ctx.beginPath();
+            ctx.arc(80, 80, 54.4, degToRad(270), degToRad(smoothmin * 6 - 90));
+            ctx.stroke();
+
+            ctx.beginPath();
+            ctx.arc(80, 80, 44.8, degToRad(270), degToRad(smoothsec * 6 - 90));
+            ctx.stroke();
+
+            ctx.font = '9px Helvetica';
+            ctx.fillStyle = 'rgba(00, 255, 255, 1)';
+            ctx.fillText(today, 56, 80);
+
+            ctx.font = '10px Helvetica Bold';
+            ctx.fillStyle = 'rgba(00, 255, 255, 1)';
+            ctx.fillText(time, 56, 89.6);
+         }
+
+         clockIntervalId = setInterval(renderTime, 40);
+      };
+
       loadClock();
       // Initialize raycaster and mouse for click handling
       raycasterRef.current = new THREE.Raycaster();
       mouseRef.current = new THREE.Vector2();
+
+      // Cleanup function
+      return () => {
+         if (clockIntervalId) {
+            clearInterval(clockIntervalId);
+         }
+         // Cleanup GSAP animations
+         gsap.killTweensOf('*');
+      };
    }, []);
 
    // PG 노드 생성
@@ -2435,6 +2706,179 @@ export default function ClusterTopologyView() {
       return group;
    };
 
+   // Create shooting star effect from PG to OSD with particle trail
+   const createShootingStar = (startPos: THREE.Vector3, endPos: THREE.Vector3, duration: number): THREE.Group => {
+      const shootingStarGroup = new THREE.Group();
+
+      // Create main sphere (shooting star body) - smaller size
+      const sphereGeometry = new THREE.SphereGeometry(0.2, 16, 16);
+      const sphereMaterial = new THREE.MeshBasicMaterial({
+         color: 0x00ffff,
+         transparent: true,
+         opacity: 1.0,
+      });
+      const sphere = new THREE.Mesh(sphereGeometry, sphereMaterial);
+
+      // Add glow effect around the main sphere
+      const glowGeometry = new THREE.SphereGeometry(0.5, 16, 16);
+      const glowMaterial = new THREE.MeshBasicMaterial({
+         color: 0x00ffff,
+         transparent: true,
+         opacity: 0.4,
+         side: THREE.BackSide,
+      });
+      const glowSphere = new THREE.Mesh(glowGeometry, glowMaterial);
+      sphere.add(glowSphere);
+
+      // Create enhanced particle trail system
+      const trailCount = 40; // Longer trail with more particles
+      const trailGeometry = new THREE.BufferGeometry();
+      const trailPositions = new Float32Array(trailCount * 3);
+      const trailAlphas = new Float32Array(trailCount);
+      const trailSizes = new Float32Array(trailCount);
+
+      // Initialize trail positions
+      for (let i = 0; i < trailCount; i++) {
+         trailPositions[i * 3] = startPos.x;
+         trailPositions[i * 3 + 1] = startPos.y;
+         trailPositions[i * 3 + 2] = startPos.z;
+         trailAlphas[i] = 0;
+         trailSizes[i] = 0;
+      }
+
+      trailGeometry.setAttribute('position', new THREE.BufferAttribute(trailPositions, 3));
+      trailGeometry.setAttribute('alpha', new THREE.BufferAttribute(trailAlphas, 1));
+      trailGeometry.setAttribute('size', new THREE.BufferAttribute(trailSizes, 1));
+
+      // Custom shader material for trail particles - fixed size
+      const trailMaterial = new THREE.ShaderMaterial({
+         transparent: true,
+         depthWrite: false,
+         blending: THREE.AdditiveBlending,
+         uniforms: {
+            uColor: { value: new THREE.Color(0x00ffff) },
+         },
+         vertexShader: `
+            attribute float alpha;
+            attribute float size;
+            varying float vAlpha;
+            void main() {
+               vAlpha = alpha;
+               vec4 mvPosition = modelViewMatrix * vec4(position, 1.0);
+               // Fixed size calculation for consistent trail appearance
+               gl_PointSize = size;
+               gl_Position = projectionMatrix * mvPosition;
+            }
+         `,
+         fragmentShader: `
+            varying float vAlpha;
+            uniform vec3 uColor;
+            void main() {
+               float d = length(gl_PointCoord - vec2(0.5));
+               if (d > 0.5) discard;
+               // Softer gradient for more connected appearance
+               float soft = 1.0 - smoothstep(0.1, 0.5, d);
+               gl_FragColor = vec4(uColor, vAlpha * soft);
+            }
+         `,
+      });
+
+      const trail = new THREE.Points(trailGeometry, trailMaterial);
+
+      // Add components to group - trail is child of group
+      shootingStarGroup.add(sphere);
+      shootingStarGroup.add(trail);
+
+      // Set initial position
+      shootingStarGroup.position.copy(startPos);
+
+      // Trail history for smooth effect
+      const trailHistory: THREE.Vector3[] = [];
+
+      // Animate shooting star movement with enhanced trail
+      gsap.to(shootingStarGroup.position, {
+         x: endPos.x,
+         y: endPos.y,
+         z: endPos.z,
+         duration: duration,
+         ease: 'power2.out',
+         onUpdate: function () {
+            // Get current world position of the shooting star
+            const currentWorldPos = new THREE.Vector3();
+            sphere.getWorldPosition(currentWorldPos);
+
+            // Add to trail history
+            trailHistory.push(currentWorldPos.clone());
+            if (trailHistory.length > trailCount) {
+               trailHistory.shift();
+            }
+
+            // Update trail particles every frame
+            const positions = trailGeometry.attributes.position.array as Float32Array;
+            const alphas = trailGeometry.attributes.alpha.array as Float32Array;
+            const sizes = trailGeometry.attributes.size.array as Float32Array;
+
+            for (let i = 0; i < trailCount; i++) {
+               if (i < trailHistory.length) {
+                  const historyIndex = trailHistory.length - 1 - i;
+                  const pos = trailHistory[historyIndex];
+
+                  // Set positions relative to parent group (subtract group position)
+                  positions[i * 3] = pos.x - shootingStarGroup.position.x;
+                  positions[i * 3 + 1] = pos.y - shootingStarGroup.position.y;
+                  positions[i * 3 + 2] = pos.z - shootingStarGroup.position.z;
+
+                  // More gradual fade for connected appearance
+                  const age = i / trailCount;
+                  const fadeCurve = Math.pow(1.0 - age, 2.0); // Stronger fade
+                  alphas[i] = fadeCurve * 0.7;
+
+                  // Much smaller size for tail particles
+                  sizes[i] = fadeCurve * 3 + 0.5; // Size from 3.5 to 0.5
+               } else {
+                  alphas[i] = 0;
+                  sizes[i] = 0;
+               }
+            }
+
+            trailGeometry.attributes.position.needsUpdate = true;
+            trailGeometry.attributes.alpha.needsUpdate = true;
+            trailGeometry.attributes.size.needsUpdate = true;
+         },
+         onComplete: () => {
+            // Fade out effect before removal
+            gsap.to([sphereMaterial, glowMaterial], {
+               opacity: 0,
+               duration: 0.3,
+               onComplete: () => {
+                  // Remove shooting star when animation completes
+                  if (sceneRef.current) {
+                     sceneRef.current.remove(shootingStarGroup);
+                  }
+                  // Dispose of geometries and materials
+                  sphereGeometry.dispose();
+                  sphereMaterial.dispose();
+                  glowGeometry.dispose();
+                  glowMaterial.dispose();
+                  trailGeometry.dispose();
+                  trailMaterial.dispose();
+               },
+            });
+         },
+      });
+
+      // Pulsing glow effect
+      gsap.to(glowMaterial, {
+         opacity: 0.6,
+         duration: 0.3,
+         repeat: -1,
+         yoyo: true,
+         ease: 'power2.inOut',
+      });
+
+      return shootingStarGroup;
+   };
+
    // Host 노드 생성
    /*const createHostNode = (hostData: any, material: any): THREE.Group => {
       const group = new THREE.Group();
@@ -3021,8 +3465,9 @@ export default function ClusterTopologyView() {
    };
 
    const showOSDsForPG = (pgData: any): void => {
-      console.log('showOSDsForPG called with pgData:', pgData);
-      console.log('Current osdAnimationDataRef size:', osdAnimationDataRef.current.size);
+      // Get the list of OSDs for the new PG (if any)
+      const newOSDIds = pgData ? new Set(generateOSDsForPG(pgData)) : new Set<number>();
+
       // Clean up existing PG-OSD connections
       const pgOsdConnections = connectionLinesRef.current.filter(line => line.userData?.type === 'pg-osd');
       pgOsdConnections.forEach(line => {
@@ -3042,105 +3487,107 @@ export default function ClusterTopologyView() {
       });
       trafficParticlesRef.current = trafficParticlesRef.current.filter(particles => particles.userData?.type !== 'pg-osd');
 
-      // If no PG is selected, reset OSDs and return
-      if (!pgData) {
-         // Reset only currently animated OSDs to original state using Map storage
-         let resetCount = 0;
+      // Reset OSDs that are not part of the new PG selection
+      osdNodesRef.current.forEach(osd => {
+         const osdId = osd.userData.id;
+         const animData = osdAnimationDataRef.current.get(osdId);
 
-         osdNodesRef.current.forEach(osd => {
-            const osdId = osd.userData.id;
-            const animData = osdAnimationDataRef.current.get(osdId);
-
-            if (animData) {
-               resetCount++;
-               // Reset position animation to original relative position (0)
-               if (animData.originalY !== undefined) {
-                  gsap.to(osd.position, {
-                     y: 0, // Reset to original relative position within parent group
-                     duration: 1.5, // 0.5 * 3 = 1.5 seconds (1/3 speed)
-                     ease: 'power2.inOut',
-                  });
-               }
-
-               // Reset scale to original size (1x)
-               gsap.to(osd.scale, {
-                  x: 1,
-                  y: 1,
-                  z: 1,
-                  duration: 1.5, // Same duration as position reset
+         // Only reset if OSD has animation data and is NOT part of new PG
+         if (animData && !newOSDIds.has(osdId)) {
+            // Reset position animation to original relative position (0)
+            if (animData.originalY !== undefined) {
+               gsap.to(osd.position, {
+                  y: 0, // Reset to original relative position within parent group
+                  duration: 1.5, // 0.5 * 3 = 1.5 seconds (1/3 speed)
                   ease: 'power2.inOut',
                });
-               // Reset rotation to original angle
-               if (animData.originalRotationY !== undefined) {
-                  gsap.to(osd.rotation, {
-                     y: animData.originalRotationY, // Reset to original rotation angle
-                     duration: 1.5, // 0.5 * 3 = 1.5 seconds (1/3 speed)
-                     ease: 'power2.inOut',
-                  });
-               }
-               // Stop rotation animation
-               if (animData.rotationTween) {
-                  animData.rotationTween.kill();
-                  animData.rotationTween = null;
-               }
-               // Stop opacity animation
-               if (animData.opacityTween) {
-                  animData.opacityTween.kill();
-                  animData.opacityTween = null;
-               }
-               // Remove label if exists
-               if (animData.label) {
-                  osd.remove(animData.label);
-                  animData.label.geometry?.dispose();
-                  animData.label.material?.dispose();
-                  animData.label = null;
-               }
-               // Reset material opacity to original value
-               const mesh = osd.children.find(child => child.type === 'Mesh') as THREE.Mesh;
-               if (mesh && mesh.material && animData.originalOpacity !== undefined) {
-                  const material = mesh.material as any;
-                  gsap.to(material, {
-                     opacity: animData.originalOpacity,
-                     duration: 1.5, // 0.5 * 3 = 1.5 seconds (1/3 speed)
-                     ease: 'power2.inOut',
-                     onUpdate: () => {
-                        material.needsUpdate = true;
-                     },
-                  });
-               } else if (mesh && mesh.material) {
-                  // Fallback to default opacity if original was not stored
-                  const material = mesh.material as any;
-                  gsap.to(material, {
-                     opacity: 0.9,
-                     duration: 1.5,
-                     ease: 'power2.inOut',
-                     onUpdate: () => {
-                        material.needsUpdate = true;
-                     },
-                  });
-               }
-
-               // Clear the animation data from Map
-               osdAnimationDataRef.current.delete(osdId);
             }
-         });
+
+            // Reset scale to original size (1x)
+            gsap.to(osd.scale, {
+               x: 1,
+               y: 1,
+               z: 1,
+               duration: 1.5, // Same duration as position reset
+               ease: 'power2.inOut',
+            });
+
+            // Reset rotation to original angle
+            if (animData.originalRotationY !== undefined) {
+               gsap.to(osd.rotation, {
+                  y: animData.originalRotationY, // Reset to original rotation angle
+                  duration: 1.5, // 0.5 * 3 = 1.5 seconds (1/3 speed)
+                  ease: 'power2.inOut',
+               });
+            }
+
+            // Stop rotation animation
+            if (animData.rotationTween) {
+               animData.rotationTween.kill();
+               animData.rotationTween = null;
+            }
+
+            // Stop opacity animation
+            if (animData.opacityTween) {
+               animData.opacityTween.kill();
+               animData.opacityTween = null;
+            }
+
+            // Remove label if exists
+            if (animData.label) {
+               osd.remove(animData.label);
+               animData.label.geometry?.dispose();
+               animData.label.material?.dispose();
+               animData.label = null;
+            }
+
+            // Reset material opacity to original value
+            const mesh = osd.children.find(child => child.type === 'Mesh') as THREE.Mesh;
+            if (mesh && mesh.material && animData.originalOpacity !== undefined) {
+               const material = mesh.material as any;
+               gsap.to(material, {
+                  opacity: animData.originalOpacity,
+                  duration: 1.5, // 0.5 * 3 = 1.5 seconds (1/3 speed)
+                  ease: 'power2.inOut',
+                  onUpdate: () => {
+                     material.needsUpdate = true;
+                  },
+               });
+            } else if (mesh && mesh.material) {
+               // Fallback to default opacity if original was not stored
+               const material = mesh.material as any;
+               gsap.to(material, {
+                  opacity: 0.9,
+                  duration: 1.5,
+                  ease: 'power2.inOut',
+                  onUpdate: () => {
+                     material.needsUpdate = true;
+                  },
+               });
+            }
+
+            // Clear the animation data from Map
+            osdAnimationDataRef.current.delete(osdId);
+         }
+      });
+
+      // Exit early if no PG is selected
+      if (!pgData) {
          return;
       }
 
       const relatedOSDs = generateOSDsForPG(pgData);
-      console.log('Related OSDs for PG:', relatedOSDs);
-      console.log('Total OSD nodes available:', osdNodesRef.current.length);
       // Debug: Check which OSDs will be animated
       relatedOSDs.forEach(osdId => {
          const osdNode = osdNodesRef.current.find(osd => osd.userData.id === osdId);
-         console.log(`OSD ${osdId} found:`, !!osdNode, osdNode ? osdNode.position : 'not found');
       });
 
-      const pgPosition = new THREE.Vector3();
       const pgNode = pgNodesRef.current.find(pg => pg.userData.id === pgData.id);
 
       if (pgNode) {
-         pgNode.getWorldPosition(pgPosition);
+         // Determine shooting star duration based on camera Y position
+         const cameraY = cameraRef.current?.position.y || 0;
+         const shootingStarDuration = cameraY >= 0 ? 3.0 : 1.5; // 3s if Y≥0, 1.5s if Y<0
 
          relatedOSDs.forEach(osdId => {
             const osdNode = osdNodesRef.current.find(osd => osd.userData.id === osdId);
@@ -3154,106 +3601,128 @@ export default function ClusterTopologyView() {
 
                // Store original Y position and rotation if not stored yet
                // Use worldY (parent group position) as the original Y position
-               animData.originalY = osdNode.userData.worldY || osdNode.position.y;
-               // Store original rotation angle
-               animData.originalRotationY = osdNode.rotation.y;
+               if (animData.originalY === undefined) {
+                  animData.originalY = osdNode.userData.worldY || osdNode.position.y;
+               }
+               // Store original rotation angle if not stored yet
+               if (animData.originalRotationY === undefined) {
+                  animData.originalRotationY = osdNode.rotation.y;
+               }
+
+               // Check if OSD is already elevated
+               const isAlreadyElevated = (animData as any).isAnimating === true;
+
                // Set animation flag
                (animData as any).isAnimating = true;
 
-               // Animate OSD lifting up by 10 units (relative to current position)
-               const currentY = osdNode.position.y;
-               const targetY = currentY + 10; // Move 10 units up from current position
-               gsap.to(osdNode.position, {
-                  y: targetY,
-                  duration: 2.4, // 0.8 * 3 = 2.4 seconds (1/3 speed)
-                  ease: 'power2.out',
-                  onComplete: () => {
-                     // Get updated position after animation completion
-                     const osdPosition = new THREE.Vector3();
-                     osdNode.getWorldPosition(osdPosition);
+               // Get accurate world positions for both PG and OSD
+               const pgPosition = new THREE.Vector3();
+               const osdPosition = new THREE.Vector3();
 
-                     // Get fresh PG position to ensure accuracy
-                     const freshPgPosition = new THREE.Vector3();
-                     if (pgNode) {
-                        pgNode.getWorldPosition(freshPgPosition);
-                     }
+               // Ensure we get fresh world positions
+               pgNode.getWorldPosition(pgPosition);
+               osdNode.getWorldPosition(osdPosition);
 
-                     // Create connection line with elevated position
-                     const connection = createAnimatedFlowConnection(freshPgPosition, osdPosition, 0x00d2ff, 5);
-                     connection.userData = { type: 'pg-osd' };
-                     connectionLinesRef.current.push(connection);
-                     sceneRef.current!.add(connection);
+               // Create shooting star effect
+               const shootingStar = createShootingStar(pgPosition, osdPosition, shootingStarDuration);
+               sceneRef.current!.add(shootingStar);
 
-                     // Add data flow particles
-                     setTimeout(() => {
-                        const particles = createTrafficParticles(freshPgPosition, osdPosition, 0x00d2ff);
-                        particles.userData = { type: 'pg-osd' };
-                        trafficParticlesRef.current.push(particles);
-                        sceneRef.current!.add(particles);
-                     }, 500);
+               // Delay OSD animation until shooting star arrives
+               setTimeout(() => {
+                  // Only animate if not already elevated
+                  const currentY = osdNode.position.y;
+                  const targetY = isAlreadyElevated ? currentY : currentY + 10; // Don't move if already elevated
+                  gsap.to(osdNode.position, {
+                     y: targetY,
+                     duration: 2.4, // 0.8 * 3 = 2.4 seconds (1/3 speed)
+                     ease: 'power2.out',
+                     onComplete: () => {
+                        // Get updated position after animation completion
+                        const osdPosition = new THREE.Vector3();
+                        osdNode.getWorldPosition(osdPosition);
 
-                     // Start opacity pulsing animation AFTER OSD has lifted up
-                     const mesh = osdNode.children.find(child => child.type === 'Mesh') as THREE.Mesh;
-
-                     const material = mesh.material as any; // Use any to avoid type issues
-
-                     // Ensure material is transparent
-                     material.transparent = true;
-                     // Get animData again to ensure we have the latest reference
-                     let currentAnimData = osdAnimationDataRef.current.get(osdId);
-                     if (!currentAnimData) {
-                        currentAnimData = {};
-                        osdAnimationDataRef.current.set(osdId, currentAnimData);
-                     }
-
-                     if (!currentAnimData.opacityTween) {
-                        // Store original opacity before starting animation
-                        if (currentAnimData.originalOpacity === undefined) {
-                           currentAnimData.originalOpacity = material.opacity;
+                        // Get fresh PG position to ensure accuracy
+                        const freshPgPosition = new THREE.Vector3();
+                        if (pgNode) {
+                           pgNode.getWorldPosition(freshPgPosition);
                         }
 
-                        // Reset material opacity to a consistent starting point for animation
-                        material.opacity = 0.9;
+                        // Create connection line with elevated position
+                        const connection = createAnimatedFlowConnection(freshPgPosition, osdPosition, 0x00d2ff, 5);
+                        connection.userData = { type: 'pg-osd' };
+                        connectionLinesRef.current.push(connection);
+                        sceneRef.current!.add(connection);
 
-                        // Kill any existing tween first
-                        if (currentAnimData.opacityTween) {
-                           currentAnimData.opacityTween.kill();
+                        // Add data flow particles
+                        setTimeout(() => {
+                           const particles = createTrafficParticles(freshPgPosition, osdPosition, 0x00d2ff);
+                           particles.userData = { type: 'pg-osd' };
+                           trafficParticlesRef.current.push(particles);
+                           sceneRef.current!.add(particles);
+                        }, 500);
+
+                        // Start opacity pulsing animation AFTER OSD has lifted up
+                        const mesh = osdNode.children.find(child => child.type === 'Mesh') as THREE.Mesh;
+
+                        const material = mesh.material as any; // Use any to avoid type issues
+
+                        // Ensure material is transparent
+                        material.transparent = true;
+                        // Get animData again to ensure we have the latest reference
+                        let currentAnimData = osdAnimationDataRef.current.get(osdId);
+                        if (!currentAnimData) {
+                           currentAnimData = {};
+                           osdAnimationDataRef.current.set(osdId, currentAnimData);
                         }
 
-                        currentAnimData.opacityTween = gsap.to(material, {
-                           opacity: 0.3,
-                           duration: 1,
-                           repeat: -1,
-                           yoyo: true,
-                           ease: 'power2.inOut',
-                           onUpdate: () => {
-                              // Force material to update
-                              material.needsUpdate = true;
-                              material.transparent = true;
-                              // Force renderer to update
-                              if (mesh) {
-                                 mesh.material = material;
-                              }
-                           },
-                           /*onRepeat: () => {
+                        if (!currentAnimData.opacityTween) {
+                           // Store original opacity before starting animation
+                           if (currentAnimData.originalOpacity === undefined) {
+                              currentAnimData.originalOpacity = material.opacity;
+                           }
+
+                           // Reset material opacity to a consistent starting point for animation
+                           material.opacity = 0.9;
+
+                           // Kill any existing tween first
+                           if (currentAnimData.opacityTween) {
+                              currentAnimData.opacityTween.kill();
+                           }
+
+                           currentAnimData.opacityTween = gsap.to(material, {
+                              opacity: 0.3,
+                              duration: 1,
+                              repeat: -1,
+                              yoyo: true,
+                              ease: 'power2.inOut',
+                              onUpdate: () => {
+                                 // Force material to update
+                                 material.needsUpdate = true;
+                                 material.transparent = true;
+                                 // Force renderer to update
+                                 if (mesh) {
+                                    mesh.material = material;
+                                 }
+                              },
+                              /*onRepeat: () => {
                               console.log(`🔄 OSD ${osdId} opacity animation repeating, current opacity: ${material.opacity}`);
                            },*/
-                        });
-                     }
-                  },
-               });
+                           });
+                        }
+                     },
+                  });
 
-               // Animate OSD scale to 1.5x when lifting up
-               gsap.to(osdNode.scale, {
-                  x: 1.5,
-                  y: 1.5,
-                  z: 1.5,
-                  duration: 2.4, // Same duration as position animation
-                  ease: 'power2.out',
-               });
+                  // Animate OSD scale to 1.5x when lifting up
+                  gsap.to(osdNode.scale, {
+                     x: 1.5,
+                     y: 1.5,
+                     z: 1.5,
+                     duration: 2.4, // Same duration as position animation
+                     ease: 'power2.out',
+                  });
 
-               // Add OSD label above the OSD and store in Map
-               /*const label = new Text();
+                  // Add OSD label above the OSD and store in Map
+                  /*const label = new Text();
                label.text = `OSD.${osdId}`;
                label.fontSize = 1.4;
                label.color = 0xffffff;
@@ -3264,64 +3733,65 @@ export default function ClusterTopologyView() {
                osdNode.add(label);
                animData.label = label;*/
 
-               // Add rotation animation and store in Map
-               animData.rotationTween = gsap.to(osdNode.rotation, {
-                  y: osdNode.rotation.y + Math.PI * 2,
-                  duration: 4,
-                  repeat: -1,
-                  ease: 'none',
-               });
-
-               // Backup: Start opacity animation after a delay as fallback
-               setTimeout(() => {
-                  // Get the latest animData reference, create if doesn't exist
-                  let currentAnimData = osdAnimationDataRef.current.get(osdId);
-                  if (!currentAnimData) {
-                     currentAnimData = {};
-                     osdAnimationDataRef.current.set(osdId, currentAnimData);
-                  }
-
-                  const mesh = osdNode.children.find(child => child.type === 'Mesh') as THREE.Mesh;
-                  if (!mesh || !mesh.material) return;
-
-                  const material = mesh.material as any;
-
-                  // Ensure material is transparent
-                  material.transparent = true;
-
-                  // Store original opacity before starting animation
-                  if (currentAnimData.originalOpacity === undefined) {
-                     currentAnimData.originalOpacity = material.opacity;
-                  }
-
-                  // Reset material opacity to a consistent starting point for animation
-                  material.opacity = 0.9;
-
-                  // Kill any existing tween first
-                  if (currentAnimData.opacityTween) {
-                     currentAnimData.opacityTween.kill();
-                  }
-
-                  // Start the pulsing animation
-                  currentAnimData.opacityTween = gsap.to(material, {
-                     opacity: 0.3,
-                     duration: 1,
+                  // Add rotation animation and store in Map
+                  animData.rotationTween = gsap.to(osdNode.rotation, {
+                     y: osdNode.rotation.y + Math.PI * 2,
+                     duration: 4,
                      repeat: -1,
-                     yoyo: true,
-                     ease: 'power2.inOut',
-                     onUpdate: () => {
-                        material.needsUpdate = true;
-                        material.transparent = true;
-                        // Force renderer to update
-                        if (mesh) {
-                           mesh.material = material;
-                        }
-                     },
-                     /*onRepeat: () => {
+                     ease: 'none',
+                  });
+
+                  // Backup: Start opacity animation after a delay as fallback
+                  setTimeout(() => {
+                     // Get the latest animData reference, create if doesn't exist
+                     let currentAnimData = osdAnimationDataRef.current.get(osdId);
+                     if (!currentAnimData) {
+                        currentAnimData = {};
+                        osdAnimationDataRef.current.set(osdId, currentAnimData);
+                     }
+
+                     const mesh = osdNode.children.find(child => child.type === 'Mesh') as THREE.Mesh;
+                     if (!mesh || !mesh.material) return;
+
+                     const material = mesh.material as any;
+
+                     // Ensure material is transparent
+                     material.transparent = true;
+
+                     // Store original opacity before starting animation
+                     if (currentAnimData.originalOpacity === undefined) {
+                        currentAnimData.originalOpacity = material.opacity;
+                     }
+
+                     // Reset material opacity to a consistent starting point for animation
+                     material.opacity = 0.9;
+
+                     // Kill any existing tween first
+                     if (currentAnimData.opacityTween) {
+                        currentAnimData.opacityTween.kill();
+                     }
+
+                     // Start the pulsing animation
+                     currentAnimData.opacityTween = gsap.to(material, {
+                        opacity: 0.3,
+                        duration: 1,
+                        repeat: -1,
+                        yoyo: true,
+                        ease: 'power2.inOut',
+                        onUpdate: () => {
+                           material.needsUpdate = true;
+                           material.transparent = true;
+                           // Force renderer to update
+                           if (mesh) {
+                              mesh.material = material;
+                           }
+                        },
+                        /*onRepeat: () => {
                         console.log(`🔄 Fallback OSD ${osdId} opacity animation repeating, current opacity: ${material.opacity}`);
                      },*/
-                  });
-               }, 3000); // Start after 3 seconds (after OSD should have lifted up)
+                     });
+                  }, 3000); // Start after 3 seconds (after OSD should have lifted up)
+               }, shootingStarDuration * 1000); // Delay based on shooting star duration
             }
          });
       }
@@ -3433,214 +3903,7 @@ export default function ClusterTopologyView() {
       return selectedOSDs;
    };
 
-   // 애니메이션 루프
-   const clockRef = useRef(new THREE.Clock());
-
-   const animate = () => {
-      requestAnimationFrame(animate);
-
-      const delta = clockRef.current.getDelta();
-      const elapsedTime = clockRef.current.getElapsedTime();
-
-      if (controlsRef.current) controlsRef.current.update();
-
-      // 별 반짝임 효과
-      /*if (starFieldRef.current) {
-         starFieldRef.current.rotation.y += 0.0002;
-         starFieldRef.current.rotation.x += 0.0001;
-
-         if (starFieldRef.current.material && (starFieldRef.current.material as any).uniforms) {
-            (starFieldRef.current.material as any).uniforms.time.value = elapsedTime;
-         }
-      }*/
-
-      // 건강 상태 링 ShaderMaterial time 업데이트 및 메시 회전
-      [...poolNodesRef.current, ...pgNodesRef.current, ...osdNodesRef.current].forEach(node => {
-         const ring = node.children.find(child => child.name === 'health-ring') as THREE.Mesh;
-         if (ring && ring.userData.material) {
-            const shaderMaterial = ring.userData.material as THREE.ShaderMaterial;
-            if (shaderMaterial.uniforms && shaderMaterial.uniforms.time) {
-               shaderMaterial.uniforms.time.value = elapsedTime;
-            }
-
-            const randomRotationSpeed = Math.random() * (1.0 - 0.1) + 0.1;
-            ring.rotation.x += delta * randomRotationSpeed;
-            const rotationSpeed = 0.5 + Math.random();
-            ring.rotation.y += delta * rotationSpeed;
-         }
-
-         // OSD 글로우 효과 업데이트
-         /*const innerGlow = node.children.find(child => child.name === 'inner-glow-effect') as THREE.Mesh;
-         if (innerGlow && innerGlow.userData.material) {
-            const glowMaterial = innerGlow.userData.material as THREE.ShaderMaterial;
-            if (glowMaterial.uniforms && glowMaterial.uniforms.time) {
-               glowMaterial.uniforms.time.value = elapsedTime;
-            }
-         }*/
-
-         /*const outerGlow = node.children.find(child => child.name === 'outer-glow-effect') as THREE.Mesh;
-         if (outerGlow && outerGlow.userData.material) {
-            const glowMaterial = outerGlow.userData.material as THREE.ShaderMaterial;
-            if (glowMaterial.uniforms && glowMaterial.uniforms.time) {
-               glowMaterial.uniforms.time.value = elapsedTime;
-            }
-         }*/
-
-         // Update Holographic HUD animations
-         const hudGroup = node.children.find(child => child.name === 'holographic-hud') as THREE.Group;
-         if (hudGroup) {
-            hudGroup.traverse(child => {
-               if (child instanceof THREE.Mesh && child.userData.material) {
-                  const material = child.userData.material as THREE.ShaderMaterial;
-                  if (material.uniforms && material.uniforms.time) {
-                     material.uniforms.time.value = elapsedTime;
-                  }
-               }
-            });
-
-            // Rotate HUD ring slowly
-            const hudRing = hudGroup.children[0];
-            if (hudRing) {
-               hudRing.rotation.z += delta * 0.5;
-            }
-         }
-
-         // Enhanced OSD animations - pulse, float, rotation, and shader updates
-         if (node.userData.type === 'OSD') {
-            const animData = osdAnimationDataRef.current.get(node.userData.id);
-            const mesh = node.children.find(child => child.type === 'Mesh') as THREE.Mesh;
-
-            if (mesh && mesh.material) {
-               const material = mesh.material as THREE.MeshPhongMaterial;
-               const ing = (document.querySelector('.search-panel') as HTMLElement).getAttribute('ing') === '1';
-               // Subtle rotation animation for all OSDs
-               mesh.rotation.x += delta * 0.1;
-               mesh.rotation.y += delta * 0.15;
-
-               // Enhanced animations for selected OSDs
-               if (animData && (animData as any).isAnimating) {
-                  // Enhanced emissive glow for selected OSDs
-                  material.emissiveIntensity = 0.8 + Math.sin(elapsedTime * 4.0) * 0.3;
-
-                  // Y 위치는 GSAP 애니메이션이 관리하므로 여기서 건드리지 않음
-
-                  // Scale pulsing for selected OSDs
-                  const scalePulse = 1.0 + Math.sin(elapsedTime * 4.0) * 0.1;
-                  node.scale.setScalar(scalePulse);
-               } else if (ing) {
-                  // Check if this OSD is being searched - if so, don't apply floating animation
-                  const isBeingSearched = searchedOSDIdsRef?.current?.has(node.userData.id) || false;
-                  const isCurrentlyFloating = node.position.y > 10; // Previously searched and floating
-
-                  if (!isBeingSearched && !isCurrentlyFloating) {
-                     // Floating animation only for non-searched, non-floating OSDs at original position
-                     const floatOffset = Math.sin(elapsedTime * 1.5 + node.userData.id * 0.1) * 0.2;
-                     node.position.y = (node.userData.originalY || 0) + floatOffset;
-                  }
-                  // If being searched, let GSAP control the position
-
-                  // Reset to normal state for non-selected OSDs
-                  if (node.userData.status === 'up' && node.userData.health === 'healthy') {
-                     material.emissiveIntensity = 0.5;
-                  } else {
-                     material.emissiveIntensity = 0.3;
-                  }
-                  node.scale.setScalar(1.0); // Reset scale
-               }
-            }
-         }
-
-         // Enhanced PG animations
-         if (node.userData.type === 'PG') {
-            // Find main mesh
-            const pgMesh = node.children.find(child => child instanceof THREE.Mesh && !(child as any).name) as THREE.Mesh;
-
-            // Update HUD animations
-            const hudGroup = node.children.find(child => child.name === 'pg-holographic-hud') as THREE.Group;
-            if (hudGroup) {
-               hudGroup.traverse(child => {
-                  if (child instanceof THREE.Mesh && child.userData.material) {
-                     const material = child.userData.material as THREE.ShaderMaterial;
-                     if (material.uniforms && material.uniforms.time) {
-                        material.uniforms.time.value = elapsedTime;
-                     }
-                  }
-               });
-
-               // Slow rotation for HUD ring
-               const hudRing = hudGroup.children[0];
-               if (hudRing) {
-                  hudRing.rotation.z += delta * 0.3;
-               }
-            }
-
-            // Update energy field animation (건강한 PG만)
-            const energyField = node.children.find(child => child.name === 'energy-field') as THREE.Mesh;
-            if (energyField && energyField.userData.material) {
-               const material = energyField.userData.material as THREE.ShaderMaterial;
-               if (material.uniforms && material.uniforms.time) {
-                  material.uniforms.time.value = elapsedTime;
-               }
-            }
-
-            // Selected PG enhanced effects (플로팅 제거)
-            if (selectedPGIdRef.current === node.userData.id) {
-               if (pgMesh && pgMesh.material) {
-                  const material = pgMesh.material as THREE.MeshPhysicalMaterial;
-
-                  // Enhanced emissive pulsing
-                  const pulseIntensity = 0.5 + Math.sin(elapsedTime * 4) * 0.3;
-                  material.emissiveIntensity = pulseIntensity;
-
-                  // Dynamic color shift for crystalline effect
-                  if (node.userData.state === 'active+clean') {
-                     const hue = Math.sin(elapsedTime * 2) * 0.1 + 0.5;
-                     material.emissive = new THREE.Color().setHSL(hue, 1, 0.3);
-                  }
-
-                  // Scale pulsing
-                  const scale = 1.2 + Math.sin(elapsedTime * 3) * 0.15;
-                  node.scale.setScalar(scale);
-               }
-            } else {
-               // Reset for non-selected PGs
-               if (pgMesh && pgMesh.material) {
-                  const material = pgMesh.material as THREE.MeshPhysicalMaterial;
-                  material.emissiveIntensity = node.userData.state === 'active+clean' ? 0.3 : node.userData.state === 'degraded' ? 0.4 : 0.5;
-               }
-               node.scale.setScalar(1.0);
-            }
-         }
-
-         // 지구 자전 효과 (Pool만)
-         if (node.userData.type === 'Pool') {
-            const earthSphere = node.children.find(child => child instanceof THREE.Mesh && !(child as any).name) as THREE.Mesh;
-            if (earthSphere) {
-               earthSphere.rotation.y += delta * 0.1;
-            }
-
-            const clouds = node.children.find(child => child instanceof THREE.Mesh && child !== earthSphere && !(child as any).name) as THREE.Mesh;
-            if (clouds) {
-               const rotationSpeed = 0.2 + Math.random() * 0.3;
-               clouds.rotation.y += delta * rotationSpeed;
-            }
-         }
-      });
-
-      // 트래픽 파티클 애니메이션
-      trafficParticlesRef.current.forEach(particleGroup => {
-         particleGroup.children.forEach((particle, index) => {
-            // if (particle instanceof THREE.Mesh) {
-            const scale = 1 + Math.sin(elapsedTime * 3 + index) * 0.2;
-            particle.scale.set(scale, scale, scale);
-            // }
-         });
-      });
-
-      if (rendererRef.current && sceneRef.current && cameraRef.current) {
-         rendererRef.current.render(sceneRef.current, cameraRef.current);
-      }
-   };
+   // Animation loop moved to R3F useFrame - removed conflicting animate() function
 
    // 마우스 클릭 이벤트 핸들러
    const onMouseClick = (event: MouseEvent) => {
@@ -3662,7 +3925,6 @@ export default function ClusterTopologyView() {
 
       if (intersects.length > 0) {
          const clickedObject = intersects[0].object.parent as THREE.Group;
-         console.log('Clicked object:', clickedObject.userData?.type, clickedObject.userData);
          if (clickedObject.userData) {
             // Pool clicks are handled by R3F component, skip here
             if (clickedObject.userData.type === 'Pool') {
@@ -3747,62 +4009,7 @@ export default function ClusterTopologyView() {
       }
    };
 
-   // Clock 컴포넌트 구현
-   const loadClock = () => {
-      const canvas = document.getElementById('clock') as HTMLCanvasElement;
-      if (!canvas) return;
-
-      const ctx = canvas.getContext('2d')!;
-      ctx.strokeStyle = '#00ffff';
-      ctx.lineWidth = 6;
-      ctx.shadowBlur = 8;
-      ctx.shadowColor = '#00ffff';
-
-      function degToRad(degree: number) {
-         const factor = Math.PI / 180;
-         return degree * factor;
-      }
-
-      function renderTime() {
-         const now = new Date();
-         const today = now.toLocaleDateString();
-         const time = now.toLocaleTimeString();
-         const hrs = now.getHours();
-         const min = now.getMinutes();
-         const sec = now.getSeconds();
-         const mil = now.getMilliseconds();
-         const smoothsec = sec + mil / 1000;
-         const smoothmin = min + smoothsec / 60;
-
-         const gradient = ctx.createRadialGradient(80, 80, 5, 80, 80, 75);
-         gradient.addColorStop(0, '#03303a');
-         gradient.addColorStop(1, 'black');
-         ctx.fillStyle = gradient;
-         ctx.fillRect(0, 0, 160, 160);
-
-         ctx.beginPath();
-         ctx.arc(80, 80, 64, degToRad(270), degToRad(hrs * 30 - 90));
-         ctx.stroke();
-
-         ctx.beginPath();
-         ctx.arc(80, 80, 54.4, degToRad(270), degToRad(smoothmin * 6 - 90));
-         ctx.stroke();
-
-         ctx.beginPath();
-         ctx.arc(80, 80, 44.8, degToRad(270), degToRad(smoothsec * 6 - 90));
-         ctx.stroke();
-
-         ctx.font = '9px Helvetica';
-         ctx.fillStyle = 'rgba(00, 255, 255, 1)';
-         ctx.fillText(today, 56, 80);
-
-         ctx.font = '10px Helvetica Bold';
-         ctx.fillStyle = 'rgba(00, 255, 255, 1)';
-         ctx.fillText(time, 56, 89.6);
-      }
-
-      setInterval(renderTime, 40);
-   };
+   // Duplicate loadClock function removed - Clock implementation moved to useEffect
 
    // 패널 컴포넌트들의 JSX
    return (
@@ -3813,7 +4020,7 @@ export default function ClusterTopologyView() {
                ref={canvasRef}
                camera={{ position: [0, 360, 0], fov: 60, near: 0.1, far: 2000 }}
                dpr={[1, 1.5]}
-               gl={{ antialias: false, toneMapping: THREE.ACESFilmicToneMapping, outputColorSpace: THREE.SRGBColorSpace }}
+               gl={{ antialias: true, toneMapping: THREE.ACESFilmicToneMapping, outputColorSpace: THREE.SRGBColorSpace }}
                shadows={false}
                style={{ background: Colors.neutral[900] }}
                className="topology-canvas"
@@ -3838,7 +4045,13 @@ export default function ClusterTopologyView() {
                   hostPlaneRefs={hostPlaneRefs}
                   selectedHostIdRef={selectedHostIdRef}
                   osdNodesRef={osdNodesRef}
-                  initialAnimate={animate}
+                  poolNodesRef={poolNodesRef}
+                  pgNodesRef={pgNodesRef}
+                  trafficParticlesRef={trafficParticlesRef}
+                  selectedPGIdRef={selectedPGIdRef}
+                  osdAnimationDataRef={osdAnimationDataRef}
+                  searchedOSDIdsRef={searchedOSDIdsRef}
+                  searchIngRef={searchIngRef}
                   updatePgSearchOption={updatePgSearchOption}
                   highlightNode={highlightNode}
                   toggleAllPanels={toggleAllPanels}
@@ -3893,6 +4106,7 @@ export default function ClusterTopologyView() {
                            defaultValue={searchQueryRef.current}
                            onChange={e => {
                               searchQueryRef.current = e.target.value;
+                              searchIngRef.current = false;
                               (document.querySelector('.search-panel') as HTMLElement).setAttribute('ing', '0');
                            }}
                            onKeyUp={e => e.key === 'Enter' && performSearch()}

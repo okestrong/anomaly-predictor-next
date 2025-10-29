@@ -23,6 +23,7 @@ export const Card = forwardRef<HTMLDivElement, ExtendedCardProps>(
          footer,
          backgroundColor,
          className,
+         bodyClassName,
          ...props
       },
       ref,
@@ -40,6 +41,9 @@ export const Card = forwardRef<HTMLDivElement, ExtendedCardProps>(
                break;
             case 'cyber':
                classes.push('border border-ai-cyber/30 shadow-cyber', 'hover:border-ai-cyber/50 hover:shadow-ai-glow');
+               break;
+            case 'glass':
+               classes.push('backdrop-blur-md', 'border border-white/10', 'hover:border-white/20');
                break;
             default:
                classes.push('backdrop-blur-sm', 'border border-secondary-700/50', 'hover:border-secondary-600');
@@ -84,6 +88,9 @@ export const Card = forwardRef<HTMLDivElement, ExtendedCardProps>(
                   break;
                case 'cyber':
                   defaultStyle.background = 'linear-gradient(90deg, rgba(139, 92, 246, 0.2) 0%, rgba(59, 130, 246, 0.1) 100%)';
+                  break;
+               case 'glass':
+                  defaultStyle.backgroundColor = 'rgba(31, 41, 55, 0.6)';
                   break;
                default:
                   defaultStyle.backgroundColor = 'rgba(31, 41, 55, 0.8)';
@@ -166,7 +173,7 @@ export const Card = forwardRef<HTMLDivElement, ExtendedCardProps>(
                )}
 
                {/* 바디 영역 */}
-               <div className={cn('p-0', bodyClasses)}>{children}</div>
+               <div className={cn('p-0', bodyClassName || '', bodyClasses)}>{children}</div>
             </div>
 
             {/* 푸터 영역 */}

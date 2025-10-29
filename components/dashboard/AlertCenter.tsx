@@ -1,21 +1,25 @@
 'use client';
 
-import React, { useState, useMemo } from 'react';
+import React, { useMemo, useState } from 'react';
 import {
    BellIcon,
-   SparklesIcon,
+   CheckCircleIcon,
+   CircleStackIcon,
+   CpuChipIcon,
    ExclamationTriangleIcon,
    InformationCircleIcon,
-   XCircleIcon,
-   CheckCircleIcon,
-   CpuChipIcon,
-   CircleStackIcon,
+   SparklesIcon,
    WifiIcon,
+   XCircleIcon,
 } from '@heroicons/react/24/outline';
-import { Button, Card } from '@/components/common';
+import { Button, Card, FuturisticSpinner } from '@/components/common';
+import { useDashboardStore } from '@/stores/dashboard';
+import { DashboardAPI } from '@/lib/api/dashboardApi';
+import dayjs from 'dayjs';
+import { useShallow } from 'zustand/react/shallow';
 
 interface Alert {
-   id: number;
+   id: string;
    title: string;
    message: string;
    severity: 'critical' | 'warning' | 'info';
@@ -34,105 +38,158 @@ interface AlertFilter {
 }
 
 export default function AlertCenter() {
+   const { dashboardData, isLoading, refreshDashboard } = useDashboardStore(
+      useShallow(state => ({
+         dashboardData: state.dashboardData,
+         isLoading: state.isLoading,
+         refreshDashboard: state.refreshDashboard,
+      })),
+   );
    const [selectedFilter, setSelectedFilter] = useState('all');
    const [autoRefresh, setAutoRefresh] = useState(true);
 
-   const [activeAlerts, setActiveAlerts] = useState<Alert[]>([
-      {
-         id: 1,
-         title: 'OSD Disk Failure Imminent',
-         message: 'SMART attributes indicate potential failure of OSD.12 within 24 hours',
-         severity: 'critical',
-         timestamp: '2 minutes ago',
-         source: 'OSD Monitor',
-         count: 1,
-         read: false,
-         icon: XCircleIcon,
-         aiSuggestion: 'Consider replacing OSD.12 immediately and redistributing data to prevent cluster degradation.',
-      },
-      {
-         id: 2,
-         title: 'High Memory Usage',
-         message: 'MON.a memory usage has exceeded 85% threshold',
-         severity: 'warning',
-         timestamp: '5 minutes ago',
-         source: 'Resource Monitor',
-         count: 3,
-         read: false,
-         icon: CpuChipIcon,
-         aiSuggestion: 'Restart MON.a service during maintenance window or increase memory allocation.',
-      },
-      {
-         id: 3,
-         title: 'Network Latency Spike',
-         message: 'Increased latency detected between rack-1 and rack-2',
-         severity: 'warning',
-         timestamp: '8 minutes ago',
-         source: 'Network Monitor',
-         count: 1,
-         read: true,
-         icon: WifiIcon,
-         aiSuggestion: 'Check network configuration and cables between affected racks.',
-      },
-      {
-         id: 4,
-         title: 'Scrub Operation Completed',
-         message: 'Deep scrub completed successfully on pool rbd_pool',
-         severity: 'info',
-         timestamp: '15 minutes ago',
-         source: 'Scrub Monitor',
-         count: 1,
-         read: true,
-         icon: CheckCircleIcon,
-      },
-      {
-         id: 5,
-         title: 'Storage Pool Near Capacity',
-         message: 'Pool cephfs_data is at 89% capacity',
-         severity: 'warning',
-         timestamp: '22 minutes ago',
-         source: 'Capacity Monitor',
-         count: 1,
-         read: false,
-         icon: CircleStackIcon,
-         aiSuggestion: 'Add new OSDs to the cluster or enable pool auto-scaling if available.',
-      },
-      {
-         id: 6,
-         title: 'Authentication Success',
-         message: 'Admin user logged in successfully',
-         severity: 'info',
-         timestamp: '1 hour ago',
-         source: 'Auth Monitor',
-         count: 1,
-         read: true,
-         icon: InformationCircleIcon,
-      },
-      {
-         id: 7,
-         title: 'Cluster Rebalancing Started',
-         message: 'Automatic rebalancing initiated after OSD addition',
-         severity: 'warning',
-         timestamp: '2 hours ago',
-         source: 'Rebalance Monitor',
-         count: 1,
-         read: false,
-         icon: CircleStackIcon,
-         aiSuggestion: 'Monitor rebalancing progress and ensure it completes during off-peak hours.',
-      },
-      {
-         id: 8,
-         title: 'Critical: Multiple PG Degraded',
-         message: '45 placement groups are in degraded state',
-         severity: 'critical',
-         timestamp: '3 hours ago',
-         source: 'PG Monitor',
-         count: 1,
-         read: false,
-         icon: ExclamationTriangleIcon,
-         aiSuggestion: 'Check OSD status and network connectivity. Consider increasing replication factor.',
-      },
-   ]);
+   // Get icon for alert type
+   const getAlertIcon = (type: string): React.ComponentType<{ className?: string }> => {
+      switch (type.toLowerCase()) {
+         case 'osd':
+         case 'storage':
+            return CircleStackIcon;
+         case 'memory':
+         case 'cpu':
+            return CpuChipIcon;
+         case 'network':
+            return WifiIcon;
+         case 'error':
+         case 'failure':
+            return XCircleIcon;
+         case 'warning':
+            return ExclamationTriangleIcon;
+         case 'info':
+         case 'success':
+            return CheckCircleIcon;
+         default:
+            return InformationCircleIcon;
+      }
+   };
+
+   // Extract alerts from dashboard store
+   const backendAlerts = dashboardData?.alerts || [];
+   const activeAlerts: Alert[] = backendAlerts.map((alert, index) => ({
+      id: alert.id || `alert-${index + 1}`,
+      title: alert.message,
+      message: alert.description,
+      severity: alert.severity as 'critical' | 'warning' | 'info',
+      timestamp: dayjs(alert.timestamp).format('YYYY-MM-DD HH:mm:ss'),
+      source: alert.source,
+      count: alert.count || 1,
+      read: alert.read || false,
+      icon: getAlertIcon(alert.type || 'info'),
+      aiSuggestion: alert.aiSuggestion,
+   }));
+
+   // Fallback alerts for demo if no backend data
+   const fallbackAlerts: Alert[] =
+      activeAlerts.length === 0
+         ? [
+              {
+                 id: 'fallback-1',
+                 title: 'OSD Disk Failure Imminent',
+                 message: 'SMART attributes indicate potential failure of OSD.12 within 24 hours',
+                 severity: 'critical',
+                 timestamp: '2 minutes ago',
+                 source: 'OSD Monitor',
+                 count: 1,
+                 read: false,
+                 icon: XCircleIcon,
+                 aiSuggestion: 'Consider replacing OSD.12 immediately and redistributing data to prevent cluster degradation.',
+              },
+              {
+                 id: 'fallback-2',
+                 title: 'High Memory Usage',
+                 message: 'MON.a memory usage has exceeded 85% threshold',
+                 severity: 'warning',
+                 timestamp: '5 minutes ago',
+                 source: 'Resource Monitor',
+                 count: 3,
+                 read: false,
+                 icon: CpuChipIcon,
+                 aiSuggestion: 'Restart MON.a service during maintenance window or increase memory allocation.',
+              },
+              {
+                 id: 'fallback-3',
+                 title: 'Network Latency Spike',
+                 message: 'Increased latency detected between rack-1 and rack-2',
+                 severity: 'warning',
+                 timestamp: '8 minutes ago',
+                 source: 'Network Monitor',
+                 count: 1,
+                 read: true,
+                 icon: WifiIcon,
+                 aiSuggestion: 'Check network configuration and cables between affected racks.',
+              },
+              {
+                 id: 'fallback-4',
+                 title: 'Scrub Operation Completed',
+                 message: 'Deep scrub completed successfully on pool rbd_pool',
+                 severity: 'info',
+                 timestamp: '15 minutes ago',
+                 source: 'Scrub Monitor',
+                 count: 1,
+                 read: true,
+                 icon: CheckCircleIcon,
+              },
+              {
+                 id: 'fallback-5',
+                 title: 'Storage Pool Near Capacity',
+                 message: 'Pool cephfs_data is at 89% capacity',
+                 severity: 'warning',
+                 timestamp: '22 minutes ago',
+                 source: 'Capacity Monitor',
+                 count: 1,
+                 read: false,
+                 icon: CircleStackIcon,
+                 aiSuggestion: 'Add new OSDs to the cluster or enable pool auto-scaling if available.',
+              },
+              {
+                 id: 'fallback-6',
+                 title: 'Authentication Success',
+                 message: 'Admin user logged in successfully',
+                 severity: 'info',
+                 timestamp: '1 hour ago',
+                 source: 'Auth Monitor',
+                 count: 1,
+                 read: true,
+                 icon: InformationCircleIcon,
+              },
+              {
+                 id: 'fallback-7',
+                 title: 'Cluster Rebalancing Started',
+                 message: 'Automatic rebalancing initiated after OSD addition',
+                 severity: 'warning',
+                 timestamp: '2 hours ago',
+                 source: 'Rebalance Monitor',
+                 count: 1,
+                 read: false,
+                 icon: CircleStackIcon,
+                 aiSuggestion: 'Monitor rebalancing progress and ensure it completes during off-peak hours.',
+              },
+              {
+                 id: 'fallback-8',
+                 title: 'Critical: Multiple PG Degraded',
+                 message: '45 placement groups are in degraded state',
+                 severity: 'critical',
+                 timestamp: '3 hours ago',
+                 source: 'PG Monitor',
+                 count: 1,
+                 read: false,
+                 icon: ExclamationTriangleIcon,
+                 aiSuggestion: 'Check OSD status and network connectivity. Consider increasing replication factor.',
+              },
+           ]
+         : [];
+
+   // Use backend alerts if available, otherwise use fallback
+   const displayAlerts = activeAlerts.length > 0 ? activeAlerts : fallbackAlerts;
 
    // Computed values
    const alertFilters: AlertFilter[] = useMemo(
@@ -232,16 +289,37 @@ export default function AlertCenter() {
    };
 
    // Event handlers
-   const markAsRead = (alertId: number) => {
-      setActiveAlerts(alerts => alerts.map(alert => (alert.id === alertId ? { ...alert, read: true } : alert)));
+   const markAsRead = async (alertId: string) => {
+      try {
+         console.log('Marking alert as read:', alertId);
+         await DashboardAPI.markAlertAsRead(alertId);
+         // Refresh dashboard data to update read status
+         await refreshDashboard();
+      } catch (error) {
+         console.error('Failed to mark alert as read:', error);
+      }
    };
 
-   const markAllAsRead = () => {
-      setActiveAlerts(alerts => alerts.map(alert => ({ ...alert, read: true })));
+   const markAllAsRead = async () => {
+      try {
+         console.log('Marking all alerts as read');
+         await DashboardAPI.markAllAlertsAsRead();
+         // Refresh dashboard data to update read status
+         await refreshDashboard();
+      } catch (error) {
+         console.error('Failed to mark all alerts as read:', error);
+      }
    };
 
-   const dismissAlert = (alertId: number) => {
-      setActiveAlerts(alerts => alerts.filter(alert => alert.id !== alertId));
+   const dismissAlert = async (alertId: string) => {
+      try {
+         console.log('Dismissing alert:', alertId);
+         await DashboardAPI.dismissAlert(alertId);
+         // Refresh dashboard data to remove dismissed alert
+         await refreshDashboard();
+      } catch (error) {
+         console.error('Failed to dismiss alert:', error);
+      }
    };
 
    const applyAiSuggestion = (alert: Alert) => {
@@ -306,8 +384,13 @@ export default function AlertCenter() {
 
          {/* Alert list */}
          <div className="flex justify-between px-4">
-            <div className="flex-1 space-y-2 max-h-80 overflow-y-auto">
-               {filteredAlerts.map(alert => (
+            {isLoading ? (
+               <div className="flex-1 flex items-center justify-center h-64">
+                  <FuturisticSpinner size="md" label="Loading alerts..." />
+               </div>
+            ) : (
+               <div className="flex-1 space-y-2 max-h-80 overflow-y-auto">
+                  {filteredAlerts.map(alert => (
                   <div
                      key={alert.id}
                      className={`flex items-start space-x-3 p-3 rounded-lg border transition-all duration-200 hover:shadow-md ${getAlertBgColor(alert.severity)} ${getAlertBorderColor(alert.severity)} ${alert.read ? 'opacity-60' : ''}`}
@@ -371,9 +454,11 @@ export default function AlertCenter() {
                      </div>
                   </div>
                ))}
-            </div>
+               </div>
+            )}
 
             {/* Statistics sidebar */}
+            {!isLoading && (
             <div className="border-t border-b w-28 border-secondary-700">
                <div className="h-full flex flex-col justify-around items-center text-center">
                   {alertStats.map(stat => (
@@ -384,6 +469,7 @@ export default function AlertCenter() {
                   ))}
                </div>
             </div>
+            )}
          </div>
       </Card>
    );

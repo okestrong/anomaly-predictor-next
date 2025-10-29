@@ -21,7 +21,7 @@ Vue 3 기반 원본 프로젝트에서 Next.js 15로의 마이그레이션이 **
 #### 1. predictor-api (백엔드)
 - Spring Boot 3.5.4 + Java 21 + H2 database
 - WebSocket STOMP 실시간 데이터 스트리밍
-- ollama API 통한 LLM 기능
+- vLLM (https://vllm.hotk.co.kr) 통한 LLM 기능 (openai/gpt-oss-20b 모델)
 - 위치: /Users/jclee/Documents/Okestro/Projects/DevSw/anomaly-predictor-api
 
 #### 2. predictor (데이터 수집)
@@ -30,7 +30,8 @@ Vue 3 기반 원본 프로젝트에서 Next.js 15로의 마이그레이션이 **
 - 위치: /Users/jclee/Documents/Okestro/Projects/DevSw/anomaly-predictor
 
 #### 3. ceph-doc-crawler (RAG)
-- sentence-transformers 기반 Ceph 공식문서 크롤링
+- ollama (nomic-embed-text-v1.5) 기반 임베딩
+- Ceph 공식문서 크롤링
 - Qdrant 벡터 인덱싱 및 RAG 검색
 - 위치: /Users/jclee/Documents/Okestro/Projects/DevSw/ceph-doc-crawler
 
@@ -64,18 +65,115 @@ export default async function DashboardPage() {
 }
 ```
 
-#### 1.2 컴포넌트 구조 (React 변환)
-- **ClusterStatus.tsx**: 클러스터 상태 표시 카드
-- **CapacityStatus.tsx**: 용량 현황 카드
-- **Charts 컴포넌트**: 8개 실시간 차트 (ECharts SSR 최적화)
-  - PoolUsageChart.tsx
-  - IopsChart.tsx
-  - LatencyChart.tsx
-  - ScrubErrorChart.tsx
-  - PgInconsistencyChart.tsx
-  - NetworkErrorChart.tsx
-  - OsdPerformanceChart.tsx
-  - ThroughputChart.tsx
+#### 1.2 레이아웃 구성
+- **상단 헤더**: 로고, 테마 전환 버튼, 사용자 정보
+- **Mega Menu 네비게이션**: 각 메뉴에 대한 간단한 설명과 함께 표시
+  - 현황 대시보드: "클러스터 실시간 상태 모니터링"
+  - 장애 예측: "AI 기반 장애 예측 및 위험 분석"
+  - 설정 최적화: "PG 최적화 및 구성 관리"
+  - 트러블슈팅: "로그 분석 및 문제 해결 가이드"
+  - 운영문서: "자동 리포트 생성 및 관리"
+
+#### 1.3 클러스터 상태 카드
+- **Health Status 표시**
+  - HEALTH_OK: 녹색 체크 아이콘
+  - HEALTH_WARN: 노란색 경고 아이콘
+  - HEALTH_ERR: 빨간색 에러 아이콘
+- **OSD 상태 요약**: Up/Down/In/Out 개수
+- **MON/MGR/MDS 상태**: 활성/비활성 개수
+- **클러스터 버전 정보**
+
+#### 1.4 용량 현황 카드
+- **전체 용량 게이지**: 사용량/전체 용량 표시
+- **Pool별 사용률**: 도넛 차트로 각 Pool의 사용 비율 표시
+- **증가 추세**: 최근 7일 용량 변화 스파크라인
+
+#### 1.5 실시간 메트릭 차트 (8개)
+
+##### Pool 사용량 차트
+- **차트 타입**: Stacked Area Chart
+- **데이터**: 각 Pool별 사용량 시계열 데이터
+- **표시 정보**: Pool 이름, 사용량(GB), 사용률(%)
+- **업데이트 주기**: 30초
+
+##### IOPS 메트릭 차트
+- **차트 타입**: Line Chart (Read/Write 구분)
+- **데이터**: 읽기/쓰기 IOPS 시계열 데이터
+- **표시 정보**:
+  - Read IOPS (파란색 라인)
+  - Write IOPS (녹색 라인)
+  - 평균값 표시 라인
+- **업데이트 주기**: 5초
+
+##### Latency 모니터 차트
+- **차트 타입**: Multi-axis Line Chart
+- **데이터**:
+  - Commit Latency (ms)
+  - Apply Latency (ms)
+  - Read Latency (ms)
+- **표시 정보**: 최소/최대/평균 레이턴시
+- **업데이트 주기**: 5초
+
+##### Scrub 오류 차트
+- **차트 타입**: Bar Chart
+- **데이터**: OSD별 Scrub/Deep-scrub 오류 개수
+- **표시 정보**:
+  - Scrub 오류 (주황색)
+  - Deep-scrub 오류 (빨간색)
+  - 마지막 Scrub 시간
+- **업데이트 주기**: 60초
+
+##### PG 불일치 차트
+- **차트 타입**: Gauge Chart + Table
+- **데이터**:
+  - Active+Clean PG 비율 (게이지)
+  - Degraded PG 수
+  - Undersized PG 수
+  - Inconsistent PG 수
+- **표시 정보**: PG 상태별 개수 및 비율
+- **업데이트 주기**: 30초
+
+##### 네트워크 오류 차트
+- **차트 타입**: Heatmap
+- **데이터**: 노드 간 네트워크 오류율
+- **표시 정보**:
+  - 패킷 손실률 (%)
+  - 재전송 횟수
+  - 대역폭 사용률
+- **업데이트 주기**: 10초
+
+##### OSD 성능 분포 차트
+- **차트 타입**: Scatter Plot
+- **데이터**: OSD별 IOPS vs Latency
+- **표시 정보**:
+  - X축: IOPS
+  - Y축: Latency
+  - 버블 크기: 사용률
+- **업데이트 주기**: 30초
+
+##### 클러스터 처리량 차트
+- **차트 타입**: Area Chart
+- **데이터**: Read/Write 처리량 (MB/s)
+- **표시 정보**:
+  - Read Throughput
+  - Write Throughput
+  - 피크 시간 하이라이트
+- **업데이트 주기**: 5초
+
+#### 1.6 AI 예측 위험 요소 패널
+- **위험도별 정렬**: Critical → High → Medium → Low
+- **카드 구성**:
+  - 위험 유형 아이콘
+  - 위험도 배지 (색상 구분)
+  - 예상 발생 시간
+  - 영향 범위
+  - "상세보기" 버튼
+
+#### 1.7 알림 센터
+- **실시간 알림 리스트**: 최근 10개 알림
+- **알림 레벨 아이콘**: Error/Warning/Info
+- **타임스탬프**: 상대 시간 표시 (예: "5분 전")
+- **Quick Action**: 알림별 빠른 조치 버튼
 
 ### 2. ECharts SSR 최적화 전략
 
@@ -277,7 +375,7 @@ export function RagSearchInterface() {
         <div className="bg-blue-50 dark:bg-blue-900/20 rounded-lg p-6">
           <h4 className="font-semibold mb-3">
             <AIIcon className="inline mr-2" />
-            AI 조치 가이드 (sentence-transformers 기반)
+            AI 조치 가이드 (ollama nomic-embed-text-v1.5 임베딩)
           </h4>
           <div 
             className="prose" 

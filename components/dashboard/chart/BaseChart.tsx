@@ -4,7 +4,7 @@ import React, { useState, useCallback, useEffect, useRef } from 'react';
 import { ArrowPathIcon, ExclamationTriangleIcon } from '@heroicons/react/24/outline';
 import { Card } from '@/components/common/Card';
 import { Button } from '@/components/common/Button';
-import { LoadingSpinner } from '@/components/common/LoadingSpinner';
+import { ChartLoadingSpinner } from '@/components/common/FuturisticSpinner';
 import { cn } from '@/lib/utils';
 import * as echarts from 'echarts/core';
 import { chartTheme, type ECOption } from '@/lib/echarts-types';
@@ -19,6 +19,7 @@ export interface BaseChartProps {
    className?: string;
    onDataLoad?: () => Promise<ECOption>;
    renderFooter?: () => React.ReactNode;
+   refreshTrigger?: any; // 이 값이 변경되면 차트 데이터를 다시 로드
 }
 
 export const BaseChart: React.FC<BaseChartProps> = ({
@@ -31,8 +32,10 @@ export const BaseChart: React.FC<BaseChartProps> = ({
    className,
    onDataLoad,
    renderFooter,
+   refreshTrigger,
 }) => {
-   const [loading, setLoading] = useState(false);
+   // 데이터 로딩 중인지 확인: refreshTrigger가 없거나 로딩 중
+   const isDataReady = refreshTrigger !== null && refreshTrigger !== undefined;
    const [error, setError] = useState<string | null>(null);
    const [currentOption, setCurrentOption] = useState<ECOption>(option);
    const chartRef = useRef<HTMLDivElement>(null);
@@ -93,7 +96,6 @@ export const BaseChart: React.FC<BaseChartProps> = ({
       if (!onDataLoad || loadingRef.current) return;
 
       loadingRef.current = true;
-      setLoading(true);
       setError(null);
 
       try {
@@ -103,7 +105,6 @@ export const BaseChart: React.FC<BaseChartProps> = ({
          setError(err.message || 'Failed to load chart data');
          console.error('Chart data loading error:', err);
       } finally {
-         setLoading(false);
          loadingRef.current = false;
       }
    }, [onDataLoad]);
@@ -119,12 +120,13 @@ export const BaseChart: React.FC<BaseChartProps> = ({
       }
    }, [autoRefresh, refreshInterval, loadData, onDataLoad]);
 
-   // Initial data load
+   // Initial data load and reload when refreshTrigger changes
    useEffect(() => {
-      if (onDataLoad) {
+      if (onDataLoad && isDataReady) {
+         // 데이터가 준비되었을 때만 로드
          loadData();
       }
-   }, []);
+   }, [refreshTrigger, isDataReady]);
 
    const handleRefresh = useCallback(async () => {
       await loadData();
@@ -146,8 +148,8 @@ export const BaseChart: React.FC<BaseChartProps> = ({
                   </div>
                )}
                {onDataLoad && (
-                  <Button variant="ghost" size="xs" onClick={handleRefresh} disabled={loading} className="text-secondary-400 hover:text-white">
-                     <ArrowPathIcon className={cn('w-4 h-4', loading && 'animate-spin')} />
+                  <Button variant="ghost" size="xs" onClick={handleRefresh} disabled={!isDataReady} className="text-secondary-400 hover:text-white">
+                     <ArrowPathIcon className="w-4 h-4" />
                   </Button>
                )}
             </div>
@@ -163,11 +165,7 @@ export const BaseChart: React.FC<BaseChartProps> = ({
             ) : (
                <div ref={chartRef} style={{ width: '100%', height: height - 16 }} />
             )}
-            {/*{loading && (
-          <div className="absolute inset-0 bg-secondary-800/50 flex items-center justify-center z-10">
-            <LoadingSpinner size="lg" />
-          </div>
-        )}*/}
+            {!isDataReady && <ChartLoadingSpinner size="md" />}
          </div>
 
          {/* Footer */}

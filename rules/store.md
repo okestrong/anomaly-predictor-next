@@ -5,17 +5,7 @@ Ceph 클러스터의 AI 기반 장애 예측 및 운영 최적화를 위한 직�
 - 이 프로젝트는 anomaly-predictor-view 프로젝트(/Users/jclee/Documents/Okestro/Projects/DevSw/anomaly-predictor-view) 를 만들 던 중, vue 의 비효율적인 문법에 실망하여 next.js 기반의 react 로 개발을 이어서 진행하고자 기존 프로젝트를 마이그레이션 한 프로젝트이다.
 
 ## 연관 프로젝트들
-### 1. predictor-api
-- 현재 프로젝트(predictor-view) 의 백엔드를 담당하는 프로젝트
-- ollama 를 통해 llm 을 이용하고, 이를 통해 ceph 에서 수집한 data 를 기반으로 인공지능 기능(장애예측 등)을 수행하는 역할도 한다. 
-- 위치 : /Users/jclee/Documents/Okestro/Projects/DevSw/anomaly-predictor-api
-### 2. predictor
-- go-ceph 를 이용하여 ceph 의 metric 등의 data 들을 주기적으로 prometheus 로 수집하고, 직접적으로 REST Api 로도 제공하는 프로젝트
-- 위치 : /Users/jclee/Documents/Okestro/Projects/DevSw/anomaly-predictor
-### 3. crawler
-- ceph 공식문서를 크롤링하고 이를 임베딩 및 벡터인덱싱하여 Qdrant 에 저장하는 프로젝트
-- predictor-api 에서 RAG 기능으로 Qdrant 의 정보를 참고한다.
-- 위치 : /Users/jclee/Documents/Okestro/Projects/DevSw/ceph-doc-crawler
+- [frontend.md](./frontend.md) 참고
 
 
 ## 최근 세션 작업 내용 (2025.01.14) - Next.js 마이그레이션 + PG/OSD 시각화 대폭 개선

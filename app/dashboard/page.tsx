@@ -1,18 +1,18 @@
 'use client';
 
-import React, { useRef, useEffect, useState } from 'react';
+import React, { memo, useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Card, Button } from '@/components/common';
+import { Button, Card } from '@/components/common';
 import { AppHeader } from '@/components/layout';
 import {
-   LatencyChart,
-   PoolUsageChart,
    IopsChart,
-   ThroughputChart,
-   OsdPerformanceChart,
+   LatencyChart,
    NetworkErrorChart,
-   ScrubErrorChart,
+   OsdPerformanceChart,
    PgInconsistencyChart,
+   PoolUsageChart,
+   ScrubErrorChart,
+   ThroughputChart,
 } from '@/components/dashboard/chart';
 import CephClusterVisualization from '@/components/dashboard/CephClusterVisualization';
 import CapacityStatus from '@/components/dashboard/CapacityStatus';
@@ -21,6 +21,8 @@ import RiskPanel from '@/components/dashboard/RiskPanel';
 import AlertCenter from '@/components/dashboard/AlertCenter';
 import { useWebSocket } from '@/providers/WebSocketProvider';
 import { useAnomalyStore } from '@/stores/anomaly';
+import { useDashboardStore } from '@/stores/dashboard';
+import { useShallow } from 'zustand/react/shallow';
 
 interface AIInsight {
    id: number;
@@ -30,70 +32,157 @@ interface AIInsight {
    severityColor: string;
 }
 
-export default function DashboardPage() {
-   const backgroundVideoRef = useRef<HTMLVideoElement>(null);
-   const router = useRouter();
-   const { isConnected, connectionStatus } = useWebSocket();
-   const { recentAnomalies: alerts } = useAnomalyStore();
-
-   // State for AI insights from backend
-   const [aiInsights, setAiInsights] = useState<AIInsight[]>([]);
+// Memoized video background component to prevent re-renders
+const VideoBackground = memo(() => {
+   const videoRef = useRef<HTMLVideoElement>(null);
 
    useEffect(() => {
-      if (backgroundVideoRef.current) {
-         backgroundVideoRef.current.playbackRate = 0.5;
+      if (videoRef.current) {
+         videoRef.current.playbackRate = 0.5;
       }
    }, []);
 
-   // Convert anomaly alerts to AI insights for display
+   return (
+      <div className="fixed inset-0 w-full h-full overflow-hidden z-0" style={{ backgroundColor: '#0f0f0f' }}>
+         <video
+            ref={videoRef}
+            className="absolute top-1/2 left-1/2 w-full h-full object-cover -translate-x-1/2 -translate-y-1/2 min-w-full min-h-full"
+            autoPlay
+            muted
+            loop
+            playsInline
+            preload="auto"
+            poster="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7"
+            style={{ opacity: 1 }}
+         >
+            <source src="/videos/digital_greenhole.mp4" type="video/mp4" />
+         </video>
+         {/* 비디오 위에 오버레이 */}
+         <div className="absolute inset-0 bg-gradient-to-br from-secondary-900/95 via-ai-neural/70 to-secondary-800/95"></div>
+      </div>
+   );
+});
+
+VideoBackground.displayName = 'VideoBackground';
+
+export default function DashboardPage() {
+   const router = useRouter();
+   const { isConnected: legacyWsConnected, connectionStatus: legacyConnectionStatus } = useWebSocket();
+   const { recentAnomalies: alerts } = useAnomalyStore();
+
+   // Dashboard store
+   const {
+      dashboardData,
+      aiInsights: backendAiInsights,
+      isLoading,
+      isConnected: dashboardWsConnected,
+      connectionError,
+      initializeDashboard,
+      refreshDashboard,
+      connectWebSocket,
+      disconnectWebSocket,
+      clearError,
+   } = useDashboardStore(
+      useShallow(state => ({
+         dashboardData: state.dashboardData,
+         aiInsights: state.aiInsights,
+         isLoading: state.isLoading,
+         isConnected: state.isConnected,
+         connectionError: state.connectionError,
+         initializeDashboard: state.initializeDashboard,
+         refreshDashboard: state.refreshDashboard,
+         connectWebSocket: state.connectWebSocket,
+         disconnectWebSocket: state.disconnectWebSocket,
+         clearError: state.clearError,
+      })),
+   );
+
+   // State for AI insights (fallback)
+   const [aiInsights, setAiInsights] = useState<AIInsight[]>([]);
+
+   // Use ref to prevent double initialization in React 18 Strict Mode
+   const isInitializedRef = useRef(false);
+
    useEffect(() => {
-      // Guard against undefined alerts
-      if (!alerts || !Array.isArray(alerts)) {
-         setAiInsights([
-            {
-               id: 1,
-               title: 'Waiting for backend connection...',
-               description: 'Connecting to predictor-api for real-time insights',
-               timestamp: 'now',
-               severityColor: connectionStatus === 'connected' ? 'bg-success-500' : 'bg-warning-500',
-            }
-         ]);
+      // Prevent double initialization in Strict Mode (React 18)
+      if (isInitializedRef.current) {
          return;
       }
+      isInitializedRef.current = true;
 
-      const insights = alerts
-         .filter(alert => alert.type === 'ai_insight' || alert.type === 'risk')
-         .slice(0, 4) // Show only the 4 most recent insights
-         .map((alert, index) => ({
-            id: index + 1,
-            title: alert.message,
-            description: `Detected via ${alert.component} analysis`,
-            timestamp: getRelativeTime(alert.timestamp),
-            severityColor: getSeverityColor(alert.severity)
-         }));
+      // Initialize dashboard data and WebSocket connection
+      initializeDashboard();
 
-      // If no real insights available, use fallback data
-      if (insights.length === 0) {
+      // Cleanup on unmount
+      return () => {
+         disconnectWebSocket();
+      };
+   }, [initializeDashboard, disconnectWebSocket]);
+
+   // Convert backend AI insights or use fallback
+   useEffect(() => {
+      if (backendAiInsights && backendAiInsights.length > 0) {
+         // Use backend AI insights
+         const insights = backendAiInsights
+            .slice(0, 4) // Show only the 4 most recent insights
+            .map((insight, index) => ({
+               id: index + 1,
+               title: insight.title,
+               description: insight.description,
+               timestamp: getRelativeTime(new Date(insight.timestamp)),
+               severityColor: getSeverityColor(insight.severity),
+            }));
+         setAiInsights(insights);
+      } else if (alerts && Array.isArray(alerts)) {
+         // Fallback to anomaly store alerts
+         const insights = alerts
+            .filter(alert => alert.type === 'ai_insight' || alert.type === 'risk')
+            .slice(0, 4)
+            .map((alert, index) => ({
+               id: index + 1,
+               title: alert.message,
+               description: `Detected via ${alert.component} analysis`,
+               timestamp: getRelativeTime(alert.timestamp),
+               severityColor: getSeverityColor(alert.severity),
+            }));
+
+         if (insights.length === 0) {
+            setAiInsights([
+               {
+                  id: 1,
+                  title: dashboardWsConnected ? 'No insights available' : 'Waiting for dashboard connection...',
+                  description: dashboardWsConnected ? 'System is running normally' : 'Connecting to dashboard API for real-time insights',
+                  timestamp: 'now',
+                  severityColor: dashboardWsConnected ? 'bg-success-500' : 'bg-warning-500',
+               },
+            ]);
+         } else {
+            setAiInsights(insights);
+         }
+      } else {
+         // Default fallback
          setAiInsights([
             {
                id: 1,
-               title: connectionStatus === 'connected' ? 'No insights available' : 'Waiting for backend connection...',
-               description: connectionStatus === 'connected' ? 'System is running normally' : 'Connecting to predictor-api for real-time insights',
+               title: 'Initializing AI insights...',
+               description: 'Loading AI-powered insights from backend',
                timestamp: 'now',
-               severityColor: connectionStatus === 'connected' ? 'bg-success-500' : 'bg-warning-500',
-            }
+               severityColor: 'bg-info-500',
+            },
          ]);
-      } else {
-         setAiInsights(insights);
       }
-   }, [alerts, connectionStatus]);
+   }, [backendAiInsights, alerts, dashboardWsConnected]);
 
    const getSeverityColor = (severity: string) => {
       switch (severity) {
-         case 'critical': return 'bg-danger-500';
-         case 'warning': return 'bg-warning-500';
-         case 'info': return 'bg-info-500';
-         default: return 'bg-ai-circuit';
+         case 'critical':
+            return 'bg-danger-500';
+         case 'warning':
+            return 'bg-warning-500';
+         case 'info':
+            return 'bg-info-500';
+         default:
+            return 'bg-ai-circuit';
       }
    };
 
@@ -119,21 +208,8 @@ export default function DashboardPage() {
          {/* Header */}
          <AppHeader />
 
-         {/* 배경 비디오 */}
-         <div className="fixed inset-0 w-full h-full overflow-hidden z-0">
-            <video
-               ref={backgroundVideoRef}
-               className="absolute top-1/2 left-1/2 w-full h-full object-cover -translate-x-1/2 -translate-y-1/2 min-w-full min-h-full"
-               autoPlay
-               muted
-               loop
-               playsInline
-            >
-               <source src="/videos/digital_purplehole.mp4" type="video/mp4" />
-            </video>
-            {/* 비디오 위에 오버레이 */}
-            <div className="absolute inset-0 bg-gradient-to-br from-secondary-900/90 via-ai-neural/70 to-secondary-800/90"></div>
-         </div>
+         {/* Memoized 배경 비디오 - 재렌더링 방지 */}
+         <VideoBackground />
 
          {/* 메인 컨텐츠 */}
          <main className="w-full p-4 md:p-6 relative z-10">
@@ -189,12 +265,30 @@ export default function DashboardPage() {
                         <div className="flex items-center justify-between">
                            <div className="flex items-center space-x-2">
                               <h3 className="text-lg font-semibold text-white">AI Insights</h3>
-                              {/* WebSocket Connection Status Indicator */}
-                              <div className={`w-2 h-2 rounded-full ${
-                                 connectionStatus === 'connected' ? 'bg-success-500' :
-                                 connectionStatus === 'connecting' ? 'bg-warning-500' :
-                                 connectionStatus === 'error' ? 'bg-danger-500' : 'bg-secondary-500'
-                              }`} title={`Backend connection: ${connectionStatus}`}></div>
+                              {/* Dashboard WebSocket Connection Status Indicator */}
+                              <div
+                                 className={`w-2 h-2 rounded-full ${
+                                    dashboardWsConnected
+                                       ? 'bg-success-500'
+                                       : isLoading
+                                         ? 'bg-warning-500'
+                                         : connectionError
+                                           ? 'bg-danger-500'
+                                           : 'bg-secondary-500'
+                                 }`}
+                                 title={`Dashboard connection: ${
+                                    dashboardWsConnected ? 'connected' : isLoading ? 'connecting' : connectionError ? 'error' : 'disconnected'
+                                 }`}
+                              ></div>
+                              {/* Refresh button */}
+                              <button
+                                 onClick={refreshDashboard}
+                                 disabled={isLoading}
+                                 className="p-1 text-xs text-secondary-400 hover:text-white transition-colors"
+                                 title="Refresh dashboard data"
+                              >
+                                 🔄
+                              </button>
                            </div>
                            <Button variant="ai" size="xs" onClick={() => navigateToPage('prediction')}>
                               View All
