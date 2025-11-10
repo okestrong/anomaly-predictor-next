@@ -205,7 +205,7 @@ export default function AvailabilityRecovery({ data }: AvailabilityRecoveryProps
 
             {/* Scrub Status */}
             <Card variant="glass" className="p-6 print:border print:border-gray-300 print:bg-white">
-               <h3 className="text-lg font-medium mb-3 text-white print:text-black">Recent Scrub Activity (Sample)</h3>
+               <h3 className="text-lg font-medium mb-3 text-white print:text-black">Recent Scrub Activity</h3>
                <div className="overflow-x-auto">
                   <table className="min-w-full divide-y divide-gray-200">
                      <thead className="bg-gray-50 print:bg-gray-100">

@@ -115,6 +115,9 @@ export const ScrubErrorChart: React.FC<ScrubErrorChartProps> = ({
       },
       yAxis: {
         type: 'value',
+        scale: false,
+        min: 0,
+        minInterval: 1,
         axisLine: { show: false },
         axisTick: { show: false },
         axisLabel: {

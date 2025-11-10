@@ -7,6 +7,8 @@ import { cn } from '@/lib/utils';
 import AIScanLoader from './AIScanLoader';
 import Markdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
+import regexifyString from 'regexify-string';
+import parse from 'html-react-parser';
 
 // Cyberpunk-style gradient backgrounds for cards
 const gradientStyles = {
@@ -114,7 +116,7 @@ export default function PredictionCard({ prediction }: PredictionCardProps) {
                </div>
                <div className="bg-black/20 rounded-lg p-2">
                   <div className="text-xs text-gray-400">Time to Impact</div>
-                  <div className="text-sm font-semibold text-orange-400">{prediction.timeToImpact}h</div>
+                  <div className="text-sm font-semibold text-orange-400">{prediction.timeToImpact}</div>
                </div>
             </div>
 
@@ -171,7 +173,7 @@ export default function PredictionCard({ prediction }: PredictionCardProps) {
                      </div>
 
                      <motion.article
-                        className="prose prose-gray max-w-none dark:prose-invert text-xs leading-relaxed !text-gray-100 pl-3 border-l-2 border-cyan-500/30 max-h-[400px] overflow-y-auto"
+                        className="prose prose-gray max-w-none dark:prose-invert text-xs leading-relaxed !text-gray-100 pl-3 border-l-2 border-cyan-500/30 h-[220px] overflow-y-auto"
                         initial={{ opacity: 0 }}
                         animate={{ opacity: 1 }}
                         transition={{ delay: 0.4 }}
@@ -180,8 +182,8 @@ export default function PredictionCard({ prediction }: PredictionCardProps) {
                            remarkPlugins={[remarkGfm]}
                            components={{
                               h1: props => <h1 className="text-2xl font-bold" {...props} />,
-                              h2: props => <h2 className="text-xl font-bold" {...props} />,
-                              h3: props => <h3 className="text-lg font-semibold" {...props} />,
+                              h2: props => <h2 className="text-2xl font-medium" {...props} />,
+                              h3: props => <h3 className="text-xl font-semibold" {...props} />,
                               table: props => <table className="w-full border-collapse border border-gray-300" {...props} />,
                               thead: props => <thead className="bg-gray-50" {...props} />,
                               th: props => <th className="border border-gray-300 px-3 py-2 text-left bg-neutral-400 text-black" {...props} />,
@@ -221,24 +223,45 @@ export default function PredictionCard({ prediction }: PredictionCardProps) {
             </div>
 
             {/* AI Recommendations */}
-            {isHovered && (
-               <motion.div
-                  initial={{ opacity: 0, height: 0 }}
-                  animate={{ opacity: 1, height: 'auto' }}
-                  exit={{ opacity: 0, height: 0 }}
-                  className="mt-4 pt-4 border-t border-white/10"
-               >
-                  <div className="text-xs text-gray-400 mb-2">AI Recommendations</div>
-                  <ul className="space-y-1">
-                     {prediction.recommendedActions.map((action: string, idx: number) => (
+            {/*{isHovered && (*/}
+            <motion.div
+               initial={{ opacity: 0, height: 0 }}
+               animate={{ opacity: 1, height: 'auto' }}
+               exit={{ opacity: 0, height: 0 }}
+               className="max-h-[200px] overflow-y-auto mt-4 pt-4 border-t border-white/10"
+            >
+               <div className="text-xs text-gray-400 mb-2">AI Recommendations</div>
+               <ul className="space-y-1">
+                  {prediction.recommendedActions.map((action: string, idx: number) => {
+                     const words = regexifyString({
+                        pattern: /`+(.+?)`+/gim,
+                        decorator: (match, index) =>
+                           `<span class="inline-flex items-center bg-green-900">${match
+                              .replace(/`/gim, '')
+                              .replace(/<(.+?)>/gim, '$1')
+                              .replace(/\\[.]/gim, '.')}</span>`,
+                        input: action,
+                     }).join('');
+                     return (
                         <li key={idx} className="text-xs text-gray-300 flex items-start">
-                           <span className="text-ai-circuit mr-1">•</span>
-                           {action}
+                           <div className="flex items-start">
+                              <span className="text-ai-circuit mr-1">•</span>
+                              <div className="pl-2 whitespace-pre-wrap break-words">
+                                 {parse(
+                                    regexifyString({
+                                       pattern: /\*+(.+?)\*+/gim,
+                                       decorator: (match, index, result) => `<strong>${match.replace(/^[*]+(.+?)[*]+$/gim, '$1')}</strong>`,
+                                       input: words,
+                                    }).join(''),
+                                 )}
+                              </div>
+                           </div>
                         </li>
-                     ))}
-                  </ul>
-               </motion.div>
-            )}
+                     );
+                  })}
+               </ul>
+            </motion.div>
+            {/*)}*/}
          </div>
       </motion.div>
    );

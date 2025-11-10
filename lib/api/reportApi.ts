@@ -31,10 +31,38 @@ export class ReportAPI {
     * Generate a new report
     */
    static async generate(params: any): Promise<Report> {
+      // Route to correct endpoint based on report type
+      let endpoint = '/api/v1/reports/generate';
+      let requestBody = params;
+
+      if (params.type === 'TREND') {
+         endpoint = '/api/v1/reports/trend/generate';
+         // Transform to TrendReportRequest DTO format
+         requestBody = {
+            startTime: params.startDate,
+            endTime: params.endDate,
+            granularity: params.options?.granularity || '1h',
+            categories: params.options?.categories || null,
+            includeInsights: params.options?.includeInsights !== false,
+         };
+      } else if (params.type === 'PREDICTIONS') {
+         endpoint = '/api/v1/reports/predictions/generate';
+         // Transform to PredictionsReportRequest DTO format
+         requestBody = {
+            startTime: params.startDate,
+            endTime: params.endDate,
+            categories: params.options?.categories || null,
+            includeSummary: params.options?.includeSummary !== false,
+            includeRiskTrend: params.options?.includeRiskTrend !== false,
+            includeLLMAnalysis: params.options?.includeLLMAnalysis !== false,
+            severityFilter: params.options?.severityFilter || 'all',
+         };
+      }
+
       const response = await apiClient.post<any>(
-         '/api/v1/reports/generate',
-         params,
-         { timeout: 120000 } // 2 minutes timeout for report generation
+         endpoint,
+         requestBody,
+         { timeout: 300000 }, // 5 minutes timeout for report generation
       );
 
       // Backend returns the report directly, not wrapped in GenerateReportResponse
@@ -58,11 +86,27 @@ export class ReportAPI {
 
    /**
     * Get a single report by ID
+    * Tries multiple endpoints to support different report types (TREND, PREDICTIONS, DAILY)
     */
    static async getReportById(reportId: string): Promise<Report> {
-      return await apiClient.get<Report>(`/api/v1/reports/${reportId}`, {
-         timeout: 30000,
-      });
+      // Try TREND endpoint first
+      try {
+         return await apiClient.get<Report>(`/api/v1/reports/trend/${reportId}`, {
+            timeout: 30000,
+         });
+      } catch (trendError) {
+         // If trend fails, try PREDICTIONS endpoint
+         try {
+            return await apiClient.get<Report>(`/api/v1/reports/predictions/${reportId}`, {
+               timeout: 30000,
+            });
+         } catch (predictionsError) {
+            // If predictions fails, try generic DAILY endpoint
+            return await apiClient.get<Report>(`/api/v1/reports/${reportId}`, {
+               timeout: 30000,
+            });
+         }
+      }
    }
 
    /**
@@ -98,9 +142,7 @@ export class ReportAPI {
    /**
     * Save a new template
     */
-   static async saveTemplate(
-      templateData: Omit<ReportTemplate, 'id' | 'createdAt' | 'updatedAt'>
-   ): Promise<ReportTemplate> {
+   static async saveTemplate(templateData: Omit<ReportTemplate, 'id' | 'createdAt' | 'updatedAt'>): Promise<ReportTemplate> {
       return await apiClient.post<ReportTemplate>('/api/v1/reports/templates', templateData, {
          timeout: 30000,
       });
@@ -109,10 +151,7 @@ export class ReportAPI {
    /**
     * Update an existing template
     */
-   static async updateTemplate(
-      templateId: string,
-      updates: Partial<ReportTemplate>
-   ): Promise<ReportTemplate> {
+   static async updateTemplate(templateId: string, updates: Partial<ReportTemplate>): Promise<ReportTemplate> {
       return await apiClient.put<ReportTemplate>(`/api/v1/reports/templates/${templateId}`, updates, {
          timeout: 30000,
       });
@@ -150,9 +189,7 @@ export class ReportAPI {
    /**
     * Create a new schedule
     */
-   static async createSchedule(
-      scheduleData: Omit<ReportSchedule, 'id' | 'createdAt' | 'updatedAt'>
-   ): Promise<ReportSchedule> {
+   static async createSchedule(scheduleData: Omit<ReportSchedule, 'id' | 'createdAt' | 'updatedAt'>): Promise<ReportSchedule> {
       return await apiClient.post<ReportSchedule>('/api/v1/reports/schedules', scheduleData, {
          timeout: 30000,
       });
@@ -161,17 +198,10 @@ export class ReportAPI {
    /**
     * Update an existing schedule
     */
-   static async updateSchedule(
-      scheduleId: string,
-      updates: Partial<ReportSchedule>
-   ): Promise<ReportSchedule> {
-      return await apiClient.put<ReportSchedule>(
-         `/api/v1/reports/schedules/${scheduleId}`,
-         updates,
-         {
-            timeout: 30000,
-         }
-      );
+   static async updateSchedule(scheduleId: string, updates: Partial<ReportSchedule>): Promise<ReportSchedule> {
+      return await apiClient.put<ReportSchedule>(`/api/v1/reports/schedules/${scheduleId}`, updates, {
+         timeout: 30000,
+      });
    }
 
    /**
@@ -198,13 +228,9 @@ export class ReportAPI {
     * Export report to specified format
     */
    static async exportReport(reportId: string, options: ExportOptions): Promise<Blob> {
-      const response = await apiClient.post<ExportResponse>(
-         `/api/v1/reports/${reportId}/export`,
-         options,
-         {
-            timeout: 120000, // 2 minutes for export generation
-         }
-      );
+      const response = await apiClient.post<ExportResponse>(`/api/v1/reports/${reportId}/export`, options, {
+         timeout: 120000, // 2 minutes for export generation
+      });
 
       // Download the exported file
       const fileResponse = await fetch(response.url);
@@ -237,13 +263,9 @@ export class ReportAPI {
     * Send report via email
     */
    static async sendEmail(reportId: string, params: EmailParams): Promise<SendEmailResponse> {
-      return await apiClient.post<SendEmailResponse>(
-         `/api/v1/reports/${reportId}/send-email`,
-         params,
-         {
-            timeout: 60000, // 1 minute for email sending
-         }
-      );
+      return await apiClient.post<SendEmailResponse>(`/api/v1/reports/${reportId}/send-email`, params, {
+         timeout: 60000, // 1 minute for email sending
+      });
    }
 
    // ==================== AI Features ====================
@@ -261,9 +283,13 @@ export class ReportAPI {
     * Generate AI insights for existing report
     */
    static async generateAIInsights(reportId: string): Promise<AIInsights> {
-      return await apiClient.post<AIInsights>(`/api/v1/reports/${reportId}/ai-insights`, {}, {
-         timeout: 120000, // 2 minutes for AI analysis
-      });
+      return await apiClient.post<AIInsights>(
+         `/api/v1/reports/${reportId}/ai-insights`,
+         {},
+         {
+            timeout: 120000, // 2 minutes for AI analysis
+         },
+      );
    }
 
    // ==================== Utility Methods ====================
@@ -310,9 +336,7 @@ export class ReportAPI {
    /**
     * Validate schedule configuration
     */
-   static async validateSchedule(
-      schedule: Partial<ReportSchedule>
-   ): Promise<{
+   static async validateSchedule(schedule: Partial<ReportSchedule>): Promise<{
       valid: boolean;
       errors?: string[];
       warnings?: string[];
@@ -329,7 +353,7 @@ export class ReportAPI {
       const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080'}/api/v1/reports/${reportId}/export?format=${format}`, {
          method: 'GET',
          headers: {
-            'Accept': 'application/pdf',
+            Accept: 'application/pdf',
          },
       });
 
@@ -344,14 +368,18 @@ export class ReportAPI {
     * Send report via email
     */
    static async sendReportEmail(reportId: string, recipients: string[], subject?: string, message?: string): Promise<any> {
-      return await apiClient.post(`/api/v1/reports/${reportId}/send-email`, {
-         recipients,
-         subject: subject || 'Ceph Cluster Report',
-         message: message || 'Please find the attached cluster report.',
-         format: 'PDF',
-      }, {
-         timeout: 60000,
-      });
+      return await apiClient.post(
+         `/api/v1/reports/${reportId}/send-email`,
+         {
+            recipients,
+            subject: subject || 'Ceph Cluster Report',
+            message: message || 'Please find the attached cluster report.',
+            format: 'PDF',
+         },
+         {
+            timeout: 60000,
+         },
+      );
    }
 }
 

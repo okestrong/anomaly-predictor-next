@@ -9,7 +9,7 @@ import { Box, Environment, OrbitControls, Plane, Stars, Text as Text3D } from '@
 import { Bloom, BrightnessContrast, EffectComposer } from '@react-three/postprocessing';
 import gsap from 'gsap';
 import { AdaptiveLayoutManager } from '@/utils/layouts';
-import { loadTexture } from '@/utils/utils';
+import { calculatePgState, calculatePoolState, loadTexture } from '@/utils/utils';
 import { AppHeader } from '@/components/layout';
 import Bubble from '@/components/models/Bubble';
 import Colors from '@/utils/color';
@@ -17,19 +17,20 @@ import { Medical } from '@/components/models/Medical';
 import TextSphere from '@/components/models/TextSphere';
 import { PortalLight } from '@/components/models/PortalLight';
 import { Text } from 'troika-three-text';
-import { MetaPlate } from '@/components/models/MetaPlate';
 import RoundMirrorTable from '@/components/models/RoundMirrorTable';
 import Atmosphere from '@/components/models/Atmosphere';
 import RoundMirrorTextTable from '@/components/models/RoundMirrorTextTable';
 import { Stone } from '@/components/models/Stone';
 import GlassBall from '@/components/models/GlassBall';
 import { TrashIcon } from '@heroicons/react/24/solid';
-import { useTopologyStore, selectTopologyData, selectIsLoading, selectIsPGLoading } from '@/stores/topology';
+import { selectIsLoading, selectTopologyData, useTopologyStore, selectError } from '@/stores/topology';
 import { transformTopologyData } from '@/lib/transformTopologyData';
 import { PGEnergyEffect } from './PGEnergyEffect';
 import { toast } from 'react-toastify';
 import { formatBytes } from '@/lib/formatUtils';
 import Image from 'next/image';
+import ClusterTopologyError from './ClusterTopologyError';
+import { useShallow } from 'zustand/react/shallow';
 
 const transition = {
    duration: 0.4, // 0.8에서 0.4로 단축
@@ -58,6 +59,43 @@ const getExitTransform = (position: string) => {
    return getInitialTransform(position);
 };
 
+// Rough Mirror Sphere Component - Lightweight replacement for MetaPlate (24MB GLB)
+const RoughMirrorSphere = ({ scale = 1, onClick, ...props }: any) => {
+   const meshRef = useRef<THREE.Mesh>(null);
+
+   // Create rough sphere geometry with noise
+   const geometry = useMemo(() => {
+      const geo = new THREE.SphereGeometry(1, 64, 64);
+      const positionAttribute = geo.attributes.position;
+
+      for (let i = 0; i < positionAttribute.count; i++) {
+         const vertex = new THREE.Vector3(positionAttribute.getX(i), positionAttribute.getY(i), positionAttribute.getZ(i));
+
+         // Apply noise to make surface rough
+         const noise = Math.sin(vertex.x * 3) * Math.cos(vertex.y * 3) * Math.sin(vertex.z * 3);
+         vertex.normalize().multiplyScalar(1 + noise * 0.15);
+
+         positionAttribute.setXYZ(i, vertex.x, vertex.y, vertex.z);
+      }
+
+      geo.computeVertexNormals();
+      return geo;
+   }, []);
+
+   useFrame(() => {
+      if (meshRef.current) {
+         meshRef.current.rotation.y += 0.01;
+         meshRef.current.rotation.x += 0.003;
+      }
+   });
+
+   return (
+      <mesh ref={meshRef} geometry={geometry} scale={scale} onClick={onClick} {...props}>
+         <meshStandardMaterial color={0xffffff} metalness={1.0} roughness={0.0} envMapIntensity={1.5} />
+      </mesh>
+   );
+};
+
 // R3F Pool Node Component
 const PoolNode = forwardRef<
    any,
@@ -71,7 +109,7 @@ const PoolNode = forwardRef<
       animationRefs?: {
          meshRef: RefObject<THREE.Mesh | null>;
          cloudsRef: RefObject<THREE.Mesh | null>;
-         healthRingRef: RefObject<THREE.Mesh | null>;
+         healthRingRef: RefObject<THREE.Group | null>;
          poolData: any;
       };
    }
@@ -79,7 +117,7 @@ const PoolNode = forwardRef<
    const meshRef = useRef<THREE.Mesh>(null);
    const cloudsRef = useRef<THREE.Mesh>(null);
    const groupRef = useRef<THREE.Group>(null);
-   const healthRingRef = useRef<THREE.Mesh>(null);
+   const healthRingRef = useRef<THREE.Group>(null);
 
    // Forward ref to parent component
    useEffect(() => {
@@ -110,10 +148,10 @@ const PoolNode = forwardRef<
          }
          if (healthRingRef.current) {
             if (healthRingRef.current.userData.rx === undefined) {
-               healthRingRef.current.userData.rx = 0.1 + Math.random() * 0.9;
+               healthRingRef.current.userData.rx = 0.01 + Math.random() * 0.09;
             }
             if (healthRingRef.current.userData.ry === undefined) {
-               healthRingRef.current.userData.ry = 0.5 + Math.random();
+               healthRingRef.current.userData.ry = 0.02 + Math.random() * 0.1;
             }
          }
       }
@@ -150,12 +188,13 @@ const PoolNode = forwardRef<
    });
 
    const healthRingRotation = useMemo(() => [Math.PI / (Math.random() * (8 - 4) + 4), 0, 0] as [number, number, number], []);
+   const poolState = calculatePoolState(poolData.detail);
 
    return (
       <group ref={groupRef} position={position} userData={{ type: 'Pool', id: poolData.id, poolData }}>
          {/* Main sphere */}
-         {poolData.health !== 'healthy' ? (
-            <MetaPlate animate scale={9.5} onClick={handleClick} />
+         {poolState.status !== 'healthy' ? (
+            <RoughMirrorSphere scale={4.5} onClick={handleClick} />
          ) : (
             <>
                <mesh
@@ -194,14 +233,14 @@ const PoolNode = forwardRef<
                   <sphereGeometry args={[5.1, 32, 32]} />
                   <meshStandardMaterial map={textures?.cloudsMap || undefined} transparent opacity={0.5} depthWrite={false} />
                </mesh>
-               <Atmosphere radius={5} intensity={1.1} power={2.0} color={Colors.emerald[400]} />
+               {/*<Atmosphere radius={6} intensity={1.8} power={2.0} color={Colors.green[400]} />*/}
             </>
          )}
 
          {/* Atmosphere effect for healthy pools */}
-         {/*{poolData.health === 'healthy' && (
+         {poolState.status === 'healthy' && (
             <mesh>
-               <sphereGeometry args={[6.1, 32, 32]} />
+               <sphereGeometry args={[6.3, 32, 32]} />
                <shaderMaterial
                   vertexShader={`
                      varying vec3 vNormal;
@@ -238,51 +277,54 @@ const PoolNode = forwardRef<
                   depthTest={true}
                />
             </mesh>
-         )}*/}
+         )}
 
-         {/* Health status ring for unhealthy pools */}
-         {poolData.health !== 'healthy' && (
-            <mesh ref={healthRingRef} rotation={healthRingRotation}>
-               <ringGeometry args={[5.5, 6.5, 64, 1, 0, Math.PI * 2]} />
-               <meshStandardMaterial color={poolData.health === 'warning' ? 0xffaa00 : 0xdc2626} side={THREE.DoubleSide} depthTest depthWrite />
-               {/*<shaderMaterial
-                  vertexShader={`
-                     varying vec2 vUv;
-                     void main() {
-                        vUv = uv;
-                        gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
-                     }
-                  `}
-                  fragmentShader={`
-                     uniform float time;
-                     uniform vec3 color;
-                     varying vec2 vUv;
-                     void main() {
-                        vec2 center = vec2(0.5, 0.5);
-                        float dist = distance(vUv, center);
-                        float angle = atan(vUv.y - 0.5, vUv.x - 0.5);
-                        float pattern = sin(angle * 4.0 + time * 2.0) * 0.5 + 0.5;
-                        float glow = 1.0 - smoothstep(0.0, 0.02, abs(dist - 0.5));
-                        vec3 finalColor = color * (0.6 + pattern * 0.4);
-                        float alpha = glow * (0.5 + pattern * 0.5);
-                        gl_FragColor = vec4(finalColor, alpha);
-                     }
-                  `}
-                  uniforms={{
-                     time: { value: 0 },
-                     color: { value: new THREE.Color(poolData.health === 'warning' ? 0xffaa00 : 0xdc2626) },
-                  }}
-                  transparent
-                  opacity={0.9}
-                  side={THREE.DoubleSide}
-                  depthTest
-                  depthWrite
-               />*/}
-            </mesh>
+         {/* Health status ring for unhealthy pools - Premium style with dual-layer glow */}
+         {poolState.status !== 'healthy' && (
+            <group ref={healthRingRef} rotation={healthRingRotation}>
+               {/* Outer solid ring with emissive glow */}
+               <mesh>
+                  <ringGeometry args={[5.8, 6.8, 64]} />
+                  <meshStandardMaterial
+                     color={poolState.status === 'warning' ? 0xffbb33 : 0xff4444}
+                     emissive={poolState.status === 'warning' ? 0xffaa00 : 0xdc2626}
+                     emissiveIntensity={0.8}
+                     metalness={0.8}
+                     roughness={0.2}
+                     side={THREE.DoubleSide}
+                  />
+               </mesh>
+
+               {/* Inner glow ring with additive blending */}
+               <mesh>
+                  <ringGeometry args={[5.6, 6.3, 64]} />
+                  <meshBasicMaterial
+                     color={poolState.status === 'warning' ? 0xffdd66 : 0xff6666}
+                     transparent
+                     opacity={0.6}
+                     blending={THREE.AdditiveBlending}
+                     side={THREE.DoubleSide}
+                     depthWrite={false}
+                  />
+               </mesh>
+
+               {/* Innermost bright core */}
+               <mesh>
+                  <ringGeometry args={[5.5, 6.5, 64]} />
+                  <meshBasicMaterial
+                     color={poolState.status === 'warning' ? 0xffffaa : 0xffaaaa}
+                     transparent
+                     opacity={0.4}
+                     blending={THREE.AdditiveBlending}
+                     side={THREE.DoubleSide}
+                     depthWrite={false}
+                  />
+               </mesh>
+            </group>
          )}
 
          {/* Pool name text - positioned above the sphere */}
-         <Text3D position={[0, 10, 0]} fontSize={1.5} color={0xffffff} anchorX="center" anchorY="top" outlineColor={Colors.blue[600]} outlineWidth={0.1}>
+         <Text3D position={[0, 10, 0]} fontSize={1.5} color={0xffffff} anchorX="center" anchorY="top" outlineColor={Colors.black} outlineWidth={0.1}>
             {poolData.name}
          </Text3D>
       </group>
@@ -413,6 +455,8 @@ const SpaceshipHost = forwardRef<
       }
    });
 
+   console.log('##### hostData=', hostData);
+
    return (
       <>
          <group
@@ -439,9 +483,57 @@ const SpaceshipHost = forwardRef<
 
             {/* Host label - moved outward by 20 units */}
             <Text3D
+               position={[-7.5, 1.1, 5.5]}
+               fontSize={1.4}
+               color={Colors.white}
+               anchorX="left"
+               anchorY="middle"
+               outlineWidth="8%"
+               outlineColor={Colors.black}
+               rotation={[-Math.PI / 2, 0, 0]}
+            >
+               CPU : {hostData.detail.cpuCount} cpu
+            </Text3D>
+            <Text3D
+               position={[-7.5, 1.1, 7.5]}
+               fontSize={1.4}
+               color={Colors.white}
+               anchorX="left"
+               anchorY="middle"
+               outlineWidth="8%"
+               outlineColor={Colors.black}
+               rotation={[-Math.PI / 2, 0, 0]}
+            >
+               Cores : {hostData.detail.coreCount} core
+            </Text3D>
+            <Text3D
+               position={[-7.5, 1.1, 9.5]}
+               fontSize={1.4}
+               color={Colors.yellow[400]}
+               anchorX="left"
+               anchorY="middle"
+               outlineWidth="8%"
+               outlineColor={0x000000}
+               rotation={[-Math.PI / 2, 0, 0]}
+            >
+               MEM : {formatBytes(hostData.detail.memory)?.replace(/^(.+)[bB]$/, '$1')}
+            </Text3D>
+            {/*<Text3D
                position={[-5.5, 1.1, 16.5]}
                fontSize={1.4}
-               color={Colors.pink[400]}
+               color={Colors.neutral[400]}
+               anchorX="center"
+               anchorY="middle"
+               outlineWidth="8%"
+               outlineColor={0x000000}
+               rotation={[-Math.PI / 2, 0, 0]}
+            >
+               CPU: {hostData.detail.cpuCount} ({hostData.detail.coreCount} cores)
+            </Text3D>*/}
+            <Text3D
+               position={[-5.5, 1.1, 16.5]}
+               fontSize={1.4}
+               color={Colors.neutral[400]}
                anchorX="center"
                anchorY="middle"
                outlineWidth="8%"
@@ -450,7 +542,15 @@ const SpaceshipHost = forwardRef<
             >
                {hostData.name}
             </Text3D>
-            <Text3D position={[6, 0.15, 18.1]} fontSize={1.3} color={0x3b82f6} anchorX="center" anchorY="middle" outlineWidth="8%" outlineColor={0x000000}>
+            <Text3D
+               position={[6, 0.15, 18.1]}
+               fontSize={1.3}
+               color={Colors.slate[400]}
+               anchorX="center"
+               anchorY="middle"
+               outlineWidth="8%"
+               outlineColor={0x000000}
+            >
                {hostData.name}
             </Text3D>
 
@@ -532,9 +632,13 @@ const CrystalOSD = ({
       return 0x4ade80; // Green for healthy
    };
 
-   // Call onCreated when component mounts
+   // Call onCreated when component mounts and cache mesh reference
    useEffect(() => {
       if (groupRef.current && onCreated) {
+         // Cache mesh reference in userData to avoid children.find() in useFrame
+         if (meshRef.current) {
+            groupRef.current.userData.cachedMesh = meshRef.current;
+         }
          onCreated(groupRef.current);
       }
    }, [onCreated]);
@@ -628,7 +732,7 @@ const ClusterTopologyScene = ({
    highlightNode,
    toggleAllPanels,
    topologyData,
-   loadingPGIds,
+   loadingPGIdsRef,
    isLoadingTopology,
 }: {
    selectedObjectRef: RefObject<any>;
@@ -656,7 +760,7 @@ const ClusterTopologyScene = ({
    highlightNode: (node: any) => void;
    toggleAllPanels: () => void;
    topologyData: any;
-   loadingPGIds: Set<string>;
+   loadingPGIdsRef: RefObject<Set<string>>;
    isLoadingTopology: boolean;
 }) => {
    const { scene, camera, mouse, viewport } = useThree();
@@ -690,17 +794,16 @@ const ClusterTopologyScene = ({
             ring.rotation.y += delta * ry;
          }
 
-         // Update Holographic HUD animations
+         // Update Holographic HUD animations using cached shader meshes
          const hudGroup = node.userData.hud as THREE.Group;
-         if (hudGroup) {
-            hudGroup.traverse(child => {
-               if (child instanceof THREE.Mesh && child.userData.material) {
-                  const material = child.userData.material as THREE.ShaderMaterial;
-                  if (material.uniforms && material.uniforms.time) {
-                     material.uniforms.time.value = elapsedTime;
-                  }
+         if (hudGroup && hudGroup.userData.shaderMeshes) {
+            const shaderMeshes = hudGroup.userData.shaderMeshes as THREE.Mesh[];
+            for (const mesh of shaderMeshes) {
+               const material = mesh.userData.material as THREE.ShaderMaterial;
+               if (material.uniforms && material.uniforms.time) {
+                  material.uniforms.time.value = elapsedTime;
                }
-            });
+            }
 
             // Rotate HUD ring slowly
             const hudRing = hudGroup.children[0];
@@ -712,7 +815,7 @@ const ClusterTopologyScene = ({
          // Enhanced OSD animations - pulse, float, rotation, and shader updates
          if (node.userData.type === 'OSD') {
             const animData = osdAnimationDataRef.current.get(node.userData.id);
-            const mesh = node.children.find(child => child.type === 'Mesh') as THREE.Mesh;
+            const mesh = node.userData.cachedMesh as THREE.Mesh;
 
             if (mesh && mesh.material) {
                const material = mesh.material as THREE.MeshPhongMaterial;
@@ -753,20 +856,19 @@ const ClusterTopologyScene = ({
 
          // Enhanced PG animations
          if (node.userData.type === 'PG') {
-            // Find main mesh
-            const pgMesh = node.children.find(child => child instanceof THREE.Mesh && !(child as any).name) as THREE.Mesh;
+            // Use cached mesh reference
+            const pgMesh = node.userData.cachedPgMesh as THREE.Mesh;
 
-            // Update HUD animations
-            const hudGroup = node.children.find(child => child.name === 'pg-holographic-hud') as THREE.Group;
-            if (hudGroup) {
-               hudGroup.traverse(child => {
-                  if (child instanceof THREE.Mesh && child.userData.material) {
-                     const material = child.userData.material as THREE.ShaderMaterial;
-                     if (material.uniforms && material.uniforms.time) {
-                        material.uniforms.time.value = elapsedTime;
-                     }
+            // Use cached HUD reference with direct shader mesh access
+            const hudGroup = node.userData.cachedHudGroup as THREE.Group;
+            if (hudGroup && hudGroup.userData.shaderMeshes) {
+               const shaderMeshes = hudGroup.userData.shaderMeshes as THREE.Mesh[];
+               for (const mesh of shaderMeshes) {
+                  const material = mesh.userData.material as THREE.ShaderMaterial;
+                  if (material.uniforms && material.uniforms.time) {
+                     material.uniforms.time.value = elapsedTime;
                   }
-               });
+               }
 
                // Slow rotation for HUD ring
                const hudRing = hudGroup.children[0];
@@ -775,8 +877,8 @@ const ClusterTopologyScene = ({
                }
             }
 
-            // Update energy field animation
-            const energyField = node.children.find(child => child.name === 'energy-field') as THREE.Mesh;
+            // Use cached energy field reference
+            const energyField = node.userData.cachedEnergyField as THREE.Mesh;
             if (energyField && energyField.userData.material) {
                const material = energyField.userData.material as THREE.ShaderMaterial;
                if (material.uniforms && material.uniforms.time) {
@@ -840,6 +942,76 @@ const ClusterTopologyScene = ({
             particle.scale.set(scale, scale, scale);
          }
       }
+
+      // Bubble animation (merged from second useFrame)
+      if (bubbleAnimationRefs.current && bubbleAnimationRefs.current.meshRef.current) {
+         const bubble = bubbleAnimationRefs.current;
+
+         // Smooth mouse tracking
+         const targetX = mouse.x * viewport.width * 0.3;
+         const targetY = mouse.y * viewport.height * 0.3;
+
+         bubble.mousePos.current.x += (targetX - bubble.mousePos.current.x) * 0.05;
+         bubble.mousePos.current.y += (targetY - bubble.mousePos.current.y) * 0.05;
+
+         // Calculate distance from center for intensity
+         const centerDist = Math.sqrt(bubble.mousePos.current.x * bubble.mousePos.current.x + bubble.mousePos.current.y * bubble.mousePos.current.y);
+         const maxDist = Math.sqrt(viewport.width * viewport.width + viewport.height * viewport.height) * 0.25;
+         const distRatio = Math.min(centerDist / maxDist, 1);
+
+         // Update vertices with noise
+         if (bubble.geometryRef.current) {
+            const geometry = bubble.geometryRef.current;
+            const positions = geometry.attributes.position.array as Float32Array;
+
+            for (let i = 0; i < bubble.originalVertices.current.length; i++) {
+               const original = bubble.originalVertices.current[i];
+               const index = i * 3;
+
+               // Apply noise based on original position and time
+               const perlin = simplex3(original.x * 0.008 + elapsedTime * 0.0005, original.y * 0.008 + elapsedTime * 0.0005, original.z * 0.008);
+
+               // Intensity based on mouse distance
+               const ratio = perlin * 0.3 * (distRatio * 0.5 + 0.2) + 0.9;
+
+               positions[index] = original.x * ratio;
+               positions[index + 1] = original.y * ratio;
+               positions[index + 2] = original.z * ratio;
+            }
+
+            geometry.attributes.position.needsUpdate = true;
+            geometry.computeVertexNormals();
+         }
+
+         // Rotation based on mouse
+         if (bubble.meshRef.current) {
+            bubble.meshRef.current.rotation.y = -0.3 + mouse.x * 0.3;
+            bubble.meshRef.current.rotation.z = 0.3 + mouse.y * -0.3;
+
+            // Apply spring scale
+            bubble.meshRef.current.scale.setScalar(bubble.springScale.current * bubble.scale);
+         }
+      }
+
+      // Host animations (merged from second useFrame)
+      hostAnimationRefs.current.forEach(hostRefs => {
+         if (hostRefs.meshRef.current) {
+            // Subtle pulsing glow effect
+            const material = hostRefs.meshRef.current.material as THREE.MeshPhysicalMaterial;
+            material.emissiveIntensity = 0.2 + Math.sin(elapsedTime * 2) * 0.1;
+         }
+
+         // Animate tube line glow effects
+         hostRefs.tubeRefs.current.forEach((tube, index) => {
+            if (tube && index == 0) {
+               const material = tube.material as THREE.MeshPhysicalMaterial;
+               // Different phases for each tube to create wave effect
+               const phase = index * Math.PI * 0.4 + elapsedTime * 3;
+               material.emissiveIntensity = 0.3 + Math.sin(phase) * 0.4;
+               material.opacity = 0.6 + Math.sin(phase) * 0.3;
+            }
+         });
+      });
    });
    const [texturesLoaded, setTexturesLoaded] = useState(false);
    const textSphereRef = useRef<THREE.Object3D>(null);
@@ -850,7 +1022,7 @@ const ClusterTopologyScene = ({
       Array<{
          meshRef: RefObject<THREE.Mesh | null>;
          cloudsRef: RefObject<THREE.Mesh | null>;
-         healthRingRef: RefObject<THREE.Mesh | null>;
+         healthRingRef: RefObject<THREE.Group | null>;
          poolData: any;
       }>
    >([]);
@@ -883,111 +1055,7 @@ const ClusterTopologyScene = ({
       return Math.sin(x * 0.1 + Math.cos(y * 0.1)) * Math.cos(z * 0.1) * 0.5;
    };
 
-   // Centralized animation loop
-   useFrame(({ clock }, delta) => {
-      const time = clock.getElapsedTime();
-
-      // Animate pools
-      poolAnimationRefs.current.forEach(poolRefs => {
-         if (poolRefs.meshRef.current) {
-            poolRefs.meshRef.current.rotation.y += 0.002;
-         }
-         if (poolRefs.cloudsRef.current) {
-            poolRefs.cloudsRef.current.rotation.y -= 0.004;
-         }
-         if (poolRefs.healthRingRef.current) {
-            poolRefs.healthRingRef.current.rotation.y += delta + Math.random() * 0.01 + 0.005;
-
-            // Update health ring animation
-            if (poolRefs.poolData.health !== 'healthy') {
-               const material = poolRefs.healthRingRef.current.material as THREE.ShaderMaterial;
-               if (material.uniforms?.time) {
-                  material.uniforms.time.value = time;
-               }
-            }
-         }
-      });
-
-      // Animate bubble
-      if (bubbleAnimationRefs.current && bubbleAnimationRefs.current.meshRef.current) {
-         const bubble = bubbleAnimationRefs.current;
-
-         // Smooth mouse tracking
-         const targetX = mouse.x * viewport.width * 0.3;
-         const targetY = mouse.y * viewport.height * 0.3;
-
-         bubble.mousePos.current.x += (targetX - bubble.mousePos.current.x) * 0.05;
-         bubble.mousePos.current.y += (targetY - bubble.mousePos.current.y) * 0.05;
-
-         // Calculate distance from center for intensity
-         const centerDist = Math.sqrt(bubble.mousePos.current.x * bubble.mousePos.current.x + bubble.mousePos.current.y * bubble.mousePos.current.y);
-         const maxDist = Math.sqrt(viewport.width * viewport.width + viewport.height * viewport.height) * 0.25;
-         const distRatio = Math.min(centerDist / maxDist, 1);
-
-         // Update vertices with noise
-         if (bubble.geometryRef.current) {
-            const geometry = bubble.geometryRef.current;
-            const positions = geometry.attributes.position.array as Float32Array;
-
-            for (let i = 0; i < bubble.originalVertices.current.length; i++) {
-               const original = bubble.originalVertices.current[i];
-               const index = i * 3;
-
-               // Apply noise based on original position and time
-               const perlin = simplex3(original.x * 0.008 + time * 0.0005, original.y * 0.008 + time * 0.0005, original.z * 0.008);
-
-               // Intensity based on mouse distance
-               const ratio = perlin * 0.3 * (distRatio * 0.5 + 0.2) + 0.9;
-
-               positions[index] = original.x * ratio;
-               positions[index + 1] = original.y * ratio;
-               positions[index + 2] = original.z * ratio;
-            }
-
-            geometry.attributes.position.needsUpdate = true;
-            geometry.computeVertexNormals();
-         }
-
-         // Rotation based on mouse
-         if (bubble.meshRef.current) {
-            bubble.meshRef.current.rotation.y = -0.3 + mouse.x * 0.3;
-            bubble.meshRef.current.rotation.z = 0.3 + mouse.y * -0.3;
-
-            // Apply spring scale
-            bubble.meshRef.current.scale.setScalar(bubble.springScale.current * bubble.scale);
-         }
-      }
-
-      // Animate hosts
-      hostAnimationRefs.current.forEach(hostRefs => {
-         if (hostRefs.meshRef.current) {
-            // Subtle pulsing glow effect
-            const material = hostRefs.meshRef.current.material as THREE.MeshPhysicalMaterial;
-            material.emissiveIntensity = 0.2 + Math.sin(time * 2) * 0.1;
-         }
-
-         // Animate tube line glow effects
-         hostRefs.tubeRefs.current.forEach((tube, index) => {
-            if (tube && index == 0) {
-               const material = tube.material as THREE.MeshPhysicalMaterial;
-               // Different phases for each tube to create wave effect
-               const phase = index * Math.PI * 0.4 + time * 3;
-               material.emissiveIntensity = 0.3 + Math.sin(phase) * 0.4;
-               material.opacity = 0.6 + Math.sin(phase) * 0.3;
-            }
-         });
-      });
-
-      // Animate OSDs
-      /*osdAnimationRefs.current.forEach(osdRefs => {
-         if (osdRefs.meshRef.current) {
-            // Pulsing glow based on health status
-            const material = osdRefs.meshRef.current.material as THREE.MeshPhysicalMaterial;
-            const baseIntensity = osdRefs.osdData.status === 'up' && osdRefs.osdData.health === 'healthy' ? 0.6 : 0.3;
-            material.emissiveIntensity = baseIntensity + Math.sin(time * 3) * 0.2;
-         }
-      });*/
-   });
+   // Duplicate useFrame removed - animations merged into main useFrame loop above
 
    // Set camera and scene refs for parent component
    useEffect(() => {
@@ -1184,11 +1252,11 @@ const ClusterTopologyScene = ({
          {/*<directionalLight position={[-30, 30, -40]} intensity={1.5} castShadow shadow-mapSize={[1024, 1024]}>
             <orthographicCamera args={[-100, 100, -100, 100, 0.1, 200]} />
          </directionalLight>*/}
-         <directionalLight position={[0, -50, 0]} intensity={7} shadow-mapSize={[256, 256]}>
+         <directionalLight position={[0, -50, 0]} intensity={3} shadow-mapSize={[256, 256]}>
             {/*<orthographicCamera args={[-100, 100, -100, 100, 0.1, 200]} />*/}
          </directionalLight>
          <rectAreaLight
-            args={['#ffffff', 3, 100, 150]}
+            args={['#ffffff', 2, 100, 150]}
             position={[0, 80, 0]}
             rotation-x={-Math.PI / 2} // -> 조명이 밑에서 위로 (위에서 아래로 비추려면 : -Math.PI / 2)
          />
@@ -1273,19 +1341,19 @@ const ClusterTopologyScene = ({
          <rectAreaLight
             args={['#ffffff', 3, 50, 50]}
             position={[0, -28, 0]}
-            rotation-x={-Math.PI / 2} // -> 조명이 밑에서 위로 (위에서 아래로 비추려면 : Math.PI / 2)
+            rotation-x={-Math.PI / 2} // -> 조명이 위에서 밑으로? (반대로 비추려면 : Math.PI / 2)
          />
          {/*<pointLight args={['#ffffff', 50, 50, 1]} position={[0, -33, 13]} />*/}
          {/*<pointLight args={['#ffffff', 50, 50, 1]} position={[0, -33, -13]} />*/}
          {/*<pointLight args={['#ffffff', 50, 50, 1]} position={[13, -33, 0]} />*/}
          {/*<pointLight args={['#ffffff', 50, 50, 1]} position={[-13, -33, 0]} />*/}
-         <Bubble position={[0, -35, 0]} scale={3} color={Colors.white} useBubble />
-         <TextSphere ref={textSphereRef} position={[0, -36, 0]} scale={4} text="OKESTRO  OKESTRO" bgColor={Colors.pink[300]} textColor={Colors.blue[500]} />
+         <Bubble position={[0, -35, 0]} scale={3} color={Colors.slate[100]} useBubble />
+         <TextSphere ref={textSphereRef} position={[0, -36, 0]} scale={4} text="OKESTRO  OKESTRO" bgColor={Colors.white} textColor={Colors.blue[600]} />
          {/*Portal 상단 조명*/}
          {/*<rectAreaLight args={['#ffffff', 3, 30, 20]} position={[0, -45, 0]} rotation-x={Math.PI / 2} />*/}
          {/*<pointLight args={['#ffffff', 40, 20, 0.5]} position={[0, -50, 0]} />*/}
          <PortalLight position={[0, -65, 0]} scale={60} />
-         <Medical position={[0, -41, 71.2]} rotation={[0, 0, 0]} scale={4} castShadow receiveShadow />
+         <Medical position={[0, -41, 71.2]} rotation={[0, 0, 0]} scale={4} />
 
          {/*<Stone position={[0, -45, 0]} scale={7} />*/}
          {/*<ControlBox position={[-61.5, -35.4, 0]} rotation={[0, -Math.PI / 2, 0]} scale={5} />*/}
@@ -1406,11 +1474,15 @@ const ClusterTopologyScene = ({
          })}
 
          {/* Energy charging effects for loading PGs */}
-         {Array.from(loadingPGIds).map(pgId => {
+         {Array.from(loadingPGIdsRef.current).map(pgId => {
             const pgNode = pgNodesRef.current.find(pg => pg.userData.id === pgId);
             if (!pgNode) return null;
 
-            const position = new THREE.Vector3();
+            // Cache position vector in node userData to avoid creating new Vector3
+            if (!pgNode.userData.cachedPosition) {
+               pgNode.userData.cachedPosition = new THREE.Vector3();
+            }
+            const position = pgNode.userData.cachedPosition;
             pgNode.getWorldPosition(position);
 
             return <PGEnergyEffect key={`energy-${pgId}`} position={position} radius={3} />;
@@ -1511,11 +1583,13 @@ const mockData = {
 
 export default function ClusterTopologyView() {
    // Topology store - fetch real data from API
-   const topologyData = useTopologyStore(selectTopologyData);
-   const isLoadingTopology = useTopologyStore(selectIsLoading);
-   const fetchPGOSDs = useTopologyStore(state => state.fetchPGOSDs);
-   const isPGLoading = useTopologyStore(state => state.isPGLoading);
-   const loadingPGIds = useTopologyStore(state => state.loadingPGIds);
+   const topologyData = useTopologyStore(useShallow(selectTopologyData));
+   const isLoadingTopology = useTopologyStore(useShallow(selectIsLoading));
+   const error = useTopologyStore(useShallow(selectError));
+   const fetchPGOSDs = useTopologyStore(useShallow(state => state.fetchPGOSDs));
+   const isPGLoading = useTopologyStore(useShallow(state => state.isPGLoading));
+   // Use useRef instead of store to avoid re-renders
+   const loadingPGIdsRef = useRef<Set<string>>(new Set());
 
    // Check for empty data and show error toast
    useEffect(() => {
@@ -1620,6 +1694,7 @@ export default function ClusterTopologyView() {
    const connectionLinesRef = useRef<(THREE.Line | THREE.Mesh)[]>([]);
    // const starFieldRef = useRef<THREE.Points | null>(null);
    const trafficParticlesRef = useRef<THREE.Group[]>([]);
+   const vacuumParticlesRef = useRef<THREE.Group[]>([]); // Vacuum particle effects for floating OSDs
 
    // Search state for performance optimization (avoids DOM queries in useFrame)
    const searchIngRef = useRef(false);
@@ -1690,6 +1765,9 @@ export default function ClusterTopologyView() {
             // 패널 열기: 버튼은 슬라이드아웃, 패널은 슬라이드인
             searchPanelElement.style.display = 'block';
 
+            // 즉시 패널을 초기 위치(-300px)로 설정하여 CSS transform과 충돌 방지
+            gsap.set(searchPanelElement, { x: -300 });
+
             // 버튼 슬라이드아웃
             gsap.to(searchExpandBtnElement, {
                x: -60,
@@ -1699,16 +1777,12 @@ export default function ClusterTopologyView() {
             });
 
             // 패널 슬라이드인
-            gsap.fromTo(
-               searchPanelElement,
-               { x: -300 },
-               {
-                  x: 0,
-                  duration: 0.4,
-                  delay: 0.1,
-                  ease: 'power2.out',
-               },
-            );
+            gsap.to(searchPanelElement, {
+               x: 0,
+               duration: 0.4,
+               delay: 0.1,
+               ease: 'power2.out',
+            });
          }
       }
    };
@@ -1847,6 +1921,20 @@ export default function ClusterTopologyView() {
             }
          });
       }
+
+      // Remove vacuum effects for searched OSDs
+      searchedOSDIdsRef.current.forEach(osdId => {
+         const vacuumEffects = vacuumParticlesRef.current.filter(effect => effect.userData?.osdId === osdId);
+         vacuumEffects.forEach(effect => {
+            sceneRef.current!.remove(effect);
+            // Dispose of particles
+            effect.traverse(child => {
+               if ((child as any).geometry) (child as any).geometry.dispose();
+               if ((child as any).material) (child as any).material.dispose();
+            });
+         });
+         vacuumParticlesRef.current = vacuumParticlesRef.current.filter(effect => effect.userData?.osdId !== osdId);
+      });
 
       searchedPoolIdsRef.current.clear(); // Clear searched pool IDs
       searchedOSDIdsRef.current.clear(); // Clear searched OSD IDs
@@ -1990,6 +2078,20 @@ export default function ClusterTopologyView() {
                });
             }
 
+            // Remove vacuum effects for previously searched OSDs before new search
+            searchedOSDIdsRef.current.forEach(osdId => {
+               const vacuumEffects = vacuumParticlesRef.current.filter(effect => effect.userData?.osdId === osdId);
+               vacuumEffects.forEach(effect => {
+                  sceneRef.current!.remove(effect);
+                  // Dispose of particles
+                  effect.traverse(child => {
+                     if ((child as any).geometry) (child as any).geometry.dispose();
+                     if ((child as any).material) (child as any).material.dispose();
+                  });
+               });
+               vacuumParticlesRef.current = vacuumParticlesRef.current.filter(effect => effect.userData?.osdId !== osdId);
+            });
+
             // Clear any existing searched OSD IDs
             searchedOSDIdsRef.current.clear();
 
@@ -2040,6 +2142,12 @@ export default function ClusterTopologyView() {
                            y: targetY,
                            duration: 1.0,
                            ease: 'power2.out',
+                           onComplete: () => {
+                              // Add vacuum/absorption particle effect after OSD floats up
+                              const vacuumEffect = createVacuumEffect(node);
+                              vacuumParticlesRef.current.push(vacuumEffect);
+                              sceneRef.current!.add(vacuumEffect);
+                           },
                         });
                      }
                   }
@@ -2079,6 +2187,7 @@ export default function ClusterTopologyView() {
       label.outlineColor = 0x000000;
       label.depthWrite = false;
       label.renderOrder = 999;
+      label.material.side = THREE.DoubleSide;
       parent.add(label);
       label.sync();
       return label;
@@ -2088,6 +2197,7 @@ export default function ClusterTopologyView() {
       const shouldClearPGs = selectedObjectRef.current?.type === 'Pool';
       const isHost = selectedObjectRef.current?.type === 'Host';
       const isOSD = selectedObjectRef.current?.type === 'OSD';
+      const isPG = selectedObjectRef.current?.type === 'PG';
 
       // useRef 사용 (React 리렌더링 없음)
       selectedObjectRef.current = null;
@@ -2107,7 +2217,49 @@ export default function ClusterTopologyView() {
 
       // Clear OSD selection if it was an OSD
       if (isOSD) {
+         const osdId = selectedOSDIdRef.current;
          selectedOSDIdRef.current = null;
+
+         // Find the OSD node and remove highlight
+         if (osdId !== null) {
+            const osdNode = osdNodesRef.current.find(node => node.userData.id === osdId);
+            if (osdNode) {
+               // Remove yellow highlight sphere
+               const existingHighlight = osdNode.getObjectByName('yellowHighlight');
+               if (existingHighlight) {
+                  osdNode.remove(existingHighlight);
+               }
+               // Stop pulse animation
+               gsap.killTweensOf(osdNode.scale);
+               osdNode.scale.set(1, 1, 1);
+            }
+         }
+      }
+
+      // Clear PG selection if it was a PG
+      if (isPG) {
+         const pgId = selectedPGIdRef.current;
+         selectedPGIdRef.current = null;
+
+         // Find the PG node and remove highlight/pulse
+         if (pgId !== null) {
+            const pgNode = pgNodesRef.current.find(node => node.userData.id === pgId);
+            if (pgNode) {
+               // Remove yellow highlight sphere
+               const existingHighlight = pgNode.getObjectByName('yellowHighlight');
+               if (existingHighlight) {
+                  pgNode.remove(existingHighlight);
+               }
+               // Stop pulse animation
+               gsap.killTweensOf(pgNode.scale);
+               pgNode.scale.set(1, 1, 1);
+            }
+         }
+
+         // Reset OSDs and connections
+         showOSDsForPG(null);
+         removePoolPGDataFlow();
+         resetPoolPGConnections();
       }
 
       // info-panel DOM 직접 숨김
@@ -2220,10 +2372,13 @@ export default function ClusterTopologyView() {
 
       // Hybrid material: MeshPhysicalMaterial as base
       let material;
-      if (pgData.state === 'active+clean') {
+      const pgState = calculatePgState(pgData.state);
+
+      if (pgState.status === 'healthy') {
          // Crystalline blue material for healthy PGs
          material = new THREE.MeshPhysicalMaterial({
-            color: 0x00d2ff,
+            // color: 0x00d2ff,
+            color: Colors.blue[300],
             metalness: 0.8,
             roughness: 0.2,
             transmission: 0.3,
@@ -2238,13 +2393,15 @@ export default function ClusterTopologyView() {
             specularColor: new THREE.Color(0x00ffff),
             transparent: true,
             opacity: 0.95,
-            emissive: 0x0066aa,
+            // emissive: 0x0066aa,
+            emissive: Colors.blue[600],
             emissiveIntensity: 0.3,
          });
-      } else if (pgData.state === 'degraded') {
+      } else if (pgState.status === 'warning') {
          // Golden warning material
          material = new THREE.MeshPhysicalMaterial({
-            color: 0xffaa00,
+            // color: 0xffaa00,
+            color: Colors.amber[300],
             metalness: 0.9,
             roughness: 0.3,
             transmission: 0.2,
@@ -2259,13 +2416,15 @@ export default function ClusterTopologyView() {
             specularColor: new THREE.Color(0xffcc00),
             transparent: true,
             opacity: 0.9,
-            emissive: 0x664400,
-            emissiveIntensity: 0.4,
+            // emissive: 0x664400,
+            emissive: Colors.amber[600],
+            emissiveIntensity: 0.8,
          });
       } else {
          // Red error material with cracks
          material = new THREE.MeshPhysicalMaterial({
-            color: 0xff3333,
+            // color: 0xff3333,
+            color: Colors.red[400],
             metalness: 0.6,
             roughness: 0.5,
             transmission: 0.1,
@@ -2280,14 +2439,15 @@ export default function ClusterTopologyView() {
             specularColor: new THREE.Color(0xff6666),
             transparent: true,
             opacity: 0.85,
-            emissive: 0x660000,
-            emissiveIntensity: 0.5,
+            // emissive: 0x660000,
+            emissive: Colors.red[700],
+            emissiveIntensity: 0.8,
          });
       }
 
       const mesh = new THREE.Mesh(geometry, material);
-      mesh.castShadow = true;
-      mesh.receiveShadow = true;
+      mesh.castShadow = false;
+      mesh.receiveShadow = false;
       mesh.userData.material = material; // Store reference for animation
       group.add(mesh);
 
@@ -2295,6 +2455,9 @@ export default function ClusterTopologyView() {
       const createHolographicHUD = () => {
          const hudGroup = new THREE.Group();
          hudGroup.name = 'pg-holographic-hud';
+
+         // Array to store meshes with shader materials (avoid traverse in useFrame)
+         const shaderMeshes: THREE.Mesh[] = [];
 
          // 상태별 색상 설정
          const hudColor = pgData.state === 'active+clean' ? 0x00d2ff : pgData.state === 'degraded' ? 0xffaa00 : 0xff3333;
@@ -2345,6 +2508,9 @@ export default function ClusterTopologyView() {
          ringMesh.userData.material = ringMaterial;
          hudGroup.add(ringMesh);
 
+         // Store in array for direct access
+         shaderMeshes.push(ringMesh);
+
          // 데이터 표시 패널들
          const panelCount = 3;
          for (let i = 0; i < panelCount; i++) {
@@ -2391,7 +2557,13 @@ export default function ClusterTopologyView() {
             panelMesh.lookAt(0, 3.8, 0);
             panelMesh.userData.material = panelMaterial;
             hudGroup.add(panelMesh);
+
+            // Store in array for direct access
+            shaderMeshes.push(panelMesh);
          }
+
+         // Cache shader meshes array in userData
+         hudGroup.userData.shaderMeshes = shaderMeshes;
 
          return hudGroup;
       };
@@ -2400,6 +2572,10 @@ export default function ClusterTopologyView() {
       group.add(hud);
 
       createLabel(pgData.id, group, 4, '8%');
+
+      // Cache mesh and HUD references in userData to avoid children.find() in useFrame
+      group.userData.cachedPgMesh = mesh;
+      group.userData.cachedHudGroup = hud;
 
       // 추가 효과: 에너지 필드 (건강한 PG만)
       if (pgData.state === 'active+clean') {
@@ -2450,6 +2626,9 @@ export default function ClusterTopologyView() {
          energyField.name = 'energy-field';
          energyField.userData.material = energyFieldMaterial;
          group.add(energyField);
+
+         // Cache energy field reference
+         group.userData.cachedEnergyField = energyField;
       }
 
       // 건강하지 않은 PG에 경고 효과
@@ -2561,8 +2740,8 @@ export default function ClusterTopologyView() {
       }
 
       const box = new THREE.Mesh(geometry, material2);
-      box.castShadow = true;
-      box.receiveShadow = true;
+      box.castShadow = false;
+      box.receiveShadow = false;
       box.userData.material = material2; // Store reference for animation updates
       group.add(box);
 
@@ -3021,6 +3200,112 @@ export default function ClusterTopologyView() {
       return particleGroup;
    };
 
+   // Vacuum/absorption particle effect for floating OSDs
+   const createVacuumEffect = (osdNode: THREE.Group): THREE.Group => {
+      const particleGroup = new THREE.Group();
+      particleGroup.userData = { type: 'vacuum-effect', osdId: osdNode.userData.id };
+
+      const particleCount = 45; // Increased from 18 to 45
+      const spawnRadius = 18;
+
+      // Shared geometry with smaller size
+      const particleGeometry = new THREE.SphereGeometry(0.15, 6, 6); // Reduced from 0.4 to 0.15
+
+      for (let i = 0; i < particleCount; i++) {
+         // Darker cyan color for more mature look
+         const particleMaterial = new THREE.MeshBasicMaterial({
+            color: Colors.cyan[300], // 0x006699, // Darker cyan (was 0x00d2ff)
+            transparent: true,
+            opacity: 0.6, // Slightly lower initial opacity
+            blending: THREE.AdditiveBlending,
+         });
+
+         const particle = new THREE.Mesh(particleGeometry, particleMaterial);
+         particle.userData = { osdNode }; // Store reference to OSD node
+
+         // Random position in spherical shell around OSD
+         const theta = Math.random() * Math.PI * 2;
+         const phi = Math.random() * Math.PI;
+
+         const osdPos = new THREE.Vector3();
+         osdNode.getWorldPosition(osdPos);
+
+         particle.position.set(
+            osdPos.x + spawnRadius * Math.sin(phi) * Math.cos(theta),
+            osdPos.y + spawnRadius * Math.sin(phi) * Math.sin(theta),
+            osdPos.z + spawnRadius * Math.cos(phi),
+         );
+
+         const duration = 1.5 + Math.random();
+         const delay = Math.random() * 0.5;
+
+         // Animation function to get fresh OSD position
+         const animateToOSD = () => {
+            const currentOsdPos = new THREE.Vector3();
+            osdNode.getWorldPosition(currentOsdPos);
+
+            gsap.to(particle.position, {
+               x: currentOsdPos.x,
+               y: currentOsdPos.y,
+               z: currentOsdPos.z,
+               duration: duration,
+               ease: 'power2.in', // Accelerate as approaching (vacuum effect)
+               onComplete: () => {
+                  // Reset particle to random position in shell with fresh OSD position
+                  const newTheta = Math.random() * Math.PI * 2;
+                  const newPhi = Math.random() * Math.PI;
+                  const freshOsdPos = new THREE.Vector3();
+                  osdNode.getWorldPosition(freshOsdPos);
+
+                  particle.position.set(
+                     freshOsdPos.x + spawnRadius * Math.sin(newPhi) * Math.cos(newTheta),
+                     freshOsdPos.y + spawnRadius * Math.sin(newPhi) * Math.sin(newTheta),
+                     freshOsdPos.z + spawnRadius * Math.cos(newPhi),
+                  );
+
+                  // Reset material properties
+                  particleMaterial.opacity = 0.6;
+                  particle.scale.set(1, 1, 1);
+
+                  // Restart animation
+                  animateToOSD();
+               },
+            });
+         };
+
+         // Start initial animation after delay
+         setTimeout(() => animateToOSD(), delay * 1000);
+
+         // Fade out as approaching center
+         gsap.to(particleMaterial, {
+            opacity: 0,
+            duration: duration,
+            delay: delay,
+            ease: 'power2.in',
+            repeat: -1,
+            onUpdate: () => {
+               particleMaterial.needsUpdate = true;
+            },
+         });
+
+         // Shrink as approaching center
+         gsap.to(particle.scale, {
+            x: 0.05, // Smaller end size
+            y: 0.05,
+            z: 0.05,
+            duration: duration,
+            delay: delay,
+            ease: 'power2.in',
+            repeat: -1,
+         });
+
+         particleGroup.add(particle);
+      }
+
+      particleGroup.frustumCulled = false;
+      return particleGroup;
+   };
+
    // 데이터 플로우 연결선 생성
    /*const createFlowConnection = (from: THREE.Vector3, to: THREE.Vector3, color: number = 0x00d2ff): THREE.Line => {
       const points = [from.clone(), to.clone()];
@@ -3156,7 +3441,7 @@ export default function ClusterTopologyView() {
 
          // Use calculated spiral position (this should be the actual final position)
          const finalPoolPos = poolWorldPos;
-         const connection = createAnimatedFlowConnection(finalPoolPos, pgNode.position, 0xe879f9, 2);
+         const connection = createAnimatedFlowConnection(finalPoolPos, pgNode.position, 0x2dd4bf, 2);
          connection.userData = { type: 'pool-pg', pgId: node.pgData.id }; // Store PG ID for highlighting
          connection.visible = showPoolPGLinesRef.current; // Set initial visibility based on toggle
          connectionLinesRef.current.push(connection);
@@ -3332,11 +3617,33 @@ export default function ClusterTopologyView() {
          if (selectedPGIdRef.current === node.userData.id) {
             // Deselect if same PG is clicked again
             selectedPGIdRef.current = null;
-            selectedPGIdRef.current = null;
+            selectedObjectRef.current = null; // Close info-panel
+
+            // Remove yellow highlight and stop pulse animation
+            const existingHighlight = node.getObjectByName('yellowHighlight');
+            if (existingHighlight) {
+               node.remove(existingHighlight);
+            }
+            gsap.killTweensOf(node.scale);
+            node.scale.set(1, 1, 1);
+
             showOSDsForPG(null); // Reset OSDs when deselecting
             removePoolPGDataFlow(); // Remove Pool-PG data flow
             resetPoolPGConnections(); // Reset connection line colors
          } else {
+            // Remove previous PG's highlight and pulse
+            if (selectedPGIdRef.current !== null) {
+               const prevPGNode = pgNodesRef.current.find(n => n.userData.id === selectedPGIdRef.current);
+               if (prevPGNode) {
+                  const prevHighlight = prevPGNode.getObjectByName('yellowHighlight');
+                  if (prevHighlight) {
+                     prevPGNode.remove(prevHighlight);
+                  }
+                  gsap.killTweensOf(prevPGNode.scale);
+                  prevPGNode.scale.set(1, 1, 1);
+               }
+            }
+
             // Reset previous PG's OSDs first, then select new PG
             showOSDsForPG(null); // Reset existing OSDs
             removePoolPGDataFlow(); // Remove existing Pool-PG data flow
@@ -3344,6 +3651,29 @@ export default function ClusterTopologyView() {
             setTimeout(() => {
                // Select new PG after reset animation has started
                selectedPGIdRef.current = node.userData.id;
+
+               // Add yellow highlight sphere for PG
+               const highlightGeometry = new THREE.SphereGeometry(4, 32, 32);
+               const highlightMaterial = new THREE.MeshBasicMaterial({
+                  color: 0xffff00,
+                  transparent: true,
+                  opacity: 0.3,
+                  side: THREE.BackSide,
+               });
+               const highlightSphere = new THREE.Mesh(highlightGeometry, highlightMaterial);
+               highlightSphere.name = 'yellowHighlight';
+               node.add(highlightSphere);
+
+               // Start pulse animation for PG
+               gsap.to(node.scale, {
+                  x: 1.3,
+                  y: 1.3,
+                  z: 1.3,
+                  duration: 0.8,
+                  repeat: -1,
+                  yoyo: true,
+                  ease: 'power2.inOut',
+               });
 
                // NEW: Get OSD IDs from PG data (already available in userData.acting)
                const osdIds = node.userData.acting || [];
@@ -3357,19 +3687,27 @@ export default function ClusterTopologyView() {
                highlightPoolPGConnection(node.userData.id); // Highlight connection line
 
                // Show 1-second loading effect for visual feedback
-               // fetchPGOSDs will add to loadingPGIds, triggering PGEnergyEffect
-               fetchPGOSDs(node.userData.id)
+               // Manually manage loadingPGIdsRef to avoid re-renders
+               const pgId = node.userData.id;
+               loadingPGIdsRef.current.add(pgId);
+
+               // Remove after 1 second for visual effect
+               setTimeout(() => {
+                  loadingPGIdsRef.current.delete(pgId);
+               }, 1000);
+
+               fetchPGOSDs(pgId)
                   .then(() => {
-                     // Loading effect automatically removed after 1 second (handled in PGEnergyEffect)
-                     console.log(`PG ${node.userData.id} OSD mapping confirmed`);
+                     console.log(`PG ${pgId} OSD mapping confirmed`);
                   })
                   .catch(error => {
                      console.warn('PG OSD fetch warning (non-blocking):', error);
+                     loadingPGIdsRef.current.delete(pgId); // Clean up on error
                   });
             }, 100); // Small delay to ensure reset starts first
          }
 
-         if (cameraRef.current && cameraRef.current.position.y >= 0) {
+         if (cameraRef.current && cameraRef.current.position.y >= 0 && selectedPGIdRef.current !== node.userData.id) {
             gsap.to(cameraRef.current.position, {
                x: 0,
                y: -20,
@@ -3477,7 +3815,7 @@ export default function ClusterTopologyView() {
          .forEach(line => {
             if (line.material) {
                const material = line.material as THREE.MeshBasicMaterial;
-               material.color.setHex(0xe879f9); // Default Pool-PG color
+               material.color.setHex(0x2dd4bf); // Teal color (original Pool-PG color)
                material.needsUpdate = true;
                // Reset visibility based on toggle (selected PG handled separately)
                if (line.userData?.pgId !== selectedPGIdRef.current) {
@@ -3582,8 +3920,8 @@ export default function ClusterTopologyView() {
                animData.label = null;
             }
 
-            // Reset opacity
-            const mesh = osd.children.find(child => child.type === 'Mesh') as THREE.Mesh;
+            // Reset opacity using cached mesh
+            const mesh = osd.userData.cachedMesh as THREE.Mesh;
             if (mesh && mesh.material && animData.originalOpacity !== undefined) {
                const material = mesh.material as any;
                gsap.to(material, {
@@ -3685,8 +4023,8 @@ export default function ClusterTopologyView() {
                animData.label = null;
             }
 
-            // Reset material opacity to original value
-            const mesh = osd.children.find(child => child.type === 'Mesh') as THREE.Mesh;
+            // Reset material opacity to original value using cached mesh
+            const mesh = osd.userData.cachedMesh as THREE.Mesh;
             if (mesh && mesh.material && animData.originalOpacity !== undefined) {
                const material = mesh.material as any;
                gsap.to(material, {
@@ -3709,6 +4047,18 @@ export default function ClusterTopologyView() {
                   },
                });
             }
+
+            // Remove vacuum particle effect for this OSD
+            const vacuumEffects = vacuumParticlesRef.current.filter(effect => effect.userData?.osdId === osdId);
+            vacuumEffects.forEach(effect => {
+               sceneRef.current!.remove(effect);
+               // Dispose of particles
+               effect.traverse(child => {
+                  if ((child as any).geometry) (child as any).geometry.dispose();
+                  if ((child as any).material) (child as any).material.dispose();
+               });
+            });
+            vacuumParticlesRef.current = vacuumParticlesRef.current.filter(effect => effect.userData?.osdId !== osdId);
 
             // Clear the animation data from Map
             osdAnimationDataRef.current.delete(osdId);
@@ -3805,8 +4155,8 @@ export default function ClusterTopologyView() {
                            sceneRef.current!.add(particles);
                         }, 500);
 
-                        // Start opacity pulsing animation AFTER OSD has lifted up
-                        const mesh = osdNode.children.find(child => child.type === 'Mesh') as THREE.Mesh;
+                        // Start opacity pulsing animation AFTER OSD has lifted up using cached mesh
+                        const mesh = osdNode.userData.cachedMesh as THREE.Mesh;
 
                         const material = mesh.material as any; // Use any to avoid type issues
 
@@ -3885,6 +4235,11 @@ export default function ClusterTopologyView() {
                      ease: 'none',
                   });
 
+                  // Add vacuum/absorption particle effect
+                  const vacuumEffect = createVacuumEffect(osdNode);
+                  vacuumParticlesRef.current.push(vacuumEffect);
+                  sceneRef.current!.add(vacuumEffect);
+
                   // Backup: Start opacity animation after a delay as fallback
                   setTimeout(() => {
                      // Get the latest animData reference, create if doesn't exist
@@ -3894,7 +4249,7 @@ export default function ClusterTopologyView() {
                         osdAnimationDataRef.current.set(osdId, currentAnimData);
                      }
 
-                     const mesh = osdNode.children.find(child => child.type === 'Mesh') as THREE.Mesh;
+                     const mesh = osdNode.userData.cachedMesh as THREE.Mesh;
                      if (!mesh || !mesh.material) return;
 
                      const material = mesh.material as any;
@@ -3969,7 +4324,25 @@ export default function ClusterTopologyView() {
       // Clear the PG nodes array
       pgNodesRef.current = [];
 
-      // Hide existing connection lines instead of disposing
+      // Remove all Pool-PG connection lines (from previous pool selection)
+      const poolPGConnections = connectionLinesRef.current.filter(line => line.userData?.type === 'pool-pg');
+      poolPGConnections.forEach(line => {
+         if (sceneRef.current) {
+            sceneRef.current.remove(line);
+         }
+         if (line.geometry) line.geometry.dispose();
+         if (line.material) {
+            if (Array.isArray(line.material)) {
+               line.material.forEach(mat => mat.dispose());
+            } else {
+               line.material.dispose();
+            }
+         }
+      });
+      // Update connectionLinesRef to exclude removed Pool-PG connections
+      connectionLinesRef.current = connectionLinesRef.current.filter(line => line.userData?.type !== 'pool-pg');
+
+      // Hide other connection lines (non Pool-PG)
       connectionLinesRef.current.forEach(line => {
          line.visible = false;
       });
@@ -4189,6 +4562,11 @@ export default function ClusterTopologyView() {
 
    // Duplicate loadClock function removed - Clock implementation moved to useEffect
 
+   // Show error component if there's an error
+   if (error && !isLoadingTopology) {
+      return <ClusterTopologyError error={new Error(error)} />;
+   }
+
    // 패널 컴포넌트들의 JSX
    return (
       <>
@@ -4234,21 +4612,21 @@ export default function ClusterTopologyView() {
                   highlightNode={highlightNode}
                   toggleAllPanels={toggleAllPanels}
                   topologyData={transformedTopologyData}
-                  loadingPGIds={loadingPGIds}
+                  loadingPGIdsRef={loadingPGIdsRef}
                   isLoadingTopology={isLoadingTopology}
                />
-               <Environment files={'/3d/background/darkcenter.jpg'} />
+               <Environment files="/3d/background/darkcenter.jpg" />
                {/* EffectComposer -> 성능을 고려하여 체감 비용 줄이기 : multisampling={0} resolutionScale={0.8} (80% 스케일 렌더링) */}
-               <EffectComposer multisampling={0} resolutionScale={0.8}>
+               <EffectComposer multisampling={0} resolutionScale={1}>
                   {/* mipmapBlur 키면 화면 깜빡임 생겨서 false 로 함 */}
-                  <Bloom mipmapBlur={false} luminanceThreshold={0.7} intensity={0.35} radius={0.4} />
+                  {/*<Bloom mipmapBlur={false} luminanceThreshold={0.7} intensity={0.35} radius={0.4} />*/}
                   <BrightnessContrast brightness={0} contrast={0.2} />
                </EffectComposer>
             </Canvas>
 
             {/* Search Panel with Slide Animation */}
             {/* 항상 렌더링, CSS display로 제어 */}
-            <div className="search-panel top-[74px] -translate-x-full" style={{ display: 'none' }}>
+            <div className="search-panel top-[74px]" style={{ display: 'none', transform: 'translateX(-300px)' }}>
                <div className={'search-header'}>
                   <button onClick={toggleSearchPanel} className={'search-collapse-btn'}>
                      <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
@@ -4482,7 +4860,7 @@ export default function ClusterTopologyView() {
 
             {/* Info Panel */}
             {/* 항상 렌더링, CSS display로 제어 */}
-            <div className={'info-panel'} style={{ display: 'none' }}>
+            <div className="info-panel" style={{ display: 'none' }}>
                <h3 id="info-title">{/* 동적 업데이트 내용 */}</h3>
                <div id="info-content" className={'info-content'}>
                   {selectedObjectRef.current?.type === 'OSD' && selectedObjectRef.current.detail && (
@@ -4785,7 +5163,19 @@ export default function ClusterTopologyView() {
             </div>
 
             {/* Loading - DOM 직접 제어 */}
-            <div className={'loading-spinner-container'}>
+            <div
+               className={'loading-spinner-container'}
+               style={{
+                  background: `linear-gradient(150deg,
+                     #0a0a0a 0%,
+                     #0a0a0a 33%,
+                     #1a1a1a 33%,
+                     #1a1a1a 66%,
+                     #252525 66%,
+                     #252525 100%
+                  )`,
+               }}
+            >
                <div className={'loading-spinner'}>
                   <div className={'spinner-ring'}></div>
                   <div className={'spinner-ring'}></div>

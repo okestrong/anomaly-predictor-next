@@ -1,21 +1,20 @@
 'use client';
 
 import { FC, RefObject, useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Canvas, useFrame, useThree } from '@react-three/fiber';
+import { Canvas, useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 import Colors from '@/utils/color';
-import { Box, Cylinder, Environment, Icosahedron, OrbitControls, PerformanceMonitor, Plane, useTexture } from '@react-three/drei';
+import { Box, Environment, Icosahedron, OrbitControls, PerformanceMonitor, Plane, useTexture } from '@react-three/drei';
 import RoundMirrorTextTable from '@/components/models/RoundMirrorTextTable';
 import { AppHeader } from '@/components/layout';
 import { mockTopologyData } from '@/public/data/topologyMockData';
 import { Bloom, BrightnessContrast, EffectComposer } from '@react-three/postprocessing';
-import { AdaptiveLayoutManager } from '@/utils/layouts';
 import Atmosphere from '@/components/models/Atmosphere';
 import { Text as Text3D } from '@react-three/drei/core/Text';
 import { loadTexture } from '@/utils/utils';
 import GhostTrails from '@/components/traffic/GhostTrails';
 import { gsap } from 'gsap';
-import ServerRackModel from '@/components/models/ServerRackModel';
+// import ServerRackModel from '@/components/models/ServerRackModel';
 import InstancedSpheres from '@/components/traffic/InstancedSpheres';
 
 // 간단한 VM 파티클: 반투명 아쿠아 큐브 위에서 사이버 색상의 점들이 공전
@@ -1371,7 +1370,7 @@ const Table = ({
             </group>
          )}
 
-         <ServerRackModel scale={30} position={[-190, 18.5, -70]} rotation={[0, Math.PI / 4, 0]} castShadow />
+         {/*<ServerRackModel scale={30} position={[-190, 18.5, -70]} rotation={[0, Math.PI / 4, 0]} castShadow />*/}
 
          {/* Right side server cases */}
          {serverData

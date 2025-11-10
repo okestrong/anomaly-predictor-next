@@ -113,6 +113,9 @@ export const OsdPerformanceChart: React.FC<OsdPerformanceChartProps> = ({
       },
       yAxis: {
         type: 'value',
+        scale: false,
+        min: 0,
+        minInterval: 1,
         name: 'Usage (%)',
         nameLocation: 'middle',
         nameGap: 45,

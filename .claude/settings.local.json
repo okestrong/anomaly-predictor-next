@@ -30,7 +30,11 @@
       "Bash(xargs kill -9)",
       "Bash(cat /Users/jclee/Documents/Okestro/Projects/DevSw/anomaly-predictor-next/app/reports/predictions/page.tsx)",
       "Bash(cat /Users/jclee/Documents/Okestro/Projects/DevSw/anomaly-predictor-next/app/reports/performance/page.tsx)",
-      "Bash(cat:*)"
+      "Bash(cat:*)",
+      "Read(//Users/jclee/Documents/Okestro/Projects/DevSw/**)",
+      "Bash(./gradlew dependencies:*)",
+      "Bash(./gradlew clean:*)",
+      "Bash(javap:*)"
     ],
     "deny": [],
     "ask": []

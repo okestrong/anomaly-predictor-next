@@ -5,7 +5,7 @@
 
 // ==================== Report Types ====================
 
-export type ReportType = 'DAILY' | 'WEEKLY' | 'MONTHLY' | 'AI_INSIGHTS' | 'PREDICTIONS' | 'PERFORMANCE' | 'CAPACITY' | 'CUSTOM';
+export type ReportType = 'DAILY' | 'TREND' | 'PREDICTIONS';
 
 export type ReportStatus = 'generating' | 'completed' | 'failed' | 'scheduled';
 
@@ -176,6 +176,7 @@ export interface AIInsights {
    predictions: PredictiveAnalytics[];
    recommendations: OptimizationRecommendation[];
    ragGuidance?: RAGGuidance;
+   highRiskSummary?: string;  // LLM-generated summary of high risk predictions
 }
 
 export interface AIModelInfo {
@@ -386,6 +387,12 @@ export interface ReportData {
    events?: EventTimeline;
    alerts?: AlertsSummary;
 
+   // Predictions Report specific fields
+   clusterSummary?: ClusterSummary;
+   predictionsSummary?: PredictionsSummary;
+   predictions?: PredictionDetail[];
+   recommendedActions?: RecommendedAction[];
+
    // Section-specific data for report pages
    risks?: Array<{
       level: string;
@@ -503,6 +510,10 @@ export interface HostSummary {
    osdCount: number;
    totalOsds: number;
    upOsds: number;
+   cpuModel: string;
+   cpuCount: number;
+   coreCount: number;
+   memory: number;
    avgCpuUsage: number;
    avgMemUsage: number;
    networkRxMBps: number;
@@ -818,4 +829,110 @@ export interface DeviceLv {
    osd_id: string;
    osdspec_affinity: string;
    type: string;
+}
+
+// ==================== Predictions Report Types ====================
+
+export interface ClusterSummary {
+   health: string;
+   capacityUtilization: number;
+   activeAlerts: number;
+   totalOsds: number;
+   upOsds: number;
+   totalCapacity: number;
+   usedCapacity: number;
+}
+
+export interface PredictionsSummary {
+   overallRiskScore: number;
+   riskDistribution: RiskDistribution;
+   categoryBreakdown: CategoryBreakdown;
+   timeDistribution: TimeToImpactDistribution;
+   confidenceStats: ConfidenceStatistics;
+   affectedComponents: AffectedComponentsSummary;
+   riskTrendLast7Days: TrendPoint[];
+   llmComprehensiveAnalysis: string;
+   highRiskPredictions: HighRiskPrediction[];
+   highRiskSummary: string;
+}
+
+export interface RiskDistribution {
+   criticalCount: number;
+   highCount: number;
+   mediumCount: number;
+   lowCount: number;
+   criticalPercent: number;
+   highPercent: number;
+   mediumPercent: number;
+   lowPercent: number;
+}
+
+export interface CategoryBreakdown {
+   categories: Record<string, CategoryRisk>;
+}
+
+export interface CategoryRisk {
+   severity: string;
+   probability: number;
+   timeToImpact: string;
+   trend: string;
+   status: string;
+}
+
+export interface TimeToImpactDistribution {
+   immediate: number;
+   shortTerm: number;
+   mediumTerm: number;
+   longTerm: number;
+}
+
+export interface ConfidenceStatistics {
+   averageConfidence: number;
+   highConfidenceCount: number;
+   mediumConfidenceCount: number;
+   lowConfidenceCount: number;
+   minConfidence: number;
+   maxConfidence: number;
+}
+
+export interface AffectedComponentsSummary {
+   componentCounts: Record<string, number>;
+   criticalComponents: string[];
+   totalAffectedOsds: number;
+   totalAffectedPools: number;
+   totalAffectedHosts: number;
+}
+
+export interface HighRiskPrediction {
+   name: string;
+   severity: string;
+   probability: number;
+   timeToImpact: string;
+}
+
+export interface PredictionDetail {
+   id: string;
+   category: string;
+   name: string;
+   severity: string;
+   probability: number;
+   confidence: number;
+   timeToImpact: string;
+   aiAnalysis: string;
+   affectedComponents: string[];
+   recommendedActions: string[];
+   trend: string;
+   metrics?: Record<string, any>;
+}
+
+export interface RecommendedAction {
+   id: string;
+   priority: string;
+   category: string;
+   title: string;
+   description: string;
+   commands: string[];
+   estimatedTime: string;
+   estimatedImpact: string;
+   relatedPredictions: string[];
 }

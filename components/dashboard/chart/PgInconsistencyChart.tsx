@@ -124,6 +124,9 @@ export const PgInconsistencyChart: React.FC<PgInconsistencyChartProps> = ({
       },
       yAxis: {
         type: 'value',
+        scale: false,
+        min: 0,
+        minInterval: 1,
         name: 'PG Count',
         nameLocation: 'middle',
         nameGap: 45,

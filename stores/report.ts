@@ -259,6 +259,13 @@ export const useReportStore = create<ReportStore>()(
                },
 
                fetchReportById: async (reportId: string): Promise<Report | null> => {
+                  // Check if report is already loaded in store
+                  const currentState = get();
+                  if (currentState.currentReport?.id === reportId) {
+                     console.log('Report already loaded in store, skipping API call');
+                     return currentState.currentReport;
+                  }
+
                   try {
                      const { ReportAPI } = await import('@/lib/api/reportApi');
                      const report = await ReportAPI.getReportById(reportId);

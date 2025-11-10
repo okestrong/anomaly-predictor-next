@@ -23,7 +23,7 @@ export default function PredictionsReportPage() {
       const generate = async () => {
          try {
             const presets = getDateRangePresets();
-            const timeRange = presets.last30Days.getTimeRange();
+            const timeRange = presets.last7Days.getTimeRange();
 
             const report = await generateReport({
                type: 'PREDICTIONS',
@@ -48,7 +48,7 @@ export default function PredictionsReportPage() {
    }, [generateReport, router]);
 
    if (isGenerating) {
-      return <ReportLoading title="Generating Predictions Report..." desc="Running predictive analytics" />;
+      return <ReportLoading title="Generating Predictions Report..." desc="Running AI analysis on 12 prediction categories" />;
    }
 
    return null;

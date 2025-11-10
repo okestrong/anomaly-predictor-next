@@ -32,11 +32,16 @@ export default function RiskPanel() {
    );
    const [activeTab, setActiveTab] = useState<'risks' | 'recommendations'>('risks');
    const [isHovered, setIsHovered] = useState(false);
+   const [lastAnalysis, setLastAnalysis] = useState<string>('');
 
    // Extract risk assessment data from dashboard store
    const riskAssessment = dashboardData?.riskAssessment;
    const overallRiskScore = riskAssessment?.riskScore || 0;
-   const lastAnalysis = riskAssessment?.lastAnalysisTime || new Date().toLocaleTimeString();
+
+   // Set lastAnalysis on client side only to avoid hydration mismatch
+   useEffect(() => {
+      setLastAnalysis(riskAssessment?.lastAnalysisTime || new Date().toLocaleTimeString());
+   }, [riskAssessment?.lastAnalysisTime]);
 
    // Get icon for risk factor type
    const getRiskIcon = (type: string): React.ComponentType<{ className?: string }> => {
@@ -259,7 +264,7 @@ export default function RiskPanel() {
             }
             footer={
                <div className="flex items-center justify-between text-xs text-secondary-400">
-                  <span>Last analysis: {lastAnalysis}</span>
+                  <span suppressHydrationWarning>Last analysis: {lastAnalysis || 'Not analyzed yet'}</span>
                   <div className="flex space-x-2">
                      <Button size="xs" variant="secondary" onClick={viewRiskHistory}>
                         History

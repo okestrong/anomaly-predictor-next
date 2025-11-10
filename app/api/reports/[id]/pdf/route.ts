@@ -31,14 +31,18 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
                format: 'A4',
                displayHeaderFooter: true,
                headerTemplate: `
-                  <div style="font-size: 10px; text-align: center; width: 100%; padding: 5px 0; border-bottom: 1px solid #ccc;">
-                     <span style="font-weight: bold;">Ceph Cluster Report</span>
+                  <div style="font-size: 10px; text-align: center; width: 100%; padding: 5px 10mm;">
+                     <div style="border-bottom: 1px solid #ccc; padding-bottom: 5px;">
+                        <span style="font-weight: bold;">Ceph Cluster Report</span>
+                     </div>
                   </div>
                `,
                footerTemplate: `
-                  <div style="font-size: 9px; text-align: center; width: 100%; padding: 5px 0; border-top: 1px solid #ccc;">
-                     <span>Page <span class="pageNumber"></span> of <span class="totalPages"></span></span>
-                     <span style="margin-left: 20px;">Generated: ${new Date().toLocaleDateString()}</span>
+                  <div style="font-size: 9px; text-align: center; width: 100%; padding: 5px 10mm;">
+                     <div style="border-top: 1px solid #ccc; padding-top: 5px;">
+                        <span>Page <span class="pageNumber"></span> of <span class="totalPages"></span></span>
+                        <span style="margin-left: 20px;">Generated: ${new Date().toLocaleDateString()}</span>
+                     </div>
                   </div>
                `,
                margin: {

@@ -33,7 +33,7 @@ export default createGlobalStyle`
       top: 20px;
       right: 20px;
       width: 300px;
-      background: rgba(0, 0, 0, 0.9);
+      background: rgba(51,65,85, 0.4);
       border: 1px solid rgba(0, 210, 255, 0.5);
       border-radius: 8px;
       padding: 20px;

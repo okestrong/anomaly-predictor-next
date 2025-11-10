@@ -5,8 +5,7 @@
 
 'use client';
 
-import { Activity, Brain, Calendar, CalendarDays, CalendarRange, TrendingUp } from 'lucide-react';
-import { useRouter } from 'next/navigation';
+import { Calendar, BarChart3, TrendingUp } from 'lucide-react';
 import type { ReportType } from '@/types/report';
 import { ReactNode } from 'react';
 
@@ -19,7 +18,6 @@ interface ReportTypeCard {
    borderColor: string;
    bgColor: string;
    badge?: string;
-   route: string;
 }
 
 const reportTypes: ReportTypeCard[] = [
@@ -31,66 +29,35 @@ const reportTypes: ReportTypeCard[] = [
       color: 'text-blue-600 dark:text-blue-400',
       borderColor: 'border-blue-200 dark:border-blue-800',
       bgColor: 'bg-blue-50 dark:bg-blue-900/20',
-      route: '/reports/daily',
    },
    {
-      id: 'WEEKLY',
-      title: 'Weekly Report',
-      description: '7-day trend analysis',
-      icon: <CalendarDays className="w-6 h-6" />,
+      id: 'TREND',
+      title: 'Trend Report',
+      description: '7-day trend data with charts and analysis',
+      icon: <BarChart3 className="w-6 h-6" />,
       color: 'text-green-600 dark:text-green-400',
       borderColor: 'border-green-200 dark:border-green-800',
       bgColor: 'bg-green-50 dark:bg-green-900/20',
-      route: '/reports/weekly',
-   },
-   {
-      id: 'MONTHLY',
-      title: 'Monthly Report',
-      description: 'Comprehensive monthly analysis',
-      icon: <CalendarRange className="w-6 h-6" />,
-      color: 'text-purple-600 dark:text-purple-400',
-      borderColor: 'border-purple-200 dark:border-purple-800',
-      bgColor: 'bg-purple-50 dark:bg-purple-900/20',
-      route: '/reports/monthly',
-   },
-   {
-      id: 'AI_INSIGHTS',
-      title: 'AI Insights',
-      description: 'AI-based analysis and recommendations',
-      icon: <Brain className="w-6 h-6" />,
-      color: 'text-amber-600 dark:text-amber-400',
-      borderColor: 'border-amber-200 dark:border-amber-800',
-      bgColor: 'bg-amber-50 dark:bg-amber-900/20',
-      badge: 'AI',
-      route: '/reports/ai-insights',
    },
    {
       id: 'PREDICTIONS',
-      title: 'Predictions',
-      description: 'Failure prediction and risk analysis',
+      title: 'Predictions Report',
+      description: 'AI failure predictions and risk analysis',
       icon: <TrendingUp className="w-6 h-6" />,
-      color: 'text-cyan-600 dark:text-cyan-400',
-      borderColor: 'border-cyan-200 dark:border-cyan-800',
-      bgColor: 'bg-cyan-50 dark:bg-cyan-900/20',
-      route: '/reports/predictions',
-   },
-   {
-      id: 'PERFORMANCE',
-      title: 'Performance',
-      description: 'Performance metrics and optimization',
-      icon: <Activity className="w-6 h-6" />,
-      color: 'text-rose-600 dark:text-rose-400',
-      borderColor: 'border-rose-200 dark:border-rose-800',
-      bgColor: 'bg-rose-50 dark:bg-rose-900/20',
-      route: '/reports/performance',
+      color: 'text-purple-600 dark:text-purple-400',
+      borderColor: 'border-purple-200 dark:border-purple-800',
+      bgColor: 'bg-purple-50 dark:bg-purple-900/20',
+      badge: 'AI',
    },
 ];
 
-export function QuickReportCards() {
-   const router = useRouter();
+interface QuickReportCardsProps {
+   onGenerate: (reportType: ReportType) => void;
+}
 
-   const handleCardClick = (route: string) => {
-      router.push(route);
+export function QuickReportCards({ onGenerate }: QuickReportCardsProps) {
+   const handleCardClick = (reportType: ReportType) => {
+      onGenerate(reportType);
    };
 
    return (
@@ -99,7 +66,7 @@ export function QuickReportCards() {
 
          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {reportTypes.map(reportType => (
-               <QuickReportCard key={reportType.id} {...reportType} onClick={() => handleCardClick(reportType.route)} />
+               <QuickReportCard key={reportType.id} {...reportType} onClick={() => handleCardClick(reportType.id)} />
             ))}
          </div>
       </div>

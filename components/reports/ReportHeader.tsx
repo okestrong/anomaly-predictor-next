@@ -5,8 +5,10 @@
 
 'use client';
 
-import { FileText, Clock, TrendingUp, FileDown } from 'lucide-react';
+import { useState } from 'react';
+import { FileText, Clock, TrendingUp, FileDown, Mail } from 'lucide-react';
 import { Button } from '@/components/common';
+import EmailSettingsDialog from './EmailSettingsDialog';
 
 interface ReportHeaderProps {
    stats?: {
@@ -18,29 +20,37 @@ interface ReportHeaderProps {
 }
 
 export function ReportHeader({ stats }: ReportHeaderProps) {
+   const [isEmailDialogOpen, setIsEmailDialogOpen] = useState(false);
+
    return (
       <div className="mb-8">
          <div className="flex items-center justify-between mb-6">
             <div>
                <h1 className="text-3xl font-bold text-slate-200 dark:text-white mb-2">Reports Dashboard</h1>
-               <p className="text-slate-400 dark:text-slate-400">Generate, schedule, and manage cluster reports with AI-powered insights</p>
+               <p className="text-slate-400 dark:text-slate-400">
+                  Generate, schedule, and manage cluster reports with AI-powered insights
+               </p>
             </div>
 
             <div className="flex gap-3">
+               <Button variant="secondary" size="md" onClick={() => setIsEmailDialogOpen(true)}>
+                  <div className="flex items-center space-x-2">
+                     <Mail className="w-4 h-4 mr-2" />
+                     <span>Email Settings</span>
+                  </div>
+               </Button>
                <Button variant="secondary" size="md">
                   <div className="flex items-center space-x-2">
                      <Clock className="w-4 h-4 mr-2" />
                      <span>Scheduled Reports</span>
                   </div>
                </Button>
-               <Button variant="primary" size="md">
-                  <div className="flex items-center space-x-2">
-                     <FileText className="w-4 h-4 mr-2" />
-                     <span>Generate Report</span>
-                  </div>
-               </Button>
             </div>
          </div>
+
+         {/* Email Settings Dialog */}
+         <EmailSettingsDialog isOpen={isEmailDialogOpen} onClose={() => setIsEmailDialogOpen(false)} />
+
 
          {/* Statistics Cards */}
          {stats && (

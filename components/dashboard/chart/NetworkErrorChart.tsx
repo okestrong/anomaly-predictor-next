@@ -33,6 +33,11 @@ export const NetworkErrorChart: React.FC<NetworkErrorChartProps> = ({
       value: d.value,
     })) || [];
 
+    // Calculate max value for y-axis
+    const allValues = [...networkErrors.map(d => d.value), ...packetDrops.map(d => d.value)];
+    const maxValue = Math.max(...allValues, 0);
+    const yAxisMax = maxValue > 0 ? undefined : 10; // Default max of 10 when all zeros
+
     // Use the longest dataset for time labels
     const allData = [networkErrors, packetDrops];
     const longestData = allData.reduce((prev, current) => prev.length > current.length ? prev : current, []);
@@ -109,6 +114,10 @@ export const NetworkErrorChart: React.FC<NetworkErrorChartProps> = ({
       },
       yAxis: {
         type: 'value',
+        scale: false,
+        min: 0,
+        max: yAxisMax,
+        minInterval: 1,
         name: 'Count',
         nameLocation: 'middle',
         nameGap: 45,
@@ -135,6 +144,10 @@ export const NetworkErrorChart: React.FC<NetworkErrorChartProps> = ({
           name: 'Network Errors',
           type: 'bar',
           data: networkErrors.map((d, index) => [index, Math.round(d.value)]),
+          showBackground: true,
+          backgroundStyle: {
+            color: 'rgba(255, 0, 128, 0.05)'
+          },
           itemStyle: {
             color: '#FF0080',
             borderRadius: [2, 2, 0, 0]
@@ -145,6 +158,10 @@ export const NetworkErrorChart: React.FC<NetworkErrorChartProps> = ({
           name: 'Packet Drops',
           type: 'bar',
           data: packetDrops.map((d, index) => [index, Math.round(d.value)]),
+          showBackground: true,
+          backgroundStyle: {
+            color: 'rgba(245, 158, 11, 0.05)'
+          },
           itemStyle: {
             color: '#F59E0B',
             borderRadius: [2, 2, 0, 0]

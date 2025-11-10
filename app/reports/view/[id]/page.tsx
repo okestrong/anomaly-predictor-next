@@ -8,10 +8,12 @@
 import { useEffect, useRef, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { useReportStore } from '@/stores/report';
+import { usePredictionStore } from '@/stores/prediction';
 import { toast } from 'react-toastify';
 import { EmailDialog } from '@/components/reports/EmailDialog';
 import { downloadBlob, ReportAPI } from '@/lib/api/reportApi';
 // Import new section components
+import ReportTitlePage from '@/components/reports/sections/ReportTitlePage';
 import ExecutiveSummary from '@/components/reports/sections/ExecutiveSummary';
 import InfrastructureStatus from '@/components/reports/sections/InfrastructureStatus';
 import PerformanceMetrics from '@/components/reports/sections/PerformanceMetrics';
@@ -20,31 +22,16 @@ import AIInsightsSection from '@/components/reports/sections/AIInsightsSection';
 import AvailabilityRecovery from '@/components/reports/sections/AvailabilityRecovery';
 import OperationalHistory from '@/components/reports/sections/OperationalHistory';
 import DetailedTables from '@/components/reports/sections/DetailedTables';
+import PredictionSection from '@/components/reports/sections/PredictionSection';
+import TrendReportView from '@/components/reports/views/TrendReportView';
 import { AppHeader } from '@/components/layout';
-import Colors from '@/utils/color';
 import dayjs from 'dayjs';
+import utc from 'dayjs/plugin/utc';
 
-// Enhanced Cyberpunk color palette for particles
-const COLORS = {
-   primary: '#00D4FF',
-   secondary: '#7C3AED',
-   success: '#10B981',
-   warning: '#F59E0B',
-   danger: '#EF4444',
-   info: '#06B6D4',
-   pink: '#EC4899',
-   indigo: '#6366F1',
-   teal: '#14B8A6',
-   lime: '#84CC16',
-   fuchsia: '#D946EF',
-   cyan: '#22D3EE',
-   emerald: '#10B981',
-   violet: '#8B5CF6',
-   amber: '#F59E0B',
-   rose: '#F43F5E',
-};
+// Extend dayjs with UTC plugin
+dayjs.extend(utc);
 
-// Enhanced Particles Background with more particles and connections
+// Particles Background with subtle gray particles
 function ParticlesBackground() {
    const canvasRef = useRef<HTMLCanvasElement>(null);
    const animationIdRef = useRef<number | null>(null);
@@ -60,10 +47,11 @@ function ParticlesBackground() {
       canvas.width = window.innerWidth;
       canvas.height = window.innerHeight;
 
-      const particleColors = [COLORS.primary, COLORS.cyan, COLORS.violet, COLORS.pink, COLORS.emerald];
+      // Subtle gray colors for particles (darker than white background)
+      const particleColors = ['#d0d0d0', '#c5c5c5', '#b8b8b8', '#cacaca', '#bcbcbc'];
 
-      // Significantly increased particle count
-      const PARTICLE_COUNT = 200;
+      // Reduced particle count to 1/10
+      const PARTICLE_COUNT = 20;
 
       // Create particles only once
       if (particlesRef.current.length === 0) {
@@ -218,7 +206,15 @@ function ParticlesBackground() {
       };
    }, []);
 
-   return <canvas ref={canvasRef} className="absolute inset-0 z-0 opacity-85 pointer-events-none" style={{ background: Colors.white }} />;
+   return (
+      <canvas
+         ref={canvasRef}
+         className="absolute inset-0 z-0 opacity-85 pointer-events-none"
+         style={{
+            background: 'linear-gradient(150deg, #f8f8f8 0%, #f8f8f8 33%, #e2e8f0 33%, #e2e8f0 66%, #f8f8f8 66%, #f8f8f8 100%)',
+         }}
+      />
+   );
 }
 
 export default function ReportViewPage() {
@@ -227,6 +223,7 @@ export default function ReportViewPage() {
    const reportId = params?.id as string;
 
    const { currentReport, fetchReportById, error } = useReportStore();
+   const { predictions, updateAllPredictions, getHighRiskPredictions } = usePredictionStore();
    const [isEmailDialogOpen, setIsEmailDialogOpen] = useState(false);
    const [isExporting, setIsExporting] = useState(false);
    const [isReportReady, setIsReportReady] = useState(false);
@@ -239,13 +236,19 @@ export default function ReportViewPage() {
             router.push('/reports');
          });
       }
-   }, [reportId, fetchReportById, router]);
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+   }, [reportId]);
 
    useEffect(() => {
       if (error) {
          toast.error(error);
       }
    }, [error]);
+
+   // Load predictions data for report
+   useEffect(() => {
+      updateAllPredictions();
+   }, [updateAllPredictions]);
 
    // Check if report and charts are ready for PDF generation
    useEffect(() => {
@@ -343,14 +346,12 @@ export default function ReportViewPage() {
 
    return (
       <div className="min-h-screen relative print:bg-white" data-report-ready={isReportReady}>
-         <AppHeader />
+         <div className="print:hidden">
+            <AppHeader />
+         </div>
          {/* 파티클 배경 */}
          <div className="fixed inset-0 w-full h-full overflow-hidden z-0 print:hidden">
-            {/* Dark gradient background */}
-            <div className="absolute inset-0 bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950" />
-            {/* Overlay gradient for depth */}
-            <div className="absolute inset-0 bg-gradient-to-br from-secondary-900/30 via-ai-neural/20 to-secondary-800/30" />
-            {/* Particles */}
+            {/* Particles with diagonal gradient background */}
             <ParticlesBackground />
          </div>
 
@@ -363,7 +364,7 @@ export default function ReportViewPage() {
                      {/* Back Button */}
                      <button
                         onClick={() => router.push('/reports')}
-                        className="w-10 h-10 rounded-full bg-secondary-800/60 backdrop-blur-md border border-ai-primary/30 text-white flex items-center justify-center hover:bg-ai-primary/20 hover:border-ai-primary/60 hover:scale-110 transition-all duration-200 cursor-pointer group"
+                        className="w-10 h-10 rounded-full bg-secondary-800/60 backdrop-blur-md border border-ai-primary/30 text-white flex items-center justify-center hover:bg-orange-400 hover:border-orange-500 hover:scale-110 transition-all duration-200 cursor-pointer group"
                         aria-label="Back to reports"
                      >
                         <svg className="w-5 h-5 group-hover:translate-x-[-2px] transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -374,6 +375,7 @@ export default function ReportViewPage() {
                         <h1 className="text-3xl font-bold text-slate-800 mb-2">{currentReport.title}</h1>
                         <p className="text-slate-500">
                            {currentReport.description}
+                           <br />
                            {currentReport.timeRange && (
                               <>
                                  {' '}
@@ -422,290 +424,404 @@ export default function ReportViewPage() {
                </div>
             </div>
 
-            {/* Enhanced Report Content - Using New Section Components */}
+            {/* Enhanced Report Content - Conditional rendering based on report type */}
             <div className="space-y-6 print:space-y-0">
-               {/* Executive Summary - Page 1 */}
-               <section className="page-break-after print:bg-white print:text-black">
-                  <ExecutiveSummary
-                     data={{
-                        healthScore: currentReport.data?.clusterHealth?.healthScore || 85,
-                        kpis: {
-                           totalCapacity: currentReport.data?.keyMetrics?.capacity?.totalCapacity,
-                           usedCapacity: currentReport.data?.keyMetrics?.capacity?.usedCapacity,
-                           utilizationPercent: currentReport.data?.keyMetrics?.capacity?.utilizationPercent,
-                           totalOsds: currentReport.data?.keyMetrics?.osdStatus?.totalOsds,
-                           healthyOsds: currentReport.data?.keyMetrics?.osdStatus?.healthyOsds,
-                           avgLatency: currentReport.data?.keyMetrics?.performance?.avgLatency,
-                           totalIOPS:
-                              (currentReport.data?.keyMetrics?.performance?.readOps || 0) + (currentReport.data?.keyMetrics?.performance?.writeOps || 0),
-                           throughput:
-                              (currentReport.data?.keyMetrics?.performance?.readThroughput || 0) +
-                              (currentReport.data?.keyMetrics?.performance?.writeThroughput || 0),
-                        },
-                        // Map AI predictions to risks
-                        risks:
-                           currentReport.aiInsights?.predictions?.map(p => ({
-                              level: p.impact,
-                              category: p.category,
-                              description: `${p.probability}% probability in ${p.estimatedTime}`,
-                              impact: p.impact,
-                           })) || [],
-                        // Map top alerts to critical issues
-                        criticalIssues:
-                           currentReport.data?.alerts?.topAlerts?.map(a => ({
-                              severity: a.severity,
-                              title: a.title,
-                              description: a.message,
-                              action: a.resolveAction || 'Review and acknowledge',
-                           })) || [],
-                     }}
-                  />
-               </section>
+               {/* TREND Report View */}
+               {currentReport.type === 'TREND' && <TrendReportView report={currentReport} />}
 
-               {/* Infrastructure Status - Pages 2-3 */}
-               <section className="page-break-after print:bg-white print:text-black">
-                  <InfrastructureStatus
-                     data={{
-                        // Map hostsSummary to hosts format
-                        hosts:
-                           currentReport.data?.hostsSummary?.map(h => ({
-                              hostname: h.hostname,
-                              cpuCores: 0,
-                              cpuModel: 'N/A',
-                              memoryGB: 0,
-                              osdCount: h.osdCount,
-                              status: h.upOsds === h.totalOsds ? 'healthy' : 'degraded',
-                           })) || [],
-                        // Transform InventoryResponse[] to Disk[]
-                        disks:
-                           currentReport.data?.disks?.flatMap(
-                              host =>
-                                 host.devices
-                                    ?.filter(device => device.osd_ids && device.osd_ids.length > 0)
-                                    .flatMap(device =>
-                                       device.osd_ids.map(osdId => ({
-                                          osdId: osdId,
-                                          hostname: host.name,
-                                          device: device.path,
-                                          deviceClass: device.human_readable_type || 'unknown',
-                                          sizeBytes: device.sys_api?.size || 0,
-                                          usedBytes: 0, // Not available in current data structure
-                                          healthStatus: device.available ? 'healthy' : 'degraded',
-                                       }))
-                                    ) || []
-                           ) || [],
-                        // Map poolsSummary to pools format
-                        pools:
-                           currentReport.data?.poolsSummary?.map(p => ({
-                              name: p.poolName,
-                              type: 'replicated',
-                              size: p.size,
-                              minSize: p.minSize,
-                              pgNum: p.pgNum,
-                              used: p.usedBytes,
-                              available: p.maxBytes - p.usedBytes,
-                           })) || [],
-                        crushMap: undefined,
-                        networkTopology: undefined,
-                        pgDistribution: undefined,
-                     }}
-                  />
-               </section>
-
-               {/* Performance Metrics - Pages 4-6 */}
-               <section className="page-break-after print:bg-white print:text-black">
-                  <PerformanceMetrics
-                     data={{
-                        iops: {
-                           poolTrends: currentReport.data?.trends?.iops,
-                           topClients: [], // No client data in API response
-                        },
-                        latency: {
-                           distribution: currentReport.data?.trends?.latency,
-                           // Calculate percentiles from trend data
-                           percentiles: (() => {
-                              const latencyData = currentReport.data?.trends?.latency?.data || [];
-                              if (latencyData.length === 0) return { p50: 0, p95: 0, p99: 0 };
-                              const sorted = [...latencyData].map(d => d.value).sort((a, b) => a - b);
-                              return {
-                                 p50: sorted[Math.floor(sorted.length * 0.5)] || 0,
-                                 p95: sorted[Math.floor(sorted.length * 0.95)] || 0,
-                                 p99: sorted[Math.floor(sorted.length * 0.99)] || 0,
-                              };
-                           })(),
-                           slowRequests: [], // No slow requests data in API response
-                        },
-                        throughput: {
-                           trends: currentReport.data?.trends?.throughput,
-                           recoveryImpact: undefined, // No recovery impact data in API response
-                        },
-                     }}
-                  />
-               </section>
-
-               {/* Capacity Management - Pages 7-8 */}
-               <section className="page-break-after print:bg-white print:text-black">
-                  <CapacityManagement
-                     data={{
-                        currentUsage: {
-                           totalCapacity: currentReport.data?.keyMetrics?.capacity?.totalCapacity,
-                           usedCapacity: currentReport.data?.keyMetrics?.capacity?.usedCapacity,
-                           availableCapacity: currentReport.data?.keyMetrics?.capacity?.availableCapacity,
-                           utilizationPercent: currentReport.data?.keyMetrics?.capacity?.utilizationPercent,
-                        },
-                        // Map poolsSummary to poolUsage format
-                        poolUsage:
-                           currentReport.data?.poolsSummary?.map(p => ({
-                              name: p.poolName, // Component expects 'name', not 'poolName'
-                              used: p.usedBytes,
-                              available: p.maxBytes - p.usedBytes,
-                              utilizationPercent: p.usagePercent,
-                              objects: p.objectCount,
-                           })) || [],
-                        // Transform prediction data to match component expectations
-                        predictions: currentReport.data?.trends?.capacity?.prediction
-                           ? {
-                                growthRatePerDay: 0, // Not available in API
-                                expectedFullDate: undefined, // Not available in API
-                                daysUntilFull: currentReport.data.trends.capacity.prediction.timeToThreshold,
-                                recommendedExpansion: undefined, // Not available in API
-                             }
-                           : undefined,
-                        trends: currentReport.data?.trends?.capacity,
-                     }}
-                  />
-               </section>
-
-               {/* AI Insights - Pages 9-11 */}
-               <section className="page-break-after print:bg-white print:text-black">
-                  <AIInsightsSection
-                     data={{
-                        anomalies: currentReport.aiInsights?.anomalies || [],
-                        predictions:
-                           currentReport.aiInsights?.predictions?.map(p => ({
-                              category: p.category,
+               {/* DAILY Report View - Legacy sections */}
+               {currentReport.type === 'DAILY' && (
+                  <>
+                     {/* Report Title Page */}
+                     <div className="hidden print:block">
+                        <ReportTitlePage
+                           reportTitle={currentReport.title}
+                           generatedAt={currentReport.createdAt}
+                           timeRange={currentReport.timeRange}
+                           clusterSummary={{
+                              health: currentReport.data?.clusterHealth?.health || 'HEALTH_WARN',
+                              capacityUtilization: currentReport.data?.keyMetrics?.capacity?.utilizationPercent || 0,
+                              activeAlerts: currentReport.data?.clusterHealth?.activeAlarms || 0,
+                              totalOsds: currentReport.data?.keyMetrics?.osdStatus?.totalOsds || 0,
+                              upOsds: currentReport.data?.keyMetrics?.osdStatus?.upOsds || 0,
+                              totalCapacity: currentReport.data?.keyMetrics?.capacity?.totalCapacity || 0,
+                              usedCapacity: currentReport.data?.keyMetrics?.capacity?.usedCapacity || 0,
+                           }}
+                           highRiskPredictions={getHighRiskPredictions().map(p => ({
+                              name: p.name,
+                              severity: p.severity as 'high' | 'critical',
                               probability: p.probability,
-                              impact: p.impact,
-                              estimatedTime: p.estimatedTime,
-                              description: `${p.category} prediction with ${p.confidence}% confidence. Risk factors: ${p.riskFactors?.length || 0}`,
-                           })) || [],
-                        recommendations:
-                           currentReport.aiInsights?.recommendations?.map(r => ({
-                              id: r.id,
-                              title: r.title,
-                              description: r.description,
-                              priority: r.priority,
-                              estimatedImpact: r.estimatedImpact,
-                              implementation: r.commands?.join('; ') || 'No specific commands provided',
-                           })) || [],
-                        analysisWindow: currentReport.timeRange?.label || 'Last 7 days',
-                        confidence: currentReport.data?.aiAnalysisConfidence || 95.0,
-                     }}
-                  />
-               </section>
+                              timeToImpact: p.timeToImpact,
+                           }))}
+                           highRiskSummary={currentReport.aiInsights?.highRiskSummary}
+                        />
+                     </div>
 
-               {/* Availability & Recovery - Pages 12-13 */}
-               <section className="page-break-after print:bg-white print:text-black">
-                  <AvailabilityRecovery
-                     data={{
-                        dataProtection: {
-                           // Calculate compliance rates from PG status
-                           replicationCompliance: 100, // Assume full replication compliance
-                           scrubCompletionRate: 0, // Not available in API
-                           deepScrubCompletionRate: 0, // Not available in API
-                           pgConsistencyRate: currentReport.data?.keyMetrics?.pgStatus?.activePgs
-                              ? ((currentReport.data.keyMetrics.pgStatus.activePgs - (currentReport.data.keyMetrics.pgStatus.inconsistentPgs || 0)) /
-                                   currentReport.data.keyMetrics.pgStatus.activePgs) *
-                                100
-                              : 100,
-                           backupCompliance: 0, // Not available in API
-                        },
-                        recoveryReadiness: {
-                           mtbf: undefined, // Not available in API
-                           mttr: undefined, // Not available in API
-                           rto: undefined, // Not available in API
-                           rpo: undefined, // Not available in API
-                           lastDisasterRecoveryTest: undefined, // Not available in API
-                           drTestResult: undefined, // Not available in API
-                        },
-                        replicationStatus: [], // No replication status data in API response
-                        scrubStatus: [], // No scrub status data in API response
-                     }}
-                  />
-               </section>
+                     {/* Executive Summary - Page 1 */}
+                     <section className="page-break-after print:bg-white print:text-black">
+                        <ExecutiveSummary
+                           data={{
+                              healthScore: currentReport.data?.clusterHealth?.healthScore || 85,
+                              kpis: {
+                                 totalCapacity: currentReport.data?.keyMetrics?.capacity?.totalCapacity,
+                                 usedCapacity: currentReport.data?.keyMetrics?.capacity?.usedCapacity,
+                                 utilizationPercent: currentReport.data?.keyMetrics?.capacity?.utilizationPercent,
+                                 totalOsds: currentReport.data?.keyMetrics?.osdStatus?.totalOsds,
+                                 healthyOsds: currentReport.data?.keyMetrics?.osdStatus?.healthyOsds,
+                                 avgLatency: currentReport.data?.keyMetrics?.performance?.avgLatency,
+                                 totalIOPS:
+                                    (currentReport.data?.keyMetrics?.performance?.readOps || 0) + (currentReport.data?.keyMetrics?.performance?.writeOps || 0),
+                                 throughput:
+                                    (currentReport.data?.keyMetrics?.performance?.readThroughput || 0) +
+                                    (currentReport.data?.keyMetrics?.performance?.writeThroughput || 0),
+                              },
+                              // Map AI predictions to risks
+                              risks:
+                                 currentReport.aiInsights?.predictions?.map(p => ({
+                                    level: p.impact,
+                                    category: p.category,
+                                    description: `${p.probability}% probability in ${p.estimatedTime}`,
+                                    impact: p.impact,
+                                 })) || [],
+                              // Map top alerts to critical issues
+                              criticalIssues:
+                                 currentReport.data?.alerts?.topAlerts?.map(a => ({
+                                    severity: a.severity,
+                                    title: a.title,
+                                    description: a.message,
+                                    action: a.resolveAction || 'Review and acknowledge',
+                                 })) || [],
+                           }}
+                        />
+                     </section>
 
-               {/* Operational History - Page 14 */}
-               <section className="page-break-after print:bg-white print:text-black">
-                  <OperationalHistory
-                     data={{
-                        // Map events to operational history
-                        configChanges: [],
-                        maintenanceLogs:
-                           currentReport.data?.events?.events
-                              ?.filter(e => e.type === 'info')
-                              .map(e => ({
-                                 timestamp: e.timestamp,
-                                 type: e.type,
-                                 category: 'Maintenance',
-                                 description: `${e.component}: ${e.message}`,
-                                 user: 'system',
-                                 severity: e.type,
-                              })) || [],
-                        incidents:
-                           currentReport.data?.events?.events
-                              ?.filter(e => e.type === 'warning' || e.type === 'error')
-                              .map(e => ({
-                                 timestamp: e.timestamp,
-                                 type: e.type,
-                                 category: 'Incident',
-                                 description: `${e.component}: ${e.message} - ${e.details || ''}`,
-                                 user: 'system',
-                                 severity: e.type,
-                              })) || [],
-                        performanceTuning: [],
-                     }}
-                  />
-               </section>
+                     {/* Infrastructure Status - Pages 2-3 */}
+                     <section className="page-break-after print:bg-white print:text-black">
+                        <InfrastructureStatus
+                           data={{
+                              // Map hostsSummary to hosts format
+                              hosts:
+                                 currentReport.data?.hostsSummary?.map(h => ({
+                                    hostname: h.hostname,
+                                    cpuCores: h.coreCount,
+                                    cpuModel: h.cpuModel,
+                                    memoryGB: Math.round(h.memory / 1024 / 1024 / 1024),
+                                    cpuUsage: h.avgCpuUsage,
+                                    memUsage: +(h.avgMemUsage || 0).toFixed(2),
+                                    osdCount: h.osdCount,
+                                    status: h.upOsds === h.totalOsds ? 'healthy' : 'degraded',
+                                    networkRxMBps: h.networkRxMBps,
+                                    networkTxMBps: h.networkTxMBps,
+                                 })) || [],
+                              // Transform InventoryResponse[] to Disk[]
+                              disks:
+                                 currentReport.data?.disks?.flatMap(
+                                    host =>
+                                       host.devices
+                                          ?.filter(device => device.osd_ids && device.osd_ids.length > 0)
+                                          .flatMap(device =>
+                                             device.osd_ids.map(osdId => ({
+                                                osdId: osdId,
+                                                hostname: host.name,
+                                                device: device.path,
+                                                deviceClass: device.human_readable_type || 'unknown',
+                                                sizeBytes: device.sys_api?.size || 0,
+                                                usedBytes: 0, // Not available in current data structure
+                                                healthStatus: device.rejected_reasons && device.rejected_reasons.length > 0 ? 'degraded' : 'healthy',
+                                                degradedReason: device.rejected_reasons,
+                                             })),
+                                          ) || [],
+                                 ) || [],
+                              // Map poolsSummary to pools format
+                              pools:
+                                 currentReport.data?.poolsSummary?.map(p => ({
+                                    name: p.poolName,
+                                    type: 'replicated',
+                                    size: p.size,
+                                    minSize: p.minSize,
+                                    pgNum: p.pgNum,
+                                    used: p.usedBytes,
+                                    available: p.maxBytes - p.usedBytes,
+                                 })) || [],
+                              crushMap: undefined,
+                              networkTopology: undefined,
+                              pgDistribution: undefined,
+                           }}
+                        />
+                     </section>
 
-               {/* Detailed Tables - Pages 15+ */}
-               <section className="print:bg-white print:text-black">
-                  <DetailedTables
-                     data={{
-                        // Map hostsSummary to OSD data
-                        osds:
-                           currentReport.data?.hostsSummary?.flatMap(h =>
-                              Array.from({ length: h.osdCount }, (_, i) => ({
-                                 id: i,
-                                 host: h.hostname,
-                                 status: i < h.upOsds ? 'up' : 'down',
-                                 weight: 1.0,
-                                 used: 0,
-                                 avail: 0,
-                                 usePercent: 0,
-                                 pgCount: 0,
-                                 device: `osd.${i}`,
-                                 deviceClass: 'hdd',
-                              })),
-                           ) || [],
-                        // Use poolsSummary directly with correct field names
-                        pools:
-                           currentReport.data?.poolsSummary?.map(p => ({
-                              name: p.poolName,
-                              id: p.poolId,
-                              type: 'replicated',
-                              size: p.size,
-                              minSize: p.minSize,
-                              pgNum: p.pgNum,
-                              pgpNum: p.pgNum, // Same as pgNum
-                              crushRule: 'replicated_rule',
-                              used: p.usedBytes,
-                              available: p.maxBytes - p.usedBytes,
-                           })) || [],
-                        clients: [], // No client data in API response
-                        configParams: [], // No config params in API response
-                     }}
-                  />
-               </section>
+                     {/* Performance Metrics - Pages 4-6 */}
+                     <section className="page-break-after print:bg-white print:text-black">
+                        <PerformanceMetrics
+                           data={{
+                              iops: {
+                                 poolTrends: currentReport.data?.trends?.iops,
+                                 topClients: [], // No client data in API response
+                              },
+                              latency: {
+                                 distribution: currentReport.data?.trends?.latency,
+                                 // Calculate percentiles from trend data
+                                 percentiles: (() => {
+                                    const latencyData = currentReport.data?.trends?.latency?.data || [];
+                                    if (latencyData.length === 0) return { p50: 0, p95: 0, p99: 0 };
+                                    const sorted = [...latencyData].map(d => d.value).sort((a, b) => a - b);
+                                    return {
+                                       p50: sorted[Math.floor(sorted.length * 0.5)] || 0,
+                                       p95: sorted[Math.floor(sorted.length * 0.95)] || 0,
+                                       p99: sorted[Math.floor(sorted.length * 0.99)] || 0,
+                                    };
+                                 })(),
+                                 slowRequests: [], // No slow requests data in API response
+                              },
+                              throughput: {
+                                 trends: currentReport.data?.trends?.throughput,
+                                 recoveryImpact: undefined, // No recovery impact data in API response
+                              },
+                           }}
+                        />
+                     </section>
+
+                     {/* Capacity Management - Pages 7-8 */}
+                     <section className="page-break-after print:bg-white print:text-black">
+                        <CapacityManagement
+                           data={{
+                              currentUsage: {
+                                 totalCapacity: currentReport.data?.keyMetrics?.capacity?.totalCapacity,
+                                 usedCapacity: currentReport.data?.keyMetrics?.capacity?.usedCapacity,
+                                 availableCapacity: currentReport.data?.keyMetrics?.capacity?.availableCapacity,
+                                 utilizationPercent: currentReport.data?.keyMetrics?.capacity?.utilizationPercent,
+                              },
+                              // Map poolsSummary to poolUsage format
+                              poolUsage:
+                                 currentReport.data?.poolsSummary?.map(p => ({
+                                    name: p.poolName, // Component expects 'name', not 'poolName'
+                                    used: p.usedBytes,
+                                    available: p.maxBytes - p.usedBytes,
+                                    utilizationPercent: p.usagePercent,
+                                    objects: p.objectCount,
+                                 })) || [],
+                              // Transform prediction data to match component expectations
+                              predictions: currentReport.data?.trends?.capacity?.prediction
+                                 ? {
+                                      growthRatePerDay: 0, // Not available in API
+                                      expectedFullDate: undefined, // Not available in API
+                                      daysUntilFull: currentReport.data.trends.capacity.prediction.timeToThreshold,
+                                      recommendedExpansion: undefined, // Not available in API
+                                   }
+                                 : undefined,
+                              trends: currentReport.data?.trends?.capacity,
+                           }}
+                        />
+                     </section>
+
+                     {/* AI Insights - Pages 9-11 */}
+                     <section className="page-break-after print:bg-white print:text-black">
+                        <AIInsightsSection
+                           data={{
+                              anomalies: currentReport.aiInsights?.anomalies || [],
+                              predictions:
+                                 currentReport.aiInsights?.predictions?.map(p => ({
+                                    category: p.category,
+                                    probability: p.probability,
+                                    impact: p.impact,
+                                    estimatedTime: p.estimatedTime,
+                                    description: `${p.category} prediction with ${p.confidence}% confidence. Risk factors: ${p.riskFactors?.length || 0}`,
+                                 })) || [],
+                              recommendations:
+                                 currentReport.aiInsights?.recommendations?.map(r => ({
+                                    id: r.id,
+                                    title: r.title,
+                                    description: r.description,
+                                    priority: r.priority,
+                                    estimatedImpact: r.estimatedImpact,
+                                    implementation: r.commands?.join('; ') || 'No specific commands provided',
+                                 })) || [],
+                              analysisWindow: currentReport.timeRange?.label || 'Last 7 days',
+                              confidence: currentReport.data?.aiAnalysisConfidence || 95.0,
+                           }}
+                        />
+                     </section>
+
+                     {/* Availability & Recovery - Pages 12-13 */}
+                     <section className="page-break-after print:bg-white print:text-black">
+                        <AvailabilityRecovery
+                           data={{
+                              dataProtection: {
+                                 // Calculate compliance rates from PG status
+                                 replicationCompliance: 100, // Assume full replication compliance
+                                 scrubCompletionRate: 0, // Not available in API
+                                 deepScrubCompletionRate: 0, // Not available in API
+                                 pgConsistencyRate: currentReport.data?.keyMetrics?.pgStatus?.activePgs
+                                    ? ((currentReport.data.keyMetrics.pgStatus.activePgs - (currentReport.data.keyMetrics.pgStatus.inconsistentPgs || 0)) /
+                                         currentReport.data.keyMetrics.pgStatus.activePgs) *
+                                      100
+                                    : 100,
+                                 backupCompliance: 0, // Not available in API
+                              },
+                              recoveryReadiness: {
+                                 mtbf: undefined, // Not available in API
+                                 mttr: undefined, // Not available in API
+                                 rto: undefined, // Not available in API
+                                 rpo: undefined, // Not available in API
+                                 lastDisasterRecoveryTest: undefined, // Not available in API
+                                 drTestResult: undefined, // Not available in API
+                              },
+                              replicationStatus:
+                                 currentReport.data?.poolsSummary?.map(pool => ({
+                                    pool: pool.poolName,
+                                    targetSize: pool.size, // Desired replication factor
+                                    currentSize: pool.size, // Assume meeting target (could be improved with per-pool PG status)
+                                    compliance: (currentReport.data?.keyMetrics?.pgStatus?.degradedPgs || 0) === 0, // Compliant if no degraded PGs
+                                 })) || [],
+                              scrubStatus: [], // No scrub status data in API response
+                           }}
+                        />
+                     </section>
+
+                     {/* AI Failure Predictions */}
+                     <section className="page-break-after print:bg-white print:text-black">
+                        <PredictionSection
+                           predictions={Object.values(predictions).map(p => ({
+                              id: p.id,
+                              category: p.category,
+                              name: p.name,
+                              severity: p.severity,
+                              probability: p.probability,
+                              confidence: p.confidence,
+                              timeToImpact: p.timeToImpact,
+                              aiAnalysis: p.aiAnalysis,
+                              affectedComponents: p.affectedComponents,
+                              recommendedActions: p.recommendedActions,
+                              trend: p.trend,
+                           }))}
+                        />
+                     </section>
+
+                     {/* Operational History - Page 14 */}
+                     <section className="page-break-after print:bg-white print:text-black">
+                        <OperationalHistory
+                           data={{
+                              // Map events to operational history
+                              configChanges: [],
+                              maintenanceLogs:
+                                 currentReport.data?.events?.events
+                                    ?.filter(e => e.type === 'info')
+                                    .map(e => ({
+                                       timestamp: e.timestamp,
+                                       type: e.type,
+                                       category: 'Maintenance',
+                                       description: `${e.component}: ${e.message}`,
+                                       user: 'system',
+                                       severity: e.type,
+                                    })) || [],
+                              incidents:
+                                 currentReport.data?.events?.events
+                                    ?.filter(e => e.type === 'warning' || e.type === 'error')
+                                    .map(e => ({
+                                       timestamp: e.timestamp,
+                                       type: e.type,
+                                       category: 'Incident',
+                                       description: `${e.component}: ${e.message} - ${e.details || ''}`,
+                                       user: 'system',
+                                       severity: e.type,
+                                    })) || [],
+                              performanceTuning: [],
+                           }}
+                        />
+                     </section>
+
+                     {/* Detailed Tables - Pages 15+ */}
+                     <section className="print:bg-white print:text-black">
+                        <DetailedTables
+                           data={{
+                              // Map hostsSummary to OSD data
+                              osds:
+                                 currentReport.data?.hostsSummary?.flatMap(h =>
+                                    Array.from({ length: h.osdCount }, (_, i) => ({
+                                       id: i,
+                                       host: h.hostname,
+                                       status: i < h.upOsds ? 'up' : 'down',
+                                       weight: 1.0,
+                                       used: 0,
+                                       avail: 0,
+                                       usePercent: 0,
+                                       pgCount: 0,
+                                       device: `osd.${i}`,
+                                       deviceClass: 'hdd',
+                                    })),
+                                 ) || [],
+                              // Use poolsSummary directly with correct field names
+                              pools:
+                                 currentReport.data?.poolsSummary?.map(p => ({
+                                    name: p.poolName,
+                                    id: p.poolId,
+                                    type: 'replicated',
+                                    size: p.size,
+                                    minSize: p.minSize,
+                                    pgNum: p.pgNum,
+                                    pgpNum: p.pgNum, // Same as pgNum
+                                    crushRule: 'replicated_rule',
+                                    used: p.usedBytes,
+                                    available: p.maxBytes - p.usedBytes,
+                                 })) || [],
+                              clients: [], // No client data in API response
+                              configParams: [], // No config params in API response
+                           }}
+                        />
+                     </section>
+                  </>
+               )}
+
+               {/* PREDICTIONS Report View */}
+               {currentReport.type === 'PREDICTIONS' && (
+                  <>
+                     {/* Report Title Page */}
+                     <div className="hidden print:block">
+                        <ReportTitlePage
+                           reportTitle={currentReport.title}
+                           generatedAt={currentReport.createdAt}
+                           timeRange={currentReport.timeRange}
+                           clusterSummary={{
+                              health: currentReport.data?.clusterSummary?.health || 'HEALTH_WARN',
+                              capacityUtilization: currentReport.data?.clusterSummary?.capacityUtilization || 0,
+                              activeAlerts: currentReport.data?.clusterSummary?.activeAlerts || 0,
+                              totalOsds: currentReport.data?.clusterSummary?.totalOsds || 0,
+                              upOsds: currentReport.data?.clusterSummary?.upOsds || 0,
+                              totalCapacity: currentReport.data?.clusterSummary?.totalCapacity || 0,
+                              usedCapacity: currentReport.data?.clusterSummary?.usedCapacity || 0,
+                           }}
+                           highRiskPredictions={
+                              currentReport.data?.predictionsSummary?.highRiskPredictions?.map(p => ({
+                                 name: p.name,
+                                 severity: p.severity as 'high' | 'critical',
+                                 probability: p.probability,
+                                 timeToImpact: p.timeToImpact,
+                              })) || []
+                           }
+                           highRiskSummary={currentReport.data?.predictionsSummary?.highRiskSummary}
+                        />
+                     </div>
+
+                     {/* Predictions Section - 12 Cards */}
+                     <section className="page-break-after print:bg-white print:text-black">
+                        <PredictionSection
+                           predictions={(currentReport.data?.predictions || []).map(p => ({
+                              id: p.id,
+                              category: p.category,
+                              name: p.name,
+                              severity: p.severity as 'low' | 'medium' | 'high' | 'critical',
+                              probability: p.probability,
+                              confidence: p.confidence,
+                              timeToImpact: p.timeToImpact,
+                              aiAnalysis: p.aiAnalysis,
+                              affectedComponents: p.affectedComponents,
+                              recommendedActions: p.recommendedActions,
+                              trend: p.trend as 'improving' | 'stable' | 'worsening',
+                           }))}
+                        />
+                     </section>
+                  </>
+               )}
             </div>
 
             {/* Back Button */}

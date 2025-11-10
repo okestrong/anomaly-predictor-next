@@ -58,7 +58,7 @@ const VideoBackground = memo(() => {
             <source src="/videos/digital_greenhole.mp4" type="video/mp4" />
          </video>
          {/* 비디오 위에 오버레이 */}
-         <div className="absolute inset-0 bg-gradient-to-br from-secondary-900/95 via-ai-neural/70 to-secondary-800/95"></div>
+         <div className="absolute inset-0 bg-gradient-to-br from-secondary-900/95 via-ai-neural/95 to-secondary-800/95"></div>
       </div>
    );
 });

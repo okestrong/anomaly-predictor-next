@@ -11,7 +11,7 @@ import {
    SunIcon,
    MoonIcon,
    Cog6ToothIcon,
-   ArrowRightOnRectangleIcon,
+   ArrowRightStartOnRectangleIcon,
    UserIcon,
    ChevronDownIcon,
    MagnifyingGlassIcon,
@@ -24,6 +24,12 @@ import {
    DocumentTextIcon,
    MapIcon,
    ChevronRightIcon,
+   BoltIcon,
+   BugAntIcon,
+   SquaresPlusIcon,
+   Square3Stack3DIcon,
+   CursorArrowRaysIcon,
+   CubeTransparentIcon,
 } from '@heroicons/react/24/outline';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/common/Button';
@@ -74,6 +80,168 @@ export default function AppHeader() {
    const hoverTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
    // Menu configuration
+   const mainMenus: MenuItem[] = [
+      {
+         id: 'dashboard',
+         name: '🚀 Dashboard',
+         icon: ChartBarIcon,
+         route: '/dashboard',
+      },
+      {
+         id: 'visualization',
+         name: 'Visualization',
+         icon: Square3Stack3DIcon,
+         route: '/',
+         submenu: [
+            /*{
+               id: 'realtime',
+               name: 'Real-time Metrics',
+               description: 'Live performance monitoring',
+               icon: ChartBarIcon,
+               route: '/monitoring',
+            },
+            {
+               id: 'performance',
+               name: 'Performance Analytics',
+               description: 'Detailed performance analysis',
+               icon: CpuChipIcon,
+               route: '/performance',
+            },
+            {
+               id: 'health',
+               name: 'Cluster Health',
+               description: 'Overall system health status',
+               icon: HeartIcon,
+               route: '/health',
+            },*/
+            {
+               id: 'topology',
+               name: 'Cluster Topology',
+               description: 'Pool, PG, OSD relationship visualization',
+               icon: CubeTransparentIcon,
+               route: '/topology',
+            },
+            {
+               id: 'traffic',
+               name: 'Cluster Traffic',
+               description: 'Real-time data flow visualization',
+               icon: CursorArrowRaysIcon,
+               route: '/traffic',
+            },
+         ],
+      },
+      {
+         id: 'ai',
+         name: 'Analytics',
+         icon: CpuChipIcon,
+         route: '/',
+         submenu: [
+            /*{
+               id: 'anomaly',
+               name: 'Anomaly Detection',
+               description: 'AI-powered anomaly detection',
+               icon: ExclamationTriangleIcon,
+               route: '/anomaly',
+            },*/
+            {
+               id: 'prediction',
+               name: 'Predictive Analytics',
+               description: 'Failure prediction and forecasting',
+               icon: SparklesIcon,
+               route: '/prediction',
+            },
+            {
+               id: 'reports',
+               name: 'Reports',
+               description: 'Generate and view system reports',
+               icon: DocumentTextIcon,
+               route: '/reports',
+            },
+            /* {
+               id: 'command',
+               name: 'Command Interface',
+               description: 'Cyberpunk AI command terminal',
+               icon: DocumentTextIcon,
+               route: '/command',
+            },*/
+         ],
+      },
+      {
+         id: 'resilience',
+         name: 'Resilience',
+         icon: SquaresPlusIcon,
+         route: '/',
+         submenu: [
+            {
+               id: 'trouble',
+               name: 'Trouble Shooting Guide',
+               description: 'Diagnostic guides and solutions for cluster issues',
+               icon: BugAntIcon,
+               route: '/trouble',
+            },
+            {
+               id: 'optimize',
+               name: 'Optimization',
+               description: 'Identify PG imbalances and apply optimal distribution strategies',
+               icon: BoltIcon,
+               route: '/optimization',
+            },
+         ],
+      },
+      /*{
+         id: 'storage',
+         name: 'Storage',
+         icon: CircleStackIcon,
+         route: '/storage',
+         submenu: [
+            {
+               id: 'capacity',
+               name: 'Capacity Management',
+               description: 'Storage capacity and usage',
+               icon: CircleStackIcon,
+               route: '/storage',
+            },
+            {
+               id: 'network',
+               name: 'Network Status',
+               description: 'Network performance and topology',
+               icon: WifiIcon,
+               route: '/network',
+            },
+         ],
+      },
+      {
+         id: 'alerts',
+         name: 'Alerts',
+         icon: BellIcon,
+         route: '/alerts',
+         submenu: [
+            {
+               id: 'active',
+               name: 'Active Alerts',
+               description: 'Current system alerts',
+               icon: BellIcon,
+               route: '/alerts',
+            },
+         ],
+      },
+      {
+         id: 'settings',
+         name: 'Settings',
+         icon: Cog6ToothIcon,
+         route: '/settings',
+         submenu: [
+            {
+               id: 'general',
+               name: 'General Settings',
+               description: 'System configuration',
+               icon: Cog6ToothIcon,
+               route: '/settings',
+            },
+         ],
+      },*/
+   ];
+   /*
    const mainMenus: MenuItem[] = [
       {
          id: 'command-center',
@@ -213,11 +381,12 @@ export default function AppHeader() {
          ],
       },
    ];
+*/
 
    const userMenuItems: UserMenuItem[] = [
       { name: 'Profile', icon: UserIcon, action: 'profile' },
       { name: 'Settings', icon: Cog6ToothIcon, action: 'settings' },
-      { name: 'Logout', icon: ArrowRightOnRectangleIcon, action: 'logout' },
+      { name: 'Logout', icon: ArrowRightStartOnRectangleIcon, action: 'logout' },
    ];
 
    // Mock data
@@ -332,7 +501,7 @@ export default function AppHeader() {
       const now = new Date();
       setCurrentTime(
          now.toLocaleString('ko-KR', {
-            year: 'numeric',
+            // year: 'numeric',
             month: '2-digit',
             day: '2-digit',
             hour: '2-digit',
@@ -438,15 +607,17 @@ export default function AppHeader() {
 
                   {/* Breadcrumb (non-dashboard pages) */}
                   {currentRoute !== 'Dashboard' && (
-                     <div className="flex items-center space-x-2 ml-4">
-                        <ChevronRightIcon className="w-4 h-4 text-secondary-400" />
-                        <nav className="flex items-center space-x-2">
-                           <Link href="/" className="text-sm text-secondary-400 hover:text-white transition-colors">
-                              Dashboard
-                           </Link>
-                           <ChevronRightIcon className="w-3 h-3 text-secondary-500" />
-                           <span className="text-sm font-medium text-white">{currentRoute}</span>
-                        </nav>
+                     <div className="h-[44px] hidden 2xl:flex items-end">
+                        <div className="flex items-center space-x-2">
+                           <ChevronRightIcon className="w-4 h-4 text-secondary-400" />
+                           <nav className="flex items-center space-x-2">
+                              <Link href="/" className="text-xs text-secondary-400 hover:text-white transition-colors">
+                                 Dashboard
+                              </Link>
+                              <ChevronRightIcon className="w-3 h-3 text-secondary-500" />
+                              <span className="text-xs font-medium text-white">{currentRoute}</span>
+                           </nav>
+                        </div>
                      </div>
                   )}
                </div>
@@ -539,7 +710,7 @@ export default function AppHeader() {
                   </div>
 
                   {/* Current time */}
-                  <div className="hidden sm:block text-right">
+                  <div className="hidden sm:block text-right w-[132px]">
                      <div className="text-sm font-medium text-secondary">{currentTime}</div>
                      <div className="text-xs text-blue-500 flex items-center justify-end space-x-2">
                         <div className={cn('w-2 h-2 rounded-full neural-pulse', connectionStatusColor)} />

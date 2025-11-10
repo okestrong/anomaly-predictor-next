@@ -5,14 +5,16 @@
 
 'use client';
 
-import { use, useEffect, useState, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { ReportHeader, QuickReportCards, RecentReports } from '@/components/reports';
-import { useReportStore } from '@/stores/report';
+import { QuickReportCards, RecentReports, ReportHeader } from '@/components/reports';
+import { getDateRangePresets, useReportStore } from '@/stores/report';
 import { LoadingSpinner } from '@/components/common';
 import { toast } from 'react-toastify';
 import { downloadBlob, generateExportFilename } from '@/lib/api/reportApi';
 import { AppHeader } from '@/components/layout';
+import type { ReportType } from '@/types/report';
+import RotateSquareLoading from '@/components/reports/RotateSquareLoading';
 
 export default function ReportsPage() {
    const router = useRouter();
@@ -20,8 +22,9 @@ export default function ReportsPage() {
    const backgroundVideoRef = useRef<HTMLVideoElement>(null);
    const hasFetchedRef = useRef(false);
    const hasCleanedRef = useRef(false);
+   const [currentReportType, setCurrentReportType] = useState<ReportType | null>(null);
 
-   const { reports, loadingReports, error, fetchReports, deleteReport, exportReport, clearError } = useReportStore();
+   const { reports, loadingReports, isGenerating, error, fetchReports, deleteReport, exportReport, generateReport, clearError } = useReportStore();
 
    // Clean up localStorage once on mount (중복 데이터 제거용)
    useEffect(() => {
@@ -135,6 +138,46 @@ export default function ReportsPage() {
       }
    };
 
+   const handleGenerateReport = async (reportType: ReportType) => {
+      try {
+         setCurrentReportType(reportType);
+         const presets = getDateRangePresets();
+
+         let timeRange;
+         switch (reportType) {
+            case 'DAILY':
+               timeRange = presets.today.getTimeRange();
+               break;
+            case 'TREND':
+               timeRange = presets.last7Days.getTimeRange();
+               break;
+            case 'PREDICTIONS':
+               timeRange = presets.last7Days.getTimeRange();
+               break;
+            default:
+               timeRange = presets.today.getTimeRange();
+         }
+
+         const report = await generateReport({
+            type: reportType,
+            timeRange,
+            options: {
+               includeAI: true,
+               includePredictions: true,
+               includeRecommendations: true,
+            },
+         });
+
+         // Redirect to view the generated report
+         router.push(`/reports/view/${report.id}`);
+      } catch (error) {
+         console.error('Failed to generate report:', error);
+         toast.error(`Failed to generate ${reportType.toLowerCase()} report`);
+      } finally {
+         setCurrentReportType(null);
+      }
+   };
+
    if (loadingReports && reports.length === 0) {
       return (
          <div className="flex items-center justify-center min-h-screen bg-gradient-to-br from-secondary-900 via-ai-neural to-secondary-800">
@@ -151,16 +194,13 @@ export default function ReportsPage() {
             <video ref={backgroundVideoRef} className="w-full h-full object-cover" autoPlay muted loop playsInline>
                <source src="/videos/digital_notebook.mp4" type="video/mp4" />
             </video>
-            <div className="absolute inset-0 bg-gradient-to-br from-secondary-900/90 via-ai-neural/90 to-secondary-800/90"></div>
+            <div className="absolute inset-0 bg-gradient-to-br from-secondary-900/95 via-ai-neural/90 to-secondary-800/95"></div>
          </div>
 
          {/* 메인 컨텐츠 */}
          <div className="container mx-auto px-4 py-6 max-w-7xl relative z-10">
             {/* Header with stats */}
             <ReportHeader stats={stats} />
-
-            {/* Quick Report Cards */}
-            <QuickReportCards />
 
             {/* Recent Reports */}
             <RecentReports
@@ -171,12 +211,28 @@ export default function ReportsPage() {
                onDelete={handleDeleteReport}
             />
 
+            {/* Quick Report Cards */}
+            <QuickReportCards onGenerate={handleGenerateReport} />
+
             {/* Scheduled Reports Section */}
             {/* TODO: Implement ScheduledReports component */}
 
             {/* Templates Section */}
             {/* TODO: Implement ReportTemplates component */}
          </div>
+
+         {/* Loading Overlay */}
+         <RotateSquareLoading
+            isVisible={isGenerating}
+            title={`Generating ${currentReportType ? currentReportType.charAt(0) + currentReportType.slice(1).toLowerCase() : ''} Report...`}
+            desc={
+               currentReportType === 'PREDICTIONS'
+                  ? 'Running AI analysis on 12 prediction categories'
+                  : currentReportType === 'TREND'
+                    ? 'Analyzing 7-day trend data with charts'
+                    : 'This may take a few moments'
+            }
+         />
       </div>
    );
 }

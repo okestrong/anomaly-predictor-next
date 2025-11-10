@@ -6,9 +6,13 @@ interface Host {
    hostname: string;
    cpuCores?: number;
    cpuModel?: string;
+   cpuUsage?: number;
    memoryGB?: number;
+   memUsage?: number;
    osdCount?: number;
    status?: string;
+   networkRxMBps?: number;
+   networkTxMBps?: number;
 }
 
 interface Disk {
@@ -19,6 +23,7 @@ interface Disk {
    sizeBytes: number;
    usedBytes: number;
    healthStatus?: string;
+   degradedReason?: string[];
 }
 
 interface Pool {
@@ -61,8 +66,9 @@ export default function InfrastructureStatus({ data }: InfrastructureStatusProps
    const getStatusBadge = (status?: string) => {
       const statusLower = status?.toLowerCase() || 'unknown';
       if (statusLower === 'up' || statusLower === 'healthy' || statusLower === 'active') return 'bg-success-500 text-white print:bg-green-600';
-      if (statusLower === 'down' || statusLower === 'unhealthy') return 'bg-danger-500 text-white print:bg-red-600';
+      if (statusLower === 'degraded') return 'bg-warning-500 text-white print:bg-yellow-600';
       if (statusLower === 'warning') return 'bg-warning-500 text-white print:bg-yellow-600';
+      if (statusLower === 'down' || statusLower === 'unhealthy') return 'bg-danger-500 text-white print:bg-red-600';
       return 'bg-secondary-500 text-white print:bg-gray-600';
    };
 
@@ -98,9 +104,13 @@ export default function InfrastructureStatus({ data }: InfrastructureStatusProps
                                  <td className="px-4 py-2 whitespace-nowrap font-medium text-gray-900 print:text-black">{host.hostname}</td>
                                  <td className="px-4 py-2 whitespace-nowrap text-gray-700 print:text-gray-800">
                                     {host.cpuCores || 'N/A'} cores
-                                    {host.cpuModel && <div className="text-xs text-gray-500 print:text-gray-600">{host.cpuModel}</div>}
+                                    {host.cpuUsage && <div className="text-xs text-gray-500 print:text-gray-600">{host.cpuUsage}% loaded</div>}
+                                    {host.cpuModel && <div className="ml-1 text-xs text-gray-500 print:text-gray-600">({host.cpuModel})</div>}
                                  </td>
-                                 <td className="px-4 py-2 whitespace-nowrap text-gray-700 print:text-gray-800">{host.memoryGB || 'N/A'} GB</td>
+                                 <td className="px-4 py-2 whitespace-nowrap text-gray-700 print:text-gray-800">
+                                    {host.memoryGB || 'N/A'} GB
+                                    {host.memUsage && <div className="text-xs text-gray-500 print:text-gray-600">{host.memUsage}% used</div>}
+                                 </td>
                                  <td className="px-4 py-2 whitespace-nowrap text-gray-700 print:text-gray-800">{host.osdCount || 0}</td>
                                  <td className="px-4 py-2 whitespace-nowrap">
                                     <span className={`px-2 py-1 text-xs font-semibold rounded ${getStatusBadge(host.status)}`}>{host.status || 'Unknown'}</span>
@@ -132,6 +142,7 @@ export default function InfrastructureStatus({ data }: InfrastructureStatusProps
                            <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider print:text-gray-700">Class</th>
                            <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider print:text-gray-700">Size</th>
                            <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider print:text-gray-700">Health</th>
+                           <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider print:text-gray-700">Reason</th>
                         </tr>
                      </thead>
                      <tbody className="bg-white divide-y divide-gray-200 print:bg-white">
@@ -155,6 +166,9 @@ export default function InfrastructureStatus({ data }: InfrastructureStatusProps
                                     <span className={`px-2 py-1 text-xs font-semibold rounded ${getStatusBadge(disk.healthStatus)}`}>
                                        {disk.healthStatus || 'Unknown'}
                                     </span>
+                                 </td>
+                                 <td className="px-3 py-2 text-gray-700 print:text-gray-800 flex flex-col items-start">
+                                    {disk.degradedReason?.map(r => <span>- {r}</span>)}
                                  </td>
                               </tr>
                            ))

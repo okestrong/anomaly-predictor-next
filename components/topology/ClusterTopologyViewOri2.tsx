@@ -9,7 +9,7 @@ import { Box, Environment, OrbitControls, Plane, Stars, Text as Text3D } from '@
 import { Bloom, BrightnessContrast, EffectComposer } from '@react-three/postprocessing';
 import gsap from 'gsap';
 import { AdaptiveLayoutManager } from '@/utils/layouts';
-import { loadTexture } from '@/utils/utils';
+import { calculatePgState, loadTexture } from '@/utils/utils';
 import { AppHeader } from '@/components/layout';
 import Bubble from '@/components/models/Bubble';
 import Colors from '@/utils/color';
@@ -23,8 +23,13 @@ import Atmosphere from '@/components/models/Atmosphere';
 import RoundMirrorTextTable from '@/components/models/RoundMirrorTextTable';
 import { Stone } from '@/components/models/Stone';
 import GlassBall from '@/components/models/GlassBall';
-import { mockTopologyData } from '@/public/data/topologyMockData';
 import { TrashIcon } from '@heroicons/react/24/solid';
+import { selectIsLoading, selectTopologyData, useTopologyStore } from '@/stores/topology';
+import { transformTopologyData } from '@/lib/transformTopologyData';
+import { PGEnergyEffect } from './PGEnergyEffect';
+import { toast } from 'react-toastify';
+import { formatBytes } from '@/lib/formatUtils';
+import Image from 'next/image';
 
 const transition = {
    duration: 0.4, // 0.8에서 0.4로 단축
@@ -189,7 +194,7 @@ const PoolNode = forwardRef<
                   <sphereGeometry args={[5.1, 32, 32]} />
                   <meshStandardMaterial map={textures?.cloudsMap || undefined} transparent opacity={0.5} depthWrite={false} />
                </mesh>
-               <Atmosphere radius={5} intensity={1.1} power={2.0} color={Colors.emerald[400]} />
+               <Atmosphere radius={5} intensity={1.1} power={2.0} color={Colors.white} />
             </>
          )}
 
@@ -277,7 +282,7 @@ const PoolNode = forwardRef<
          )}
 
          {/* Pool name text - positioned above the sphere */}
-         <Text3D position={[0, 10, 0]} fontSize={1.5} color={0xffffff} anchorX="center" anchorY="top" outlineColor={Colors.blue[600]} outlineWidth={0.1}>
+         <Text3D position={[0, 10, 0]} fontSize={1.5} color={0xffffff} anchorX="center" anchorY="top" outlineColor={Colors.black} outlineWidth={0.1}>
             {poolData.name}
          </Text3D>
       </group>
@@ -408,6 +413,8 @@ const SpaceshipHost = forwardRef<
       }
    });
 
+   console.log('##### hostData=', hostData);
+
    return (
       <>
          <group
@@ -434,9 +441,57 @@ const SpaceshipHost = forwardRef<
 
             {/* Host label - moved outward by 20 units */}
             <Text3D
+               position={[-7.5, 1.1, 5.5]}
+               fontSize={1.4}
+               color={Colors.white}
+               anchorX="left"
+               anchorY="middle"
+               outlineWidth="8%"
+               outlineColor={Colors.black}
+               rotation={[-Math.PI / 2, 0, 0]}
+            >
+               CPU : {hostData.detail.cpuCount} cpu
+            </Text3D>
+            <Text3D
+               position={[-7.5, 1.1, 7.5]}
+               fontSize={1.4}
+               color={Colors.white}
+               anchorX="left"
+               anchorY="middle"
+               outlineWidth="8%"
+               outlineColor={Colors.black}
+               rotation={[-Math.PI / 2, 0, 0]}
+            >
+               Cores : {hostData.detail.coreCount} core
+            </Text3D>
+            <Text3D
+               position={[-7.5, 1.1, 9.5]}
+               fontSize={1.4}
+               color={Colors.yellow[400]}
+               anchorX="left"
+               anchorY="middle"
+               outlineWidth="8%"
+               outlineColor={0x000000}
+               rotation={[-Math.PI / 2, 0, 0]}
+            >
+               MEM : {formatBytes(hostData.detail.memory)?.replace(/^(.+)[bB]$/, '$1')}
+            </Text3D>
+            {/*<Text3D
                position={[-5.5, 1.1, 16.5]}
                fontSize={1.4}
-               color={Colors.pink[400]}
+               color={Colors.neutral[400]}
+               anchorX="center"
+               anchorY="middle"
+               outlineWidth="8%"
+               outlineColor={0x000000}
+               rotation={[-Math.PI / 2, 0, 0]}
+            >
+               CPU: {hostData.detail.cpuCount} ({hostData.detail.coreCount} cores)
+            </Text3D>*/}
+            <Text3D
+               position={[-5.5, 1.1, 16.5]}
+               fontSize={1.4}
+               color={Colors.neutral[400]}
                anchorX="center"
                anchorY="middle"
                outlineWidth="8%"
@@ -445,7 +500,15 @@ const SpaceshipHost = forwardRef<
             >
                {hostData.name}
             </Text3D>
-            <Text3D position={[6, 0.15, 18.1]} fontSize={1.3} color={0x3b82f6} anchorX="center" anchorY="middle" outlineWidth="8%" outlineColor={0x000000}>
+            <Text3D
+               position={[6, 0.15, 18.1]}
+               fontSize={1.3}
+               color={Colors.slate[400]}
+               anchorX="center"
+               anchorY="middle"
+               outlineWidth="8%"
+               outlineColor={0x000000}
+            >
                {hostData.name}
             </Text3D>
 
@@ -622,6 +685,9 @@ const ClusterTopologyScene = ({
    updatePgSearchOption,
    highlightNode,
    toggleAllPanels,
+   topologyData,
+   loadingPGIds,
+   isLoadingTopology,
 }: {
    selectedObjectRef: RefObject<any>;
    selectedPoolIdRef: RefObject<number | null>;
@@ -647,6 +713,9 @@ const ClusterTopologyScene = ({
    updatePgSearchOption: (enabled: boolean) => void;
    highlightNode: (node: any) => void;
    toggleAllPanels: () => void;
+   topologyData: any;
+   loadingPGIds: Set<string>;
+   isLoadingTopology: boolean;
 }) => {
    const { scene, camera, mouse, viewport } = useThree();
 
@@ -832,8 +901,8 @@ const ClusterTopologyScene = ({
    });
    const [texturesLoaded, setTexturesLoaded] = useState(false);
    const textSphereRef = useRef<THREE.Object3D>(null);
-   const allPools = useMemo(() => mockTopologyData.pools.map((_, i) => ({ index: i })), []);
-   const poolPositions = useMemo(() => new AdaptiveLayoutManager().applyLayout(allPools, 'spiral', { spacing: 25 }), []);
+   const allPools = useMemo(() => (topologyData?.pools || []).map((_: any, i: number) => ({ index: i })), [topologyData]);
+   const poolPositions = useMemo(() => new AdaptiveLayoutManager().applyLayout(allPools, 'spiral', { spacing: 25 }), [allPools]);
    // Animation refs for centralized animation
    const poolAnimationRefs = useRef<
       Array<{
@@ -1009,26 +1078,38 @@ const ClusterTopologyScene = ({
          const infoTitle = document.querySelector('#info-title');
          const infoContent = document.querySelector('#info-content');
 
+         // Get pool detail from poolData.detail
+         const poolDetail = poolData.detail;
+         const poolInfo = poolDetail?.pool_info;
+
          if (infoPanelElement && infoTitle && infoContent) {
             infoTitle.textContent = `Pool: ${poolData.name}`;
             infoContent.innerHTML = `
                <p>
-                  <strong>Pool ID:</strong> ${poolData.id}<br/>
                   <strong>Pool Name:</strong> ${poolData.name}<br/>
-                  <strong>Type:</strong> ${poolData.type || 'replicated'}<br/>
+                  <strong>Pool ID:</strong> ${poolData.id}<br/>
                   <strong>Health:</strong> ${poolData.health || 'healthy'}<br/>
-                  <strong>Size:</strong> ${poolData.size || 3}<br/>
-                  <strong>Min Size:</strong> ${poolData.min_size || 2}<br/>
-                  <strong>Used:</strong> ${poolData.used || 0}TB (${poolData.usedPercent || 0}%)<br/>
-                  <strong>Available:</strong> ${poolData.available || poolData.size}TB<br/>
-                  <strong>PG Count:</strong> ${poolData.pgCount || 128}<br/>
-                  <strong>PGP Count:</strong> ${poolData.pgp_count || poolData.pgCount || 128}<br/>
-                  <strong>Crush Rule:</strong> ${poolData.crush_rule || 'replicated_rule'}<br/>
-                  <strong>Objects:</strong> ${poolData.objects || Math.floor(Math.random() * 10000)}<br/>
-                  <strong>Read IOPS:</strong> ${poolData.read_iops || Math.floor(Math.random() * 5000)}<br/>
-                  <strong>Write IOPS:</strong> ${poolData.write_iops || Math.floor(Math.random() * 5000)}<br/>
-                  <strong>Read Bandwidth:</strong> ${poolData.read_bandwidth || Math.floor(Math.random() * 1000)}MB/s<br/>
-                  <strong>Write Bandwidth:</strong> ${poolData.write_bandwidth || Math.floor(Math.random() * 1000)}MB/s
+                  <strong>Type:</strong> ${poolInfo?.type || 'N/A'}<br/>
+                  <strong>Size:</strong> ${poolInfo?.size || 'N/A'}<br/>
+                  <strong>Min Size:</strong> ${poolInfo?.min_size || 'N/A'}<br/>
+                  <br/>
+                  <strong>Objects:</strong> ${poolInfo?.statistics?.objects?.toLocaleString() || 0}<br/>
+                  <strong>Stored Bytes:</strong> ${poolInfo?.statistics?.stored_bytes ? formatBytes(poolInfo.statistics.stored_bytes) : 'N/A'}<br/>
+                  <strong>Used Bytes:</strong> ${poolInfo?.utilization?.used_bytes ? formatBytes(poolInfo.utilization.used_bytes) : 'N/A'}<br/>
+                  <strong>Usage Percent:</strong> ${poolInfo?.utilization?.usage_percent?.toFixed(2) || 0}%<br/>
+                  <br/>
+                  <strong>PG Count:</strong> ${poolInfo?.pg_num || 0}<br/>
+                  <strong>PGP Count:</strong> ${poolInfo?.pgp_num || 0}<br/>
+                  <br/>
+                  <strong>Application:</strong> ${poolInfo?.application || 'N/A'}<br/>
+                  <strong>Autoscale Mode:</strong> ${poolInfo?.autoscale_mode || 'N/A'}<br/>
+                  <strong>Compression Mode:</strong> ${poolInfo?.compression_mode || 'N/A'}<br/>
+                  <strong>Compression Algorithm:</strong> ${poolInfo?.compression_algorithm || 'N/A'}<br/>
+                  <br/>
+                  <strong>Read Ops:</strong> ${poolInfo?.statistics?.read_ops}<br/>
+                  <strong>Write Ops:</strong> ${poolInfo?.statistics?.write_ops}<br/>
+                  <strong>Read Bytes:</strong> ${poolInfo?.statistics?.read_bytes != null ? formatBytes(poolInfo.statistics.read_bytes) : 'N/A'}<br/>
+                  <strong>Write Bytes:</strong> ${poolInfo?.statistics?.write_bytes != null ? formatBytes(poolInfo.statistics.write_bytes) : 'N/A'}
                </p>
             `;
             infoPanelElement.style.display = 'block';
@@ -1056,8 +1137,17 @@ const ClusterTopologyScene = ({
          // texturesRef.current.redMap = textureLoader.load('/3d/textures/cube/Leather_Tufted_header_red.jpg');
          // texturesRef.current.hostMap = textureLoader.load('/3d/textures/planet/silver-metal-pattern-steel.webp');
 
-         // Mark textures as loaded and loading as complete
+         // Mark textures as loaded
          setTexturesLoaded(true);
+         // Spinner will be hidden by the effect that checks both textures and topology API
+      };
+
+      initScene();
+   }, []);
+
+   // Hide spinner when both textures and topology API are loaded
+   useEffect(() => {
+      if (texturesLoaded && !isLoadingTopology && topologyData) {
          setTimeout(() => {
             loadingRef.current = false;
             // DOM 직접 조작으로 로딩 스피너 숨김
@@ -1065,20 +1155,18 @@ const ClusterTopologyScene = ({
             if (loadingElement) {
                loadingElement.style.display = 'none';
             }
-         }, 2000);
-      };
-
-      initScene();
-   }, []);
+         }, 1000); // Short delay for smooth transition
+      }
+   }, [texturesLoaded, isLoadingTopology, topologyData]);
 
    const ref = useRef(false);
 
    useEffect(() => {
-      if (texturesLoaded && !ref.current) {
+      if (texturesLoaded && !ref.current && topologyData) {
          ref.current = true;
          // Use a longer delay to ensure all components are mounted
          setTimeout(() => {
-            /*const allPools = mockTopologyData.pools.map((_, i) => ({ index: i }));
+            /*const allPools = topologyData.pools.map((_, i) => ({ index: i }));
             const positions = new AdaptiveLayoutManager().applyLayout(allPools, 'spiral', {
                spacing: 25,
             });
@@ -1096,7 +1184,7 @@ const ClusterTopologyScene = ({
 
             let clickPoolId = 0;
             let maxCount = 0;
-            mockTopologyData.pools.forEach(p => {
+            topologyData.pools.forEach((p: any) => {
                if (p.pgs.length > maxCount) {
                   maxCount = p.pgs.length;
                   clickPoolId = p.id;
@@ -1129,15 +1217,17 @@ const ClusterTopologyScene = ({
             }, 100);*/
          }, 1); // Increased delay to ensure refs are ready
       }
-   }, [texturesLoaded]);
+   }, [texturesLoaded, topologyData]);
 
-   // Wait for textures to load before rendering main content
-   if (!texturesLoaded) {
+   // Wait for textures and topology API to load before rendering main content
+   if (!texturesLoaded || isLoadingTopology || !topologyData) {
+      const loadingMessage = !texturesLoaded ? 'Loading Textures...' : isLoadingTopology || !topologyData ? 'Loading Topology Data...' : 'Loading...';
+
       return (
          <>
             <Stars radius={300} depth={100} count={1000} factor={4} saturation={0} fade />
             <Text3D position={[0, 0, 0]} fontSize={8} color={0xffffff} anchorX="center" anchorY="middle">
-               Loading Textures...
+               {loadingMessage}
             </Text3D>
          </>
       );
@@ -1152,9 +1242,14 @@ const ClusterTopologyScene = ({
          {/*<directionalLight position={[-30, 30, -40]} intensity={1.5} castShadow shadow-mapSize={[1024, 1024]}>
             <orthographicCamera args={[-100, 100, -100, 100, 0.1, 200]} />
          </directionalLight>*/}
-         <directionalLight position={[0, -50, 0]} intensity={7} shadow-mapSize={[256, 256]}>
+         <directionalLight position={[0, -50, 0]} intensity={3} shadow-mapSize={[256, 256]}>
             {/*<orthographicCamera args={[-100, 100, -100, 100, 0.1, 200]} />*/}
          </directionalLight>
+         <rectAreaLight
+            args={['#ffffff', 1.5, 100, 150]}
+            position={[0, 80, 0]}
+            rotation-x={-Math.PI / 2} // -> 조명이 밑에서 위로 (위에서 아래로 비추려면 : -Math.PI / 2)
+         />
          {/*{textSphereRef.current && (
             <SpotLight
                color={0xffffff}
@@ -1175,7 +1270,7 @@ const ClusterTopologyScene = ({
             dampingFactor={0.05}
             enablePan
             autoRotate
-            autoRotateSpeed={0.02}
+            autoRotateSpeed={0.05}
             mouseButtons={{
                LEFT: THREE.MOUSE.ROTATE,
                MIDDLE: THREE.MOUSE.PAN,
@@ -1190,9 +1285,9 @@ const ClusterTopologyScene = ({
          </mesh>*/}
 
          {/* Pool Nodes with Spiral Layout */}
-         {mockTopologyData.pools.map((pool, index) => {
+         {topologyData.pools.map((pool: any, index: number) => {
             // const layoutManager = new AdaptiveLayoutManager();
-            // const allPools = mockTopologyData.pools.map((_, i) => ({ index: i }));
+            // const allPools = topologyData.pools.map((_, i) => ({ index: i }));
             // const positions = layoutManager.applyLayout(allPools, 'hierarchical', { spacing: 20 });
             const pos = poolPositions[index].position;
 
@@ -1236,25 +1331,25 @@ const ClusterTopologyScene = ({
          <rectAreaLight
             args={['#ffffff', 3, 50, 50]}
             position={[0, -28, 0]}
-            rotation-x={-Math.PI / 2} // -> 조명이 밑에서 위로 (위에서 아래로 비추려면 : Math.PI / 2)
+            rotation-x={-Math.PI / 2} // -> 조명이 위에서 밑으로? (반대로 비추려면 : Math.PI / 2)
          />
          {/*<pointLight args={['#ffffff', 50, 50, 1]} position={[0, -33, 13]} />*/}
          {/*<pointLight args={['#ffffff', 50, 50, 1]} position={[0, -33, -13]} />*/}
          {/*<pointLight args={['#ffffff', 50, 50, 1]} position={[13, -33, 0]} />*/}
          {/*<pointLight args={['#ffffff', 50, 50, 1]} position={[-13, -33, 0]} />*/}
-         <Bubble position={[0, -35, 0]} scale={3} color={Colors.white} useBubble />
-         <TextSphere ref={textSphereRef} position={[0, -36, 0]} scale={4} text="OKESTRO  OKESTRO" bgColor={Colors.pink[300]} textColor={Colors.blue[500]} />
+         <Bubble position={[0, -35, 0]} scale={3} color={Colors.slate[100]} useBubble />
+         <TextSphere ref={textSphereRef} position={[0, -36, 0]} scale={4} text="OKESTRO  OKESTRO" bgColor={Colors.white} textColor={Colors.blue[600]} />
          {/*Portal 상단 조명*/}
          {/*<rectAreaLight args={['#ffffff', 3, 30, 20]} position={[0, -45, 0]} rotation-x={Math.PI / 2} />*/}
          {/*<pointLight args={['#ffffff', 40, 20, 0.5]} position={[0, -50, 0]} />*/}
          <PortalLight position={[0, -65, 0]} scale={60} />
-         <Medical position={[0, -41, 71.2]} rotation={[0, 0, 0]} scale={4} castShadow receiveShadow />
+         <Medical position={[0, -41, 71.2]} rotation={[0, 0, 0]} scale={4} />
 
          {/*<Stone position={[0, -45, 0]} scale={7} />*/}
          {/*<ControlBox position={[-61.5, -35.4, 0]} rotation={[0, -Math.PI / 2, 0]} scale={5} />*/}
          {/*<TabletModel position={[-83, -37, 0]} rotation={[0, 0, 0]} scale={5.5} />*/}
          {/* Spaceship Host Control Panels on Random Segments */}
-         {mockTopologyData.hosts.map((host, index) => {
+         {topologyData.hosts.map((host: any, index: number) => {
             // Assign hosts to random segments (but consistent)
             const segmentIndex = index % 8; // Distribute across 8 segments
 
@@ -1281,11 +1376,11 @@ const ClusterTopologyScene = ({
          })}
 
          {/* Crystal OSD Cubes on Host Control Panels */}
-         {mockTopologyData.hosts.map((host, hostIndex) => {
+         {topologyData.hosts.map((host: any, hostIndex: number) => {
             const segmentIndex = hostIndex % 8;
             const angle = (segmentIndex / 8) * Math.PI * 2 + Math.PI / 8;
 
-            const hostOsds = mockTopologyData.osds.filter(osd => osd.host === host.id);
+            const hostOsds = topologyData.osds.filter((osd: any) => osd.host === host.id);
             const cubeSize = 2.5;
             const spacing = cubeSize * 0.25; // 1/4 of cube size
             const totalSpacing = cubeSize + spacing;
@@ -1294,7 +1389,7 @@ const ClusterTopologyScene = ({
             const cols = 4;
             // const rows = Math.ceil(hostOsds.length / cols);
 
-            return hostOsds.map((osd, osdIndex) => {
+            return hostOsds.map((osd: any, osdIndex: number) => {
                const row = Math.floor(osdIndex / cols);
                const col = osdIndex % cols;
 
@@ -1366,6 +1461,17 @@ const ClusterTopologyScene = ({
                   </group>
                );
             });
+         })}
+
+         {/* Energy charging effects for loading PGs */}
+         {Array.from(loadingPGIds).map(pgId => {
+            const pgNode = pgNodesRef.current.find(pg => pg.userData.id === pgId);
+            if (!pgNode) return null;
+
+            const position = new THREE.Vector3();
+            pgNode.getWorldPosition(position);
+
+            return <PGEnergyEffect key={`energy-${pgId}`} position={position} radius={3} />;
          })}
       </>
    );
@@ -1461,7 +1567,33 @@ const mockData = {
    ],
 };
 
-export default function ClusterTopologyView() {
+export default function ClusterTopologyViewOri2() {
+   // Topology store - fetch real data from API
+   const topologyData = useTopologyStore(selectTopologyData);
+   const isLoadingTopology = useTopologyStore(selectIsLoading);
+   const fetchPGOSDs = useTopologyStore(state => state.fetchPGOSDs);
+   const isPGLoading = useTopologyStore(state => state.isPGLoading);
+   const loadingPGIds = useTopologyStore(state => state.loadingPGIds);
+
+   // Check for empty data and show error toast
+   useEffect(() => {
+      if (!isLoadingTopology && topologyData) {
+         // Check if data field is null or empty
+         if (!topologyData.data || topologyData.data.length === 0) {
+            toast.error('토폴로지 데이터가 비어있습니다. 클러스터 상태를 확인해주세요.');
+         }
+      }
+   }, [isLoadingTopology, topologyData]);
+
+   // Transform real data to match structure expected by visualization
+   // Only transform when data is available
+   const transformedTopologyData = useMemo(() => {
+      if (topologyData && topologyData.data && topologyData.data.length > 0) {
+         return transformTopologyData(topologyData);
+      }
+      return null;
+   }, [topologyData]);
+
    // useRef로 모든 상태 관리 (리렌더링 방지)
    const selectedObjectRef = useRef<any>(null);
    const loadingRef = useRef(true);
@@ -1500,6 +1632,7 @@ export default function ClusterTopologyView() {
    const selectedOSDIdRef = useRef<number | null>(null);
    const searchedPoolIdsRef = useRef<Set<number>>(new Set());
    const searchedOSDIdsRef = useRef<Set<number>>(new Set());
+   const showPoolPGLinesRef = useRef(true); // Toggle for pool-pg connection lines visibility
 
    // Node refs - moved from ClusterTopologyScene to main component
    const poolNodesRef = useRef<THREE.Group[]>([]);
@@ -1524,9 +1657,15 @@ export default function ClusterTopologyView() {
    const hostPlaneRefs = useRef<THREE.Mesh[]>([]);
    const texturesRef = useRef<any>({});
    // R3F Pool refs for getting actual world positions
-   const poolRefs = useMemo(() => Array.from({ length: mockTopologyData.pools.length }, () => createRef()), [mockTopologyData.pools.length]);
+   const poolRefs = useMemo(
+      () => Array.from({ length: transformedTopologyData?.pools.length || 0 }, () => createRef()),
+      [transformedTopologyData?.pools.length],
+   );
    // R3F Host refs for search functionality
-   const hostRefs = useMemo(() => Array.from({ length: mockTopologyData.hosts.length }, () => createRef<THREE.Group>()), [mockTopologyData.hosts.length]);
+   const hostRefs = useMemo(
+      () => Array.from({ length: transformedTopologyData?.hosts.length || 0 }, () => createRef<THREE.Group>()),
+      [transformedTopologyData?.hosts.length],
+   );
 
    // Three.js refs - some are deprecated in R3F but kept for compatibility
    const sceneRef = useRef<THREE.Scene | null>(null);
@@ -1636,6 +1775,7 @@ export default function ClusterTopologyView() {
    // const togglePanel = (position: 'top' | 'left' | 'bottom' | 'right') => {};
 
    const toggleAllPanels = useCallback(() => {
+      console.log('##### toggle-all-panels 호출됨');
       const targetPositions: Array<'top' | 'left' | 'bottom' | 'right'> = ['top', 'left', 'bottom', 'right'];
 
       // useRef로 상태 확인 (리렌더링 없음)
@@ -1857,19 +1997,21 @@ export default function ClusterTopologyView() {
       switch (searchTypeRef.current) {
          case 'pool':
             // Search R3F Pool components using poolRefs
-            poolRefs.forEach((ref, index) => {
-               if (ref.current) {
-                  const poolData = mockTopologyData.pools[index];
-                  const poolName = poolData.name?.toLowerCase() || '';
-                  if (poolName.includes(query)) {
-                     const poolObject = ref.current as THREE.Object3D;
-                     // Store searched pool ID
-                     searchedPoolIdsRef.current.add(poolData.id);
-                     pulseNode(poolObject, poolData.id);
-                     matchCount++;
+            if (transformedTopologyData) {
+               poolRefs.forEach((ref, index) => {
+                  if (ref.current) {
+                     const poolData = transformedTopologyData.pools[index];
+                     const poolName = poolData.name?.toLowerCase() || '';
+                     if (poolName.includes(query)) {
+                        const poolObject = ref.current as THREE.Object3D;
+                        // Store searched pool ID
+                        searchedPoolIdsRef.current.add(poolData.id);
+                        pulseNode(poolObject, poolData.id);
+                        matchCount++;
+                     }
                   }
-               }
-            });
+               });
+            }
             break;
          case 'pg':
             if (selectedPoolIdRef.current !== null && pgNodesRef.current.length > 0) {
@@ -1965,17 +2107,19 @@ export default function ClusterTopologyView() {
             break;
          case 'host':
             // Search R3F Host components using hostRefs
-            hostRefs.forEach((ref, index) => {
-               if (ref.current && typeof ref.current === 'object' && 'scale' in ref.current) {
-                  const hostData = mockTopologyData.hosts[index];
-                  const hostName = hostData.name?.toLowerCase() || '';
-                  if (hostName.includes(query)) {
-                     const hostObject = ref.current as THREE.Object3D;
-                     pulseNode(hostObject);
-                     matchCount++;
+            if (transformedTopologyData) {
+               hostRefs.forEach((ref, index) => {
+                  if (ref.current && typeof ref.current === 'object' && 'scale' in ref.current) {
+                     const hostData = transformedTopologyData.hosts[index];
+                     const hostName = hostData.name?.toLowerCase() || '';
+                     if (hostName.includes(query)) {
+                        const hostObject = ref.current as THREE.Object3D;
+                        pulseNode(hostObject);
+                        matchCount++;
+                     }
                   }
-               }
-            });
+               });
+            }
             break;
       }
    };
@@ -1993,6 +2137,7 @@ export default function ClusterTopologyView() {
       label.outlineColor = 0x000000;
       label.depthWrite = false;
       label.renderOrder = 999;
+      label.material.side = THREE.DoubleSide;
       parent.add(label);
       label.sync();
       return label;
@@ -2021,7 +2166,23 @@ export default function ClusterTopologyView() {
 
       // Clear OSD selection if it was an OSD
       if (isOSD) {
+         const osdId = selectedOSDIdRef.current;
          selectedOSDIdRef.current = null;
+
+         // Find the OSD node and remove highlight
+         if (osdId !== null) {
+            const osdNode = osdNodesRef.current.find(node => node.userData.id === osdId);
+            if (osdNode) {
+               // Remove yellow highlight sphere
+               const existingHighlight = osdNode.getObjectByName('yellowHighlight');
+               if (existingHighlight) {
+                  osdNode.remove(existingHighlight);
+               }
+               // Stop pulse animation
+               gsap.killTweensOf(osdNode.scale);
+               osdNode.scale.set(1, 1, 1);
+            }
+         }
       }
 
       // info-panel DOM 직접 숨김
@@ -2050,26 +2211,26 @@ export default function ClusterTopologyView() {
          ctx.shadowColor = '#00ffff';
 
          function degToRad(degree: number) {
-            return (degree / 180) * Math.PI;
+            const factor = Math.PI / 180;
+            return degree * factor;
          }
 
          function renderTime() {
             const now = new Date();
-            const today = now.toDateString();
+            const today = now.toLocaleDateString();
             const time = now.toLocaleTimeString();
-            const hrs = now.getHours() % 12;
-            const mins = now.getMinutes();
-            const secs = now.getSeconds();
+            const hrs = now.getHours();
+            const min = now.getMinutes();
+            const sec = now.getSeconds();
+            const mil = now.getMilliseconds();
+            const smoothsec = sec + mil / 1000;
+            const smoothmin = min + smoothsec / 60;
 
-            const smoothsec = secs + now.getMilliseconds() / 1000;
-            const smoothmin = mins + smoothsec / 60;
-
-            ctx.fillStyle = 'rgba(00, 00, 00, 0.1)';
+            const gradient = ctx.createRadialGradient(80, 80, 5, 80, 80, 75);
+            gradient.addColorStop(0, '#03303a');
+            gradient.addColorStop(1, 'black');
+            ctx.fillStyle = gradient;
             ctx.fillRect(0, 0, 160, 160);
-
-            ctx.strokeStyle = '#00ffff';
-            ctx.lineWidth = 15;
-            ctx.lineCap = 'round';
 
             ctx.beginPath();
             ctx.arc(80, 80, 64, degToRad(270), degToRad(hrs * 30 - 90));
@@ -2134,10 +2295,12 @@ export default function ClusterTopologyView() {
 
       // Hybrid material: MeshPhysicalMaterial as base
       let material;
-      if (pgData.state === 'active+clean') {
+
+      if (calculatePgState(pgData.state).status === 'healthy') {
          // Crystalline blue material for healthy PGs
          material = new THREE.MeshPhysicalMaterial({
-            color: 0x00d2ff,
+            // color: 0x00d2ff,
+            color: Colors.blue[300],
             metalness: 0.8,
             roughness: 0.2,
             transmission: 0.3,
@@ -2152,13 +2315,15 @@ export default function ClusterTopologyView() {
             specularColor: new THREE.Color(0x00ffff),
             transparent: true,
             opacity: 0.95,
-            emissive: 0x0066aa,
+            // emissive: 0x0066aa,
+            emissive: Colors.blue[600],
             emissiveIntensity: 0.3,
          });
-      } else if (pgData.state === 'degraded') {
+      } else if (calculatePgState(pgData.state).status === 'warning') {
          // Golden warning material
          material = new THREE.MeshPhysicalMaterial({
-            color: 0xffaa00,
+            // color: 0xffaa00,
+            color: Colors.amber[400],
             metalness: 0.9,
             roughness: 0.3,
             transmission: 0.2,
@@ -2173,13 +2338,15 @@ export default function ClusterTopologyView() {
             specularColor: new THREE.Color(0xffcc00),
             transparent: true,
             opacity: 0.9,
-            emissive: 0x664400,
+            // emissive: 0x664400,
+            emissive: Colors.amber[700],
             emissiveIntensity: 0.4,
          });
       } else {
          // Red error material with cracks
          material = new THREE.MeshPhysicalMaterial({
-            color: 0xff3333,
+            // color: 0xff3333,
+            color: Colors.red[400],
             metalness: 0.6,
             roughness: 0.5,
             transmission: 0.1,
@@ -2200,8 +2367,8 @@ export default function ClusterTopologyView() {
       }
 
       const mesh = new THREE.Mesh(geometry, material);
-      mesh.castShadow = true;
-      mesh.receiveShadow = true;
+      mesh.castShadow = false;
+      mesh.receiveShadow = false;
       mesh.userData.material = material; // Store reference for animation
       group.add(mesh);
 
@@ -2475,8 +2642,8 @@ export default function ClusterTopologyView() {
       }
 
       const box = new THREE.Mesh(geometry, material2);
-      box.castShadow = true;
-      box.receiveShadow = true;
+      box.castShadow = false;
+      box.receiveShadow = false;
       box.userData.material = material2; // Store reference for animation updates
       group.add(box);
 
@@ -3052,7 +3219,7 @@ export default function ClusterTopologyView() {
          // Use pgNode.position to ensure connection aligns with actual PG position
          // Get actual pool world position from R3F ref if available
          let poolWorldPos: THREE.Vector3;
-         const poolIndex = mockTopologyData.pools.findIndex(p => p.id === pool.userData.id);
+         const poolIndex = transformedTopologyData!.pools.findIndex(p => p.id === pool.userData.id);
 
          if (poolRefs && poolRefs[poolIndex] && poolRefs[poolIndex].current) {
             // Get actual world position from R3F pool ref
@@ -3062,7 +3229,7 @@ export default function ClusterTopologyView() {
          } else {
             // Fallback: Calculate the correct pool position (spiral layout)
             const layoutManager = new AdaptiveLayoutManager();
-            const allPools = mockTopologyData.pools.map((_, i) => ({ index: i }));
+            const allPools = transformedTopologyData!.pools.map((_, i) => ({ index: i }));
             const positions = layoutManager.applyLayout(allPools, 'spiral', { spacing: 25 });
             const correctPoolPos = positions[poolIndex].position;
             poolWorldPos = new THREE.Vector3(correctPoolPos[0], 40, correctPoolPos[2]);
@@ -3070,8 +3237,9 @@ export default function ClusterTopologyView() {
 
          // Use calculated spiral position (this should be the actual final position)
          const finalPoolPos = poolWorldPos;
-         const connection = createAnimatedFlowConnection(finalPoolPos, pgNode.position, 0xe879f9, 1.5);
+         const connection = createAnimatedFlowConnection(finalPoolPos, pgNode.position, 0x94a3b8, 2);
          connection.userData = { type: 'pool-pg', pgId: node.pgData.id }; // Store PG ID for highlighting
+         connection.visible = showPoolPGLinesRef.current; // Set initial visibility based on toggle
          connectionLinesRef.current.push(connection);
          sceneRef.current!.add(connection);
 
@@ -3151,6 +3319,22 @@ export default function ClusterTopologyView() {
          // Update selected host ID
          selectedHostIdRef.current = node.userData.name;
 
+         // Find all OSDs belonging to this host
+         const hostOSDs = transformedTopologyData?.osds?.filter((osd: any) => osd.host === node.userData.name) || [];
+
+         // Get host data from userData (already stored when mesh was created)
+         // hostData has a detail field that contains the actual HostDetail object
+         const hostData = node.userData.hostData;
+
+         // Update selected object with host info, detail, and its OSDs
+         selectedObjectRef.current = {
+            type: 'Host',
+            name: node.userData.name,
+            id: node.userData.id || node.userData.name,
+            osds: hostOSDs,
+            detail: hostData?.detail, // hostData.detail contains the HostDetail object
+         };
+
          // First reset all host planes to cyan
          hostPlaneRefs.current.forEach(plane => {
             if (plane) {
@@ -3166,6 +3350,15 @@ export default function ClusterTopologyView() {
             const material = hostPlaneRefs.current[segmentIndex].material as THREE.MeshPhysicalMaterial;
             material.color.set(Colors.pink[400]);
             material.emissive.set(Colors.pink[400]);
+         }
+
+         // Show info panel for Host
+         const infoPanelElement = document.querySelector('.info-panel') as HTMLElement;
+         const infoTitle = document.querySelector('#info-title');
+
+         if (infoPanelElement && infoTitle) {
+            infoTitle.textContent = `Host: ${node.userData.name}`;
+            infoPanelElement.style.display = 'block';
          }
       }
 
@@ -3231,11 +3424,29 @@ export default function ClusterTopologyView() {
 
             setTimeout(() => {
                // Select new PG after reset animation has started
-               // setSelectedPGId(node.userData.id); // Already handled in the next line
                selectedPGIdRef.current = node.userData.id;
-               showOSDsForPG(node.userData);
+
+               // NEW: Get OSD IDs from PG data (already available in userData.acting)
+               const osdIds = node.userData.acting || [];
+
+               // Convert OSD IDs to osd data format for showOSDsForPG
+               const osdData = osdIds.map((osdId: number) => ({ osd_id: osdId }));
+
+               // Immediately start shooting stars with existing OSD data
+               showOSDsForPG(node.userData, osdData);
                addPoolPGDataFlow(node.userData.id); // Add Pool-PG data flow for selected PG
                highlightPoolPGConnection(node.userData.id); // Highlight connection line
+
+               // Show 1-second loading effect for visual feedback
+               // fetchPGOSDs will add to loadingPGIds, triggering PGEnergyEffect
+               fetchPGOSDs(node.userData.id)
+                  .then(() => {
+                     // Loading effect automatically removed after 1 second (handled in PGEnergyEffect)
+                     console.log(`PG ${node.userData.id} OSD mapping confirmed`);
+                  })
+                  .catch(error => {
+                     console.warn('PG OSD fetch warning (non-blocking):', error);
+                  });
             }, 100); // Small delay to ensure reset starts first
          }
 
@@ -3253,7 +3464,7 @@ export default function ClusterTopologyView() {
 
    // Add Pool-PG data flow for selected PG only
    const addPoolPGDataFlow = (pgId: string): void => {
-      if (!sceneRef.current) return;
+      if (!sceneRef.current || !transformedTopologyData) return;
 
       // Find the selected PG node
       const pgNode = sceneRef.current.children.find(node => node.userData?.type === 'PG' && node.userData?.id === pgId);
@@ -3264,7 +3475,7 @@ export default function ClusterTopologyView() {
 
       // Find the pool position using poolRefs (similar to positionPGsAroundPool logic)
       const poolId = pgNode.userData.poolId;
-      const poolIndex = mockTopologyData.pools.findIndex(p => p.id === poolId);
+      const poolIndex = transformedTopologyData.pools.findIndex(p => p.id === poolId);
 
       if (poolIndex === -1) {
          return;
@@ -3280,7 +3491,7 @@ export default function ClusterTopologyView() {
       } else {
          // Fallback: Calculate the correct pool position (spiral layout)
          const layoutManager = new AdaptiveLayoutManager();
-         const allPools = mockTopologyData.pools.map((_, i) => ({ index: i }));
+         const allPools = transformedTopologyData.pools.map((_, i) => ({ index: i }));
          const positions = layoutManager.applyLayout(allPools, 'spiral', { spacing: 25 });
          const correctPoolPos = positions[poolIndex].position;
          poolWorldPos = new THREE.Vector3(correctPoolPos[0], 40, correctPoolPos[2]);
@@ -3324,10 +3535,19 @@ export default function ClusterTopologyView() {
       // Find and highlight the connection for the selected PG
       const targetConnection = connectionLinesRef.current.find(line => line.userData?.type === 'pool-pg' && line.userData?.pgId === pgId);
 
+      console.log('Highlighting Pool-PG connection for PG:', pgId);
+      console.log('Found connection:', targetConnection);
+      console.log(
+         'All pool-pg connections:',
+         connectionLinesRef.current.filter(line => line.userData?.type === 'pool-pg'),
+      );
+
       if (targetConnection && targetConnection.material) {
          const material = targetConnection.material as THREE.MeshBasicMaterial;
-         material.color.setHex(0x00d2ff); // Highlight color
+         material.color.setHex(0x00ffff); // Cyan color (same as PG-OSD connection)
          material.needsUpdate = true;
+         targetConnection.visible = true; // Always show selected PG's connection line
+         console.log('Pool-PG connection highlighted to cyan and set to visible');
       }
    };
 
@@ -3340,6 +3560,10 @@ export default function ClusterTopologyView() {
                const material = line.material as THREE.MeshBasicMaterial;
                material.color.setHex(0xe879f9); // Default Pool-PG color
                material.needsUpdate = true;
+               // Reset visibility based on toggle (selected PG handled separately)
+               if (line.userData?.pgId !== selectedPGIdRef.current) {
+                  line.visible = showPoolPGLinesRef.current;
+               }
             }
          });
    };
@@ -3464,9 +3688,10 @@ export default function ClusterTopologyView() {
       updatePgSearchOption(false);
    };
 
-   const showOSDsForPG = (pgData: any): void => {
+   const showOSDsForPG = (pgData: any, osdData?: any[]): void => {
       // Get the list of OSDs for the new PG (if any)
-      const newOSDIds = pgData ? new Set(generateOSDsForPG(pgData)) : new Set<number>();
+      // Use osdData if provided (from API), otherwise use generateOSDsForPG (fallback)
+      const newOSDIds = pgData ? (osdData ? new Set(osdData.map(osd => osd.osd_id)) : new Set(generateOSDsForPG(pgData))) : new Set<number>();
 
       // Clean up existing PG-OSD connections
       const pgOsdConnections = connectionLinesRef.current.filter(line => line.userData?.type === 'pg-osd');
@@ -3797,6 +4022,9 @@ export default function ClusterTopologyView() {
       }
    };
    const showPGsForPool = (poolId: number, poolRefs?: RefObject<any>[]): void => {
+      // Early return if no topology data
+      if (!transformedTopologyData) return;
+
       // Reset OSDs when switching pools or clearing PGs
       showOSDsForPG(null);
 
@@ -3838,13 +4066,13 @@ export default function ClusterTopologyView() {
 
       // If not found in poolNodesRef, create a temporary pool object for positioning
       if (!pool) {
-         const poolData = mockTopologyData.pools.find(p => p.id === poolId);
+         const poolData = transformedTopologyData.pools.find(p => p.id === poolId);
          if (poolData) {
             // Calculate pool position using same logic as PoolNode rendering
             const layoutManager = new AdaptiveLayoutManager();
-            const allPools = mockTopologyData.pools.map((p, i) => ({ index: i }));
+            const allPools = transformedTopologyData.pools.map((p, i) => ({ index: i }));
             const positions = layoutManager.applyLayout(allPools, 'hierarchical', { spacing: 20 });
-            const poolIndex = mockTopologyData.pools.findIndex(p => p.id === poolId);
+            const poolIndex = transformedTopologyData.pools.findIndex(p => p.id === poolId);
             const pos = positions[poolIndex].position;
 
             // Create temporary pool object
@@ -3864,7 +4092,10 @@ export default function ClusterTopologyView() {
    };
 
    const generatePGsForPool = (poolId: number): any[] => {
-      const pool = mockTopologyData.pools.find(p => p.id === poolId);
+      // Early return if no topology data
+      if (!transformedTopologyData) return [];
+
+      const pool = transformedTopologyData.pools.find(p => p.id === poolId);
       if (!pool) return [];
 
       // Use pre-generated PG data from the pool
@@ -3876,9 +4107,12 @@ export default function ClusterTopologyView() {
    };
 
    const generateRandomOSDSet = (): number[] => {
+      // Early return if no topology data
+      if (!transformedTopologyData) return [];
+
       // Group OSDs by host
       const osdsByHost: { [hostId: string]: number[] } = {};
-      mockTopologyData.osds.forEach(osd => {
+      transformedTopologyData.osds.forEach(osd => {
          if (!osdsByHost[osd.host]) {
             osdsByHost[osd.host] = [];
          }
@@ -3951,52 +4185,77 @@ export default function ClusterTopologyView() {
                   infoContent.innerHTML = `
                      <p>
                         <strong>PG ID:</strong> ${nodeData.id}<br/>
-                        <strong>Status:</strong> ${nodeData.status || 'active+clean'}<br/>
-                        <strong>Pool:</strong> ${nodeData.poolId || 'N/A'}<br/>
-                        <strong>Acting OSDs:</strong> ${nodeData.osds?.join(', ') || 'N/A'}<br/>
-                        <strong>Up OSDs:</strong> ${nodeData.up_osds?.join(', ') || nodeData.osds?.join(', ') || 'N/A'}<br/>
-                        <strong>State:</strong> ${nodeData.state || 'active'}<br/>
-                        <strong>Objects:</strong> ${nodeData.objects || Math.floor(Math.random() * 1000)}<br/>
-                        <strong>Bytes:</strong> ${nodeData.bytes || Math.floor(Math.random() * 1000000000)}<br/>
-                        <strong>Last Scrub:</strong> ${nodeData.last_scrub || new Date().toISOString()}<br/>
-                        <strong>Deep Scrub:</strong> ${nodeData.last_deep_scrub || new Date().toISOString()}
+                        <strong>State:</strong> ${nodeData.state || 'N/A'}<br/>
+                        <strong>Pool ID:</strong> ${nodeData.poolId || 'N/A'}<br/>
+                        <strong>Pool Name:</strong> ${nodeData.poolName || 'N/A'}<br/>
+                        <strong>Primary OSD:</strong> ${nodeData.primary !== undefined ? 'osd.' + nodeData.primary : 'N/A'}<br/>
+                        <strong>Acting OSDs:</strong> ${nodeData.acting?.map((id: number) => 'osd.' + id).join(', ') || 'N/A'}<br/>
+                        <strong>Objects:</strong> ${nodeData.objects?.toLocaleString() || 0}<br/>
+                        <strong>Bytes:</strong> ${nodeData.bytes ? formatBytes(nodeData.bytes) : 'N/A'}<br/>
+                        <strong>OSDs Count:</strong> ${nodeData.acting?.length || 0}
                      </p>
                   `;
                } else if (nodeType === 'OSD') {
+                  // Get detailed OSD data from nodeData.detail (stored by transformTopologyData)
+                  const osdDetail = nodeData.detail;
+
                   infoTitle.textContent = `OSD: ${nodeData.id}`;
                   infoContent.innerHTML = `
                      <p>
                         <strong>OSD ID:</strong> ${nodeData.id}<br/>
-                        <strong>Status:</strong> ${nodeData.status || 'up'}<br/>
+                        <strong>Status:</strong> ${osdDetail?.status?.state || nodeData.status || 'up'}<br/>
                         <strong>Health:</strong> ${nodeData.health || 'healthy'}<br/>
                         <strong>Host:</strong> ${nodeData.host || 'N/A'}<br/>
+                        <strong>PG Count:</strong> ${osdDetail?.num_pgs || 0}<br/>
                         <strong>Utilization:</strong> ${nodeData.utilization || 0}%<br/>
-                        <strong>Weight:</strong> ${nodeData.weight || 1.0}<br/>
-                        <strong>Capacity:</strong> ${nodeData.capacity || '1TB'}<br/>
-                        <strong>Used:</strong> ${nodeData.used || '650GB'}<br/>
-                        <strong>Available:</strong> ${nodeData.available || '350GB'}<br/>
-                        <strong>PGs:</strong> ${nodeData.pgs || Math.floor(Math.random() * 100)}<br/>
-                        <strong>Read IOPS:</strong> ${nodeData.read_iops || Math.floor(Math.random() * 1000)}<br/>
-                        <strong>Write IOPS:</strong> ${nodeData.write_iops || Math.floor(Math.random() * 1000)}<br/>
-                        <strong>Latency:</strong> ${nodeData.latency || Math.floor(Math.random() * 10)}ms
+                        <strong>Weight:</strong> ${osdDetail?.status?.weight?.toFixed(2) || '1.00'}<br/>
+                        <strong>Reweight:</strong> ${osdDetail?.status?.reweight?.toFixed(2) || '1.00'}<br/>
+                        <strong>Capacity:</strong> ${osdDetail?.capacity?.total_bytes ? formatBytes(osdDetail.capacity.total_bytes) : 'N/A'}<br/>
+                        <strong>Used:</strong> ${osdDetail?.capacity?.used_bytes ? formatBytes(osdDetail.capacity.used_bytes) : 'N/A'}<br/>
+                        <strong>Available:</strong> ${osdDetail?.capacity?.available_bytes ? formatBytes(osdDetail.capacity.available_bytes) : 'N/A'}<br/>
+                        <strong>Device:</strong> ${osdDetail?.device?.path || 'N/A'} (${osdDetail?.device?.type || 'N/A'})<br/>
+                        <strong>SMART Status:</strong> ${osdDetail?.smart?.health_status || 'N/A'}<br/>
+                        <strong>Temperature:</strong> ${osdDetail?.smart?.temperature_celsius ? osdDetail.smart.temperature_celsius + '°C' : 'N/A'}<br/>
+                        <strong>Public IP:</strong> ${osdDetail?.host_info?.publicIp || 'N/A'}<br/>
+                        <strong>Cluster IP:</strong> ${osdDetail?.host_info?.clusterIp || 'N/A'}<br/>
+                        <strong>Host Name:</strong> ${osdDetail?.host_info?.name || 'N/A'}
                      </p>
                   `;
                } else if (nodeType === 'Host') {
-                  infoTitle.textContent = `Host: ${nodeData.name || nodeData.id}`;
+                  // Get host detail from nodeData.hostData.detail
+                  const hostDetail = nodeData.hostData?.detail;
+                  console.log('##### nodeData=', nodeData);
+                  console.log('##### hostDetail=', hostDetail);
+
+                  infoTitle.textContent = `Host: ${hostDetail?.hostname || nodeData.name || nodeData.id}`;
                   infoContent.innerHTML = `
                      <p>
-                        <strong>Host Name:</strong> ${nodeData.name || nodeData.id}<br/>
-                        <strong>IP Address:</strong> ${nodeData.ip || '192.168.1.' + Math.floor(Math.random() * 255)}<br/>
-                        <strong>Status:</strong> ${nodeData.status || 'online'}<br/>
-                        <strong>OSDs:</strong> ${nodeData.osdCount || nodeData.osds?.length || Math.floor(Math.random() * 10)}<br/>
-                        <strong>Total Capacity:</strong> ${nodeData.totalCapacity || '10TB'}<br/>
-                        <strong>Used Capacity:</strong> ${nodeData.usedCapacity || '6.5TB'}<br/>
-                        <strong>Available:</strong> ${nodeData.availableCapacity || '3.5TB'}<br/>
-                        <strong>CPU Usage:</strong> ${nodeData.cpuUsage || Math.floor(Math.random() * 100)}%<br/>
-                        <strong>Memory Usage:</strong> ${nodeData.memoryUsage || Math.floor(Math.random() * 100)}%<br/>
-                        <strong>Network In:</strong> ${nodeData.network_in || Math.floor(Math.random() * 1000)}MB/s<br/>
-                        <strong>Network Out:</strong> ${nodeData.network_out || Math.floor(Math.random() * 1000)}MB/s<br/>
-                        <strong>Uptime:</strong> ${nodeData.uptime || Math.floor(Math.random() * 365)} days
+                        <strong>Hostname:</strong> ${hostDetail?.hostname || nodeData.name || nodeData.id}<br/>
+                        <strong>Address:</strong> ${hostDetail?.address || 'N/A'}<br/>
+                        <strong>Public IP:</strong> ${hostDetail?.publicAddr || 'N/A'}<br/>
+                        <strong>Cluster IP:</strong> ${hostDetail?.clusterAddr || 'N/A'}<br/>
+                        <strong>Status:</strong> ${hostDetail?.status || nodeData.status || 'online'}<br/>
+                        <strong>Labels:</strong> ${hostDetail?.labels?.join(', ') || 'None'}<br/>
+                        <br/>
+                        <strong>OSD Count:</strong> ${hostDetail?.osdIds?.length || nodeData.osds?.length || 0}<br/>
+                        <strong>OSD IDs:</strong> ${hostDetail?.osdIds?.map((id: number) => `osd.${id}`).join(', ') || nodeData.osds?.map((o: any) => `osd.${o.id}`).join(', ') || 'N/A'}<br/>
+                        <br/>
+                        <strong>Host Capacity:</strong> ${hostDetail?.hostCapacity ? formatBytes(hostDetail.hostCapacity) : 'N/A'}<br/>
+                        <strong>OSD Capacity:</strong> ${hostDetail?.totalCapacity ? formatBytes(hostDetail.totalCapacity) : formatBytes(nodeData.osds?.reduce((sum: number, osd: any) => sum + (osd.detail?.capacity?.total_bytes || 0), 0) || 0)}<br/>
+                        <strong>OSD Used:</strong> ${hostDetail?.usedCapacity ? formatBytes(hostDetail.usedCapacity) : formatBytes(nodeData.osds?.reduce((sum: number, osd: any) => sum + (osd.detail?.capacity?.used_bytes || 0), 0) || 0)}<br/>
+                        <strong>OSD Available:</strong> ${hostDetail?.availableCapacity ? formatBytes(hostDetail.availableCapacity) : formatBytes(nodeData.osds?.reduce((sum: number, osd: any) => sum + (osd.detail?.capacity?.available_bytes || 0), 0) || 0)}<br/>
+                        <strong>Utilization:</strong> ${hostDetail?.usedPercent ? hostDetail.usedPercent.toFixed(2) + '%' : 'N/A'}<br/>
+                        <br/>
+                        <strong>CPU:</strong> ${hostDetail?.cpuModel || 'N/A'}<br/>
+                        <strong>CPU Count:</strong> ${hostDetail?.cpuCount || 'N/A'}<br/>
+                        <strong>Core Count:</strong> ${hostDetail?.coreCount || 'N/A'}<br/>
+                        <strong>Memory:</strong> ${hostDetail?.memory ? formatBytes(hostDetail.memory) : 'N/A'}<br/>
+                        <strong>NIC Count:</strong> ${hostDetail?.nicCount || 'N/A'}<br/>
+                        <br/>
+                        <strong>Model:</strong> ${hostDetail?.model || 'N/A'}<br/>
+                        <strong>OS:</strong> ${hostDetail?.os || 'N/A'}<br/>
+                        <strong>Kernel:</strong> ${hostDetail?.kernel || 'N/A'}<br/>
+                        <strong>Ceph Version:</strong> ${hostDetail?.version || 'N/A'}
                      </p>
                   `;
                }
@@ -4055,8 +4314,11 @@ export default function ClusterTopologyView() {
                   updatePgSearchOption={updatePgSearchOption}
                   highlightNode={highlightNode}
                   toggleAllPanels={toggleAllPanels}
+                  topologyData={transformedTopologyData}
+                  loadingPGIds={loadingPGIds}
+                  isLoadingTopology={isLoadingTopology}
                />
-               <Environment files={'/3d/background/datacenter.jpg'} />
+               <Environment files="/3d/background/darkcenter.jpg" />
                {/* EffectComposer -> 성능을 고려하여 체감 비용 줄이기 : multisampling={0} resolutionScale={0.8} (80% 스케일 렌더링) */}
                <EffectComposer multisampling={0} resolutionScale={0.8}>
                   {/* mipmapBlur 키면 화면 깜빡임 생겨서 false 로 함 */}
@@ -4120,6 +4382,45 @@ export default function ClusterTopologyView() {
                               <path d="m10 10 2 2" stroke="currentColor" strokeWidth="1.5" />
                            </svg>
                         </button>
+                     </div>
+                     {/* Pool-PG Connection Lines Toggle */}
+                     <div style={{ marginTop: '12px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <input
+                           type="checkbox"
+                           id="pool-pg-lines-toggle"
+                           defaultChecked={showPoolPGLinesRef.current}
+                           onChange={e => {
+                              showPoolPGLinesRef.current = e.target.checked;
+                              // Update visibility of all pool-pg connection lines
+                              connectionLinesRef.current
+                                 .filter(line => line.userData?.type === 'pool-pg')
+                                 .forEach(line => {
+                                    // Always show selected PG's connection line
+                                    if (line.userData?.pgId === selectedPGIdRef.current) {
+                                       line.visible = true;
+                                    } else {
+                                       line.visible = showPoolPGLinesRef.current;
+                                    }
+                                 });
+                           }}
+                           style={{
+                              width: '16px',
+                              height: '16px',
+                              cursor: 'pointer',
+                              accentColor: '#00d2ff',
+                           }}
+                        />
+                        <label
+                           htmlFor="pool-pg-lines-toggle"
+                           style={{
+                              fontSize: '11px',
+                              color: 'rgba(0, 210, 255, 0.8)',
+                              cursor: 'pointer',
+                              userSelect: 'none',
+                           }}
+                        >
+                           Show Pool-PG Connections
+                        </label>
                      </div>
                   </div>
                </div>
@@ -4265,13 +4566,159 @@ export default function ClusterTopologyView() {
             <div className={'info-panel'} style={{ display: 'none' }}>
                <h3 id="info-title">{/* 동적 업데이트 내용 */}</h3>
                <div id="info-content" className={'info-content'}>
-                  {selectedObjectRef.current?.type === 'OSD' && (
-                     <p>
-                        Status: {selectedObjectRef.current.status}
-                        <br />
-                        Utilization: {selectedObjectRef.current.utilization}%<br />
-                        Host: {selectedObjectRef.current.host}
-                     </p>
+                  {selectedObjectRef.current?.type === 'OSD' && selectedObjectRef.current.detail && (
+                     <div className="space-y-2">
+                        <div className="info-section">
+                           <div className="font-semibold text-cyan-400">OSD {selectedObjectRef.current.detail.osd_id}</div>
+                           <div className="text-sm">Hostname: {selectedObjectRef.current.detail.hostname}</div>
+                        </div>
+
+                        <div className="info-section">
+                           <div className="font-semibold text-cyan-400">Status</div>
+                           <div className="text-sm">
+                              State:{' '}
+                              <span className={selectedObjectRef.current.detail.status.up ? 'text-green-400' : 'text-red-400'}>
+                                 {selectedObjectRef.current.detail.status.state}
+                              </span>
+                           </div>
+                           <div className="text-sm">Up: {selectedObjectRef.current.detail.status.up ? '✓' : '✗'}</div>
+                           <div className="text-sm">In: {selectedObjectRef.current.detail.status.in ? '✓' : '✗'}</div>
+                           <div className="text-sm">Weight: {selectedObjectRef.current.detail.status.weight.toFixed(2)}</div>
+                           <div className="text-sm">Reweight: {selectedObjectRef.current.detail.status.reweight.toFixed(2)}</div>
+                        </div>
+
+                        <div className="info-section">
+                           <div className="font-semibold text-cyan-400">Placement Groups</div>
+                           <div className="text-sm">PG Count: {selectedObjectRef.current.detail.num_pgs || 0}</div>
+                        </div>
+
+                        <div className="info-section">
+                           <div className="font-semibold text-cyan-400">Device</div>
+                           <div className="text-sm">Path: {selectedObjectRef.current.detail.device.path}</div>
+                           <div className="text-sm">Type: {selectedObjectRef.current.detail.device.type.toUpperCase()}</div>
+                        </div>
+
+                        <div className="info-section">
+                           <div className="font-semibold text-cyan-400">Capacity</div>
+                           <div className="text-sm">Total: {(selectedObjectRef.current.detail.capacity.total_bytes / 1024 / 1024 / 1024).toFixed(2)} GB</div>
+                           <div className="text-sm">Used: {(selectedObjectRef.current.detail.capacity.used_bytes / 1024 / 1024 / 1024).toFixed(2)} GB</div>
+                           <div className="text-sm">
+                              Available: {(selectedObjectRef.current.detail.capacity.available_bytes / 1024 / 1024 / 1024).toFixed(2)} GB
+                           </div>
+                           <div className="text-sm">
+                              Utilization:{' '}
+                              <span
+                                 className={
+                                    selectedObjectRef.current.detail.capacity.utilization_percent > 80
+                                       ? 'text-red-400'
+                                       : selectedObjectRef.current.detail.capacity.utilization_percent > 60
+                                         ? 'text-yellow-400'
+                                         : 'text-green-400'
+                                 }
+                              >
+                                 {selectedObjectRef.current.detail.capacity.utilization_percent.toFixed(2)}%
+                              </span>
+                           </div>
+                        </div>
+
+                        <div className="info-section">
+                           <div className="font-semibold text-cyan-400">SMART</div>
+                           <div className="text-sm">Health: {selectedObjectRef.current.detail.smart.health_status}</div>
+                           <div className="text-sm">Temperature: {selectedObjectRef.current.detail.smart.temperature_celsius}°C</div>
+                        </div>
+
+                        <div className="info-section">
+                           <div className="font-semibold text-cyan-400">Host Info</div>
+                           <div className="text-sm">Host Name: {selectedObjectRef.current.detail.host_info?.name || 'N/A'}</div>
+                           <div className="text-sm">Public IP: {selectedObjectRef.current.detail.host_info?.publicIp || 'N/A'}</div>
+                           <div className="text-sm">Cluster IP: {selectedObjectRef.current.detail.host_info?.clusterIp || 'N/A'}</div>
+                           <div className="text-sm">
+                              Host OSDs: {selectedObjectRef.current.detail.host_info?.osdIds?.map((id: number) => `osd.${id}`).join(', ') || 'N/A'}
+                           </div>
+                        </div>
+                     </div>
+                  )}
+
+                  {selectedObjectRef.current?.type === 'Host' && (
+                     <div className="space-y-2">
+                        <div className="info-section">
+                           <div className="font-semibold text-cyan-400">
+                              Host: {selectedObjectRef.current.detail?.hostname || selectedObjectRef.current.name}
+                           </div>
+                        </div>
+
+                        {selectedObjectRef.current.detail && (
+                           <>
+                              <div className="info-section">
+                                 <div className="font-semibold text-cyan-400">Network Information</div>
+                                 <div className="text-sm">Hostname: {selectedObjectRef.current.detail.hostname}</div>
+                                 <div className="text-sm">Address: {selectedObjectRef.current.detail.address}</div>
+                                 <div className="text-sm">Public IP: {selectedObjectRef.current.detail.publicAddr}</div>
+                                 <div className="text-sm">Cluster IP: {selectedObjectRef.current.detail.clusterAddr}</div>
+                                 <div className="text-sm">Status: {selectedObjectRef.current.detail.status || 'online'}</div>
+                                 <div className="text-sm">Labels: {selectedObjectRef.current.detail.labels?.join(', ') || 'None'}</div>
+                              </div>
+
+                              <div className="info-section">
+                                 <div className="font-semibold text-cyan-400">OSDs on this Host</div>
+                                 <div className="text-sm">Count: {selectedObjectRef.current.detail.osdIds?.length || 0}</div>
+                                 <div className="text-sm">
+                                    OSD IDs: {selectedObjectRef.current.detail.osdIds?.map((id: number) => `osd.${id}`).join(', ') || 'N/A'}
+                                 </div>
+                              </div>
+
+                              <div className="info-section">
+                                 <div className="font-semibold text-cyan-400">Capacity</div>
+                                 <div className="text-sm">
+                                    Host Capacity: {(selectedObjectRef.current.detail.hostCapacity / 1024 / 1024 / 1024).toFixed(2)} GB
+                                 </div>
+                                 <div className="text-sm">
+                                    Total Capacity: {(selectedObjectRef.current.detail.totalCapacity / 1024 / 1024 / 1024).toFixed(2)} GB
+                                 </div>
+                                 <div className="text-sm">Used: {(selectedObjectRef.current.detail.usedCapacity / 1024 / 1024 / 1024).toFixed(2)} GB</div>
+                                 <div className="text-sm">
+                                    Available: {(selectedObjectRef.current.detail.availableCapacity / 1024 / 1024 / 1024).toFixed(2)} GB
+                                 </div>
+                                 <div className="text-sm">
+                                    Utilization:{' '}
+                                    <span
+                                       className={
+                                          selectedObjectRef.current.detail.usedPercent > 80
+                                             ? 'text-red-400'
+                                             : selectedObjectRef.current.detail.usedPercent > 60
+                                               ? 'text-yellow-400'
+                                               : 'text-green-400'
+                                       }
+                                    >
+                                       {selectedObjectRef.current.detail.usedPercent.toFixed(2)}%
+                                    </span>
+                                 </div>
+                              </div>
+
+                              <div className="info-section">
+                                 <div className="font-semibold text-cyan-400">Hardware</div>
+                                 <div className="text-sm">CPU: {selectedObjectRef.current.detail.cpuModel}</div>
+                                 <div className="text-sm">CPU Count: {selectedObjectRef.current.detail.cpuCount}</div>
+                                 <div className="text-sm">Core Count: {selectedObjectRef.current.detail.coreCount}</div>
+                                 <div className="text-sm">
+                                    Memory:{' '}
+                                    {selectedObjectRef.current.detail.memory
+                                       ? (selectedObjectRef.current.detail.memory / 1024 / 1024).toFixed(2) + ' GB'
+                                       : 'N/A'}
+                                 </div>
+                                 <div className="text-sm">NIC Count: {selectedObjectRef.current.detail.nicCount}</div>
+                                 <div className="text-sm">Model: {selectedObjectRef.current.detail.model}</div>
+                              </div>
+
+                              <div className="info-section">
+                                 <div className="font-semibold text-cyan-400">System Information</div>
+                                 <div className="text-sm">OS: {selectedObjectRef.current.detail.os}</div>
+                                 <div className="text-sm">Kernel: {selectedObjectRef.current.detail.kernel}</div>
+                                 <div className="text-sm">Ceph Version: {selectedObjectRef.current.detail.version}</div>
+                              </div>
+                           </>
+                        )}
+                     </div>
                   )}
                </div>
                <button onClick={closeInfo} className={'close-btn'}>
@@ -4424,7 +4871,8 @@ export default function ClusterTopologyView() {
                   <div className={'spinner-ring'}></div>
                   <div className={'spinner-ring'}></div>
                   <div className={'spinner-ring'}></div>
-                  <div className={'spinner-text'}>Loading Textures...</div>
+                  <Image src={'/videos/loading_sphere.gif'} alt="loading" width={100} height={100} className="mx-auto mt-[64px]" />
+                  <div className={'spinner-text'}>{isLoadingTopology || !topologyData ? 'Loading Topology Data...' : 'Loading Textures...'}</div>
                </div>
             </div>
          </div>

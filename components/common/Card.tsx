@@ -29,7 +29,7 @@ export const Card = forwardRef<HTMLDivElement, ExtendedCardProps>(
       ref,
    ) => {
       const cardClasses = useMemo(() => {
-         const classes = ['ai-card neon-hover flex flex-col justify-between'];
+         const classes = ['ai-card neon-hover flex flex-col justify-between', 'print:bg-gray-200'];
 
          // 변형별 스타일 (배경은 인라인 스타일로 처리하므로 배경색 클래스 제거)
          switch (variant) {

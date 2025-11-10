@@ -35,6 +35,11 @@ export const ThroughputChart: React.FC<ThroughputChartProps> = ({ timeRange = '1
       const read: MetricValue[] = throughputData?.readThroughput || [];
       const write: MetricValue[] = throughputData?.writeThroughput || [];
 
+      // Calculate max value for y-axis
+      const allValues = [...read.map(d => d.value), ...write.map(d => d.value)];
+      const maxValue = Math.max(...allValues, 0);
+      const yAxisMax = maxValue > 0 ? undefined : 10 * 1024 * 1024; // 10 MB/s as default when all zeros
+
       // Create time labels for x-axis (show 5 time points)
       const timeLabels = read.map((d, index) => {
          if (index % Math.ceil(read.length / 5) === 0) {
@@ -110,6 +115,10 @@ export const ThroughputChart: React.FC<ThroughputChartProps> = ({ timeRange = '1
          },
          yAxis: {
             type: 'value',
+            scale: false,
+            min: 0,
+            max: yAxisMax,
+            minInterval: 1,
             axisLine: {
                show: false,
             },
@@ -135,6 +144,10 @@ export const ThroughputChart: React.FC<ThroughputChartProps> = ({ timeRange = '1
                type: 'bar',
                stack: 'throughput',
                data: read.map((d, index) => [index, d.value]),
+               showBackground: true,
+               backgroundStyle: {
+                  color: 'rgba(16, 185, 129, 0.05)',
+               },
                itemStyle: {
                   color: '#10B981',
                },
@@ -144,6 +157,10 @@ export const ThroughputChart: React.FC<ThroughputChartProps> = ({ timeRange = '1
                type: 'bar',
                stack: 'throughput',
                data: write.map((d, index) => [index, d.value]),
+               showBackground: true,
+               backgroundStyle: {
+                  color: 'rgba(245, 158, 11, 0.05)',
+               },
                itemStyle: {
                   color: '#F59E0B',
                },

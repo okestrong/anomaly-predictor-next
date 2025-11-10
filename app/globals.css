@@ -125,7 +125,7 @@
   --animate-page-flip: page-flip 0.6s cubic-bezier(0.645, 0.045, 0.355, 1);
   
   /* 커스텀 박스 섀도우 */
-  --shadow-ai-glow: 0 0 20px rgba(0, 210, 255, 0.3), 0 0 40px rgba(255, 0, 128, 0.2);
+  --shadow-ai-glow: 0 0 12px rgba(16, 185, 129, 0.3), 0 0 24px rgba(16, 185, 129, 0.15);
   --shadow-neural: 0 0 30px rgba(139, 92, 246, 0.4), inset 0 0 20px rgba(139, 92, 246, 0.1);
   --shadow-cyber: 0 4px 20px rgba(0, 255, 65, 0.2), 0 0 40px rgba(0, 255, 65, 0.1);
 }
@@ -272,6 +272,10 @@ body {
   overflow-x: hidden;
 }
 
+button {
+    cursor: pointer !important;
+}
+
 /* 커스텀 스크롤바 */
 ::-webkit-scrollbar {
   width: 8px;
@@ -321,16 +325,16 @@ body {
 }
 
 .neon-hover:hover {
-  box-shadow: 0 0 20px rgba(255, 0, 128, 0.4), 0 0 40px rgba(255, 0, 128, 0.2), 0 0 60px rgba(255, 0, 128, 0.1);
+  box-shadow: 0 0 12px rgba(16, 185, 129, 0.4), 0 0 24px rgba(16, 185, 129, 0.2), 0 0 36px rgba(16, 185, 129, 0.1);
 }
 
 .neon-always {
   transition: all 0.3s;
-  box-shadow: 0 0 20px rgba(255, 0, 128, 0.6), 0 0 40px rgba(255, 0, 128, 0.4), 0 0 60px rgba(255, 0, 128, 0.2);
+  box-shadow: 0 0 12px rgba(16, 185, 129, 0.5), 0 0 24px rgba(16, 185, 129, 0.3), 0 0 36px rgba(16, 185, 129, 0.15);
 }
 
 .neon-always:hover {
-  box-shadow: 0 0 30px rgba(255, 0, 128, 0.8), 0 0 60px rgba(255, 0, 128, 0.6), 0 0 90px rgba(255, 0, 128, 0.4);
+  box-shadow: 0 0 16px rgba(16, 185, 129, 0.6), 0 0 32px rgba(16, 185, 129, 0.4), 0 0 48px rgba(16, 185, 129, 0.2);
 }
 
 .neural-pulse {
@@ -440,4 +444,36 @@ body {
 
 .search-clear-btn:active {
   transform: scale(0.95);
+}
+
+/* Print styles for PDF generation */
+@media print {
+  /* Force page break before each section */
+  .page-break-before {
+    page-break-before: always !important;
+    break-before: page !important;
+  }
+
+  /* Force page break after each section */
+  .page-break-after {
+    page-break-after: always !important;
+    break-after: page !important;
+  }
+
+  /* Prevent page break inside */
+  .page-break-inside-avoid {
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
+  }
+
+  /* Ensure sections start on new page */
+  section.page-break-after {
+    page-break-after: always !important;
+    break-after: page !important;
+  }
+
+  section.page-break-before {
+    page-break-before: always !important;
+    break-before: page !important;
+  }
 }

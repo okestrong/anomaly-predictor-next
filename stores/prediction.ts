@@ -26,7 +26,7 @@ export interface Prediction {
   aiAnalysis?: string // AI-generated analysis summary from backend
   probability: number // 0-1
   severity: 'low' | 'medium' | 'high' | 'critical'
-  timeToImpact: number // hours
+  timeToImpact: string // formatted string like "3일", "2주", "6개월 이상"
   confidence: number // 0-1
   affectedComponents: string[]
   rootCauses: string[]
@@ -151,6 +151,22 @@ const predictionConfigs: Record<PredictionCategory, {
   }
 }
 
+// Helper function to format hours to Korean time format
+function formatTimeToImpact(hours: number): string {
+  if (hours <= 0) return 'Immediate';
+  if (hours < 24) return `${hours}시간`;
+  if (hours < 168) {
+    const days = Math.floor(hours / 24);
+    return `${days}일`;
+  }
+  if (hours < 720) {
+    const weeks = Math.floor(hours / 168);
+    return `${weeks}주`;
+  }
+  const months = Math.floor(hours / 720);
+  return `${months}개월`;
+}
+
 // Generate initial predictions
 function generateInitialPredictions(): Record<PredictionCategory, Prediction> {
   const predictions = {} as Record<PredictionCategory, Prediction>
@@ -173,7 +189,7 @@ function generateInitialPredictions(): Record<PredictionCategory, Prediction> {
         probability > 0.7 ? 'critical' :
         probability > 0.5 ? 'high' :
         probability > 0.3 ? 'medium' : 'low',
-      timeToImpact: Math.floor((1 - probability) * 168), // 0-168 hours (1 week)
+      timeToImpact: formatTimeToImpact(Math.floor((1 - probability) * 168)), // Convert hours to Korean format
       confidence,
       affectedComponents: generateAffectedComponents(category),
       rootCauses: generateRootCauses(category),
@@ -479,9 +495,13 @@ export const usePredictionStore = create<PredictionStore>()(
 
       getImminentFailures: () => {
         const predictions = Object.values(get().predictions)
+        // Filter for imminent failures (within hours or immediate)
         return predictions
-          .filter(p => p.timeToImpact <= 24 && p.probability > 0.3)
-          .sort((a, b) => a.timeToImpact - b.timeToImpact)
+          .filter(p =>
+            (p.timeToImpact.includes('시간') || p.timeToImpact === 'Immediate') &&
+            p.probability > 0.3
+          )
+          .sort((a, b) => b.probability - a.probability) // Sort by probability since timeToImpact is now a string
       },
 
       getOverallRiskScore: () => {
@@ -552,29 +572,14 @@ function convertRiskLevelToSeverity(riskLevel: string): 'low' | 'medium' | 'high
  * Parse backend predictedTimeToFailure string to hours
  * Examples: "3 days" -> 72, "2 weeks" -> 336, "1-2 months" -> 1080, "N/A" -> 168
  */
-function parseTimeToFailure(timeString: string): number {
-  if (!timeString || timeString === 'N/A' || timeString === '6+ months') {
-    return 168 * 6 // 6 months
+// Parse time to failure - now returns formatted string from backend
+function parseTimeToFailure(timeString: string): string {
+  // Backend already returns formatted Korean strings like "3일", "2주", "6개월 이상"
+  // Just return as-is, with fallback for empty/null
+  if (!timeString || timeString.trim() === '') {
+    return '알 수 없음'
   }
-
-  // Extract first number from string
-  const match = timeString.match(/(\d+)/)
-  if (!match) return 168 // Default to 1 week
-
-  const value = parseInt(match[1], 10)
-
-  // Check for unit
-  if (timeString.includes('day')) {
-    return value * 24
-  } else if (timeString.includes('week')) {
-    return value * 24 * 7
-  } else if (timeString.includes('month')) {
-    return value * 24 * 30
-  } else if (timeString.includes('hour') || timeString.includes('h')) {
-    return value
-  }
-
-  return value * 24 // Default to days
+  return timeString
 }
 
 // Auto-update predictions disabled to prevent card re-mounting animation

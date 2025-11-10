@@ -1,7 +1,7 @@
 # Anomaly Predictor Next - Product Requirements Document
 
 ## 프로젝트 개요 (Project Overview)
-- 이 프로젝트는 anomaly-predictor-view 프로젝트(/Users/jclee/Documents/Okestro/Projects/DevSw/anomaly-predictor-view) 를 만들 던 중, vue 의 비효율적인 문법에 실망하여 next.js 기반의 react 로 개발을 이어서 진행하고자 기존 프로젝트를 마이그레이션 한 프로젝트이다. 
+Ceph 클러스터의 AI (LLM) 기반 장애 예측 및 운영 최적화를 위한 직관적인 웹 대시보드 제공 
 
 ### 프로젝트 정보
 - **프로젝트명**: Anomaly Predictor Next
@@ -21,7 +21,7 @@ Vue 3 기반 원본 프로젝트에서 Next.js 15로의 마이그레이션이 **
 #### 1. predictor-api (백엔드)
 - Spring Boot 3.5.4 + Java 21 + H2 database
 - WebSocket STOMP 실시간 데이터 스트리밍
-- vLLM (https://vllm.hotk.co.kr) 통한 LLM 기능 (openai/gpt-oss-20b 모델)
+- vLLM (https://vllm.hotk.co.kr) 연동을 통한 LLM 기능 (openai/gpt-oss-20b 모델)
 - 위치: /Users/jclee/Documents/Okestro/Projects/DevSw/anomaly-predictor-api
 
 #### 2. predictor (데이터 수집)

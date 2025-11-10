@@ -96,6 +96,9 @@ export const IopsChart: React.FC<IopsChartProps> = ({ timeRange = '1h', autoRefr
          },
          yAxis: {
             type: 'value',
+            scale: false,
+            min: 0,
+            minInterval: 1,
             axisLine: {
                show: false,
             },

@@ -10,7 +10,7 @@ const ReportLoading: FC<Props> = ({ title, desc }) => {
       // <div className="flex items-center justify-center min-h-screen bg-gradient-to-br from-secondary-900 via-ai-neural to-secondary-800">
       <div className="flex items-center justify-center min-h-screen bg-black">
          <div className="text-center">
-            <video className="mx-auto mb-4" autoPlay loop muted playsInline>
+            <video className="w-[640px] aspect-video mx-auto mb-4" autoPlay loop muted playsInline>
                <source src="/videos/loading_cyber.mp4" type="video/mp4" />
             </video>
             <p className="text-lg text-white">{title}</p>

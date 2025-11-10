@@ -9,6 +9,7 @@ import * as THREE from 'three';
 import { ClusterTopologyAPI, ClusterTopologyData } from '@/lib/api/dashboardApi';
 import { formatBytes } from '@/lib/formatUtils';
 import Colors from '@/utils/color';
+import { FuturisticSpinner } from '@/components/common';
 
 // Types
 interface OSDData {
@@ -63,8 +64,8 @@ const getHealthColor = (health: string): number => {
 };
 
 const getUsageColor = (usage: number): number => {
-   if (usage < 60) return 0x2563eb;
-   if (usage < 80) return 0xea580c;
+   if (usage < 60) return 0x3b82f6;
+   if (usage < 80) return 0xf97316;
    return 0xef4444;
 };
 
@@ -718,13 +719,9 @@ const CephClusterVisualization: React.FC = () => {
       >
          {/* 2D Loading Spinner */}
          {isLoading ? (
-            <div className="loading-spinner-container">
-               <div className="loading-spinner">
-                  <div className="spinner-ring"></div>
-                  <div className="spinner-ring"></div>
-                  <div className="spinner-ring"></div>
-                  <div className="spinner-text">Loading Cluster Data...</div>
-               </div>
+            <div className="absolute inset-0 flex flex-col items-center justify-center bg-transparent">
+               <FuturisticSpinner size="lg" />
+               <p className="mt-6 text-lg text-gray-300 font-medium">Loading Cluster Data...</p>
             </div>
          ) : (
             /* Three.js Canvas - Only mount after loading and delay */

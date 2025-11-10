@@ -82,6 +82,9 @@ export const LatencyChart: React.FC<LatencyChartProps> = ({ timeRange = '1h', au
          },
          yAxis: {
             type: 'value',
+            scale: false,
+            min: 0,
+            minInterval: 0.1,
             axisLine: {
                show: false,
             },

@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { usePredictionStore } from '@/stores/prediction';
 import { useAnomalyStore } from '@/stores/anomaly';
@@ -11,22 +11,27 @@ import RiskMeter from './RiskMeter';
 import PredictionCard from './PredictionCard';
 
 export default function PredictionDashboard() {
-   const { predictions, isUpdating, updateAllPredictions, getHighRiskPredictions, getImminentFailures, getOverallRiskScore, getImminentFailuresCount } = usePredictionStore();
+   const { predictions, isUpdating, updateAllPredictions, getHighRiskPredictions, getImminentFailures, getOverallRiskScore, getImminentFailuresCount } =
+      usePredictionStore();
 
    const { aiStatus, anomalyScore } = useAnomalyStore();
 
    const [selectedCategory, setSelectedCategory] = useState<string>('all');
    const [autoRefresh, setAutoRefresh] = useState(true);
    const [mounted, setMounted] = useState(false);
+   const isInitialMount = useRef(true);
 
    useEffect(() => {
       // Set mounted to avoid hydration mismatch
       setMounted(true);
 
-      // Initial prediction update
-      updateAllPredictions();
+      // Initial prediction update only on first mount
+      if (isInitialMount.current) {
+         updateAllPredictions();
+         isInitialMount.current = false;
+      }
 
-      // Auto-refresh every 30 seconds if enabled
+      // Auto-refresh every 5 minutes if enabled
       const interval = autoRefresh
          ? setInterval(() => {
               updateAllPredictions();
@@ -45,7 +50,9 @@ export default function PredictionDashboard() {
    const overallRisk = mounted ? getOverallRiskScore() : 0;
 
    const filteredPredictions = mounted
-      ? (selectedCategory === 'all' ? Object.values(predictions) : Object.values(predictions).filter(p => p.severity === selectedCategory))
+      ? selectedCategory === 'all'
+         ? Object.values(predictions)
+         : Object.values(predictions).filter(p => p.severity === selectedCategory)
       : [];
 
    return (
@@ -56,24 +63,16 @@ export default function PredictionDashboard() {
          <div className="max-w-[1800px] mx-auto mb-8 relative z-10">
             <div className="flex items-center justify-between mb-6">
                <div>
-                  <h1 className="text-3xl font-bold text-white mb-2">AI Failure Prediction</h1>
-                  <p className="text-gray-400">ML-powered predictive analytics for proactive cluster management</p>
+                  <h1 className="text-3xl font-bold text-white mb-2 flex items-baseline">
+                     Predictive Risk Analysis
+                     <span className="text-xl text-slate-300 ml-2">
+                        by <span className="text-white">RAG</span>
+                     </span>
+                  </h1>
+                  <p className="text-gray-400">RAG-powered predictive analytics for proactive cluster management</p>
                </div>
 
                <div className="flex items-center space-x-4">
-                  {/* AI Status Indicator */}
-                  <div className="flex items-center space-x-2 px-4 py-2 bg-black/30 rounded-lg border border-ai-circuit/20">
-                     <div
-                        className={cn('w-2 h-2 rounded-full', {
-                           'bg-green-400 animate-pulse': aiStatus === 'analyzing',
-                           'bg-blue-400': aiStatus === 'idle',
-                           'bg-yellow-400 animate-pulse': aiStatus === 'learning',
-                           'bg-purple-400 animate-pulse': aiStatus === 'predicting',
-                        })}
-                     />
-                     <span className="text-sm text-ai-circuit font-medium">AI {aiStatus.charAt(0).toUpperCase() + aiStatus.slice(1)}</span>
-                  </div>
-
                   {/* Auto-refresh toggle */}
                   <button
                      onClick={() => setAutoRefresh(!autoRefresh)}
@@ -91,6 +90,10 @@ export default function PredictionDashboard() {
             <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
                {/* Overall Risk */}
                <div className="bg-black/30 backdrop-blur-sm rounded-xl border border-white/10 p-6">
+                  <div className="flex items-center justify-between mb-4">
+                     <SparklesIcon className="w-5 h-5 text-purple-400" />
+                     <span className="text-xs text-gray-400">Live</span>
+                  </div>
                   <RiskMeter score={overallRisk} />
                </div>
 

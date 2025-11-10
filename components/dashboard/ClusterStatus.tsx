@@ -243,9 +243,9 @@ export default function ClusterStatus() {
                <div className="text-center">
                   <div className="relative inline-flex items-center justify-center">
                      <div className={`w-24 h-24 rounded-full flex items-center justify-center text-white font-bold text-lg neural-pulse ${overallHealthBg}`}>
-                        {overallHealthPercentage}%
+                        <span className="z-20">{overallHealthPercentage}%</span>
                         <div
-                           className={`absolute inset-0 w-24 h-24 rounded-full border-4 ${overallHealthBorder}`}
+                           className={`z-10 absolute inset-0 w-24 h-24 rounded-full border-4 ${overallHealthBorder}`}
                            style={{
                               background: `conic-gradient(${overallHealthColor} ${overallHealthPercentage * 3.6}deg, transparent 0deg)`,
                            }}
