@@ -101,7 +101,7 @@ export default function PredictionSection({ predictions }: PredictionSectionProp
                                  </span>
                               </div>
                            </div>
-                           <div className={`flex items-center space-x-1 text-sm font-medium ${getTrendColor(prediction.trend)}`}>
+                           <div className={`flex items-center space-x-1 text-gray-200 text-sm font-medium ${getTrendColor(prediction.trend)}`}>
                               <span>{getTrendIcon(prediction.trend)}</span>
                               <span className="capitalize">{prediction.trend}</span>
                            </div>

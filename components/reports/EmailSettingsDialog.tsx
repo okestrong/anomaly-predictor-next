@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, Mail, Plus, Trash2, Send, CheckCircle, AlertCircle } from 'lucide-react';
 import { useEmailRecipientsStore } from '@/stores/emailRecipients';
@@ -15,13 +15,20 @@ interface EmailSettingsDialogProps {
  * Manages email recipients for automated daily reports
  */
 export default function EmailSettingsDialog({ isOpen, onClose }: EmailSettingsDialogProps) {
-   const { emails, addEmail, removeEmail } = useEmailRecipientsStore();
+   const { emails, loadEmails, addEmail, removeEmail, isLoading } = useEmailRecipientsStore();
    const [newEmail, setNewEmail] = useState('');
    const [error, setError] = useState<string | null>(null);
    const [success, setSuccess] = useState<string | null>(null);
    const [hoveredEmail, setHoveredEmail] = useState<string | null>(null);
 
-   const handleAddEmail = () => {
+   // Load emails from backend when dialog opens
+   useEffect(() => {
+      if (isOpen) {
+         loadEmails();
+      }
+   }, [isOpen, loadEmails]);
+
+   const handleAddEmail = async () => {
       setError(null);
       setSuccess(null);
 
@@ -31,7 +38,7 @@ export default function EmailSettingsDialog({ isOpen, onClose }: EmailSettingsDi
       }
 
       try {
-         addEmail(newEmail);
+         await addEmail(newEmail);
          setSuccess(`Added ${newEmail} successfully!`);
          setNewEmail('');
 
@@ -42,9 +49,9 @@ export default function EmailSettingsDialog({ isOpen, onClose }: EmailSettingsDi
       }
    };
 
-   const handleRemoveEmail = (email: string) => {
+   const handleRemoveEmail = async (email: string) => {
       try {
-         removeEmail(email);
+         await removeEmail(email);
          setSuccess(`Removed ${email}`);
          setTimeout(() => setSuccess(null), 2000);
       } catch (err: any) {
@@ -164,13 +171,21 @@ export default function EmailSettingsDialog({ isOpen, onClose }: EmailSettingsDi
                                  maxLength={100}
                               />
                               <motion.button
-                                 whileHover={{ scale: 1.05 }}
-                                 whileTap={{ scale: 0.95 }}
+                                 whileHover={{ scale: isLoading ? 1 : 1.05 }}
+                                 whileTap={{ scale: isLoading ? 1 : 0.95 }}
                                  onClick={handleAddEmail}
-                                 className="px-6 py-3 bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-600 hover:to-blue-700 text-white rounded-xl font-medium shadow-lg shadow-cyan-500/30 hover:shadow-cyan-500/50 transition-all flex items-center space-x-2 cursor-pointer"
+                                 disabled={isLoading}
+                                 className="px-6 py-3 bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-600 hover:to-blue-700 text-white rounded-xl font-medium shadow-lg shadow-cyan-500/30 hover:shadow-cyan-500/50 transition-all flex items-center space-x-2 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
                               >
-                                 <Plus className="w-5 h-5" />
-                                 <span>Add</span>
+                                 {isLoading ? (
+                                    <svg className="animate-spin h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                       <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                       <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                    </svg>
+                                 ) : (
+                                    <Plus className="w-5 h-5" />
+                                 )}
+                                 <span>{isLoading ? 'Adding...' : 'Add'}</span>
                               </motion.button>
                            </div>
                            <p className="text-xs text-gray-500 mt-1">Maximum 100 characters per email address</p>
@@ -228,10 +243,11 @@ export default function EmailSettingsDialog({ isOpen, onClose }: EmailSettingsDi
                                           </div>
 
                                           <motion.button
-                                             whileHover={{ scale: 1.1 }}
-                                             whileTap={{ scale: 0.9 }}
+                                             whileHover={{ scale: isLoading ? 1 : 1.1 }}
+                                             whileTap={{ scale: isLoading ? 1 : 0.9 }}
                                              onClick={() => handleRemoveEmail(email)}
-                                             className="w-9 h-9 rounded-lg bg-red-500/10 hover:bg-red-500/20 border border-red-500/30 hover:border-red-500/50 flex items-center justify-center transition-all opacity-0 group-hover:opacity-100 cursor-pointer"
+                                             disabled={isLoading}
+                                             className="w-9 h-9 rounded-lg bg-red-500/10 hover:bg-red-500/20 border border-red-500/30 hover:border-red-500/50 flex items-center justify-center transition-all opacity-0 group-hover:opacity-100 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
                                           >
                                              <Trash2 className="w-4 h-4 text-red-400" />
                                           </motion.button>

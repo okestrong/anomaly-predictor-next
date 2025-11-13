@@ -79,8 +79,8 @@ export default function RiskPanel() {
          title: risk.title,
          description: risk.description,
          severity: risk.level as 'critical' | 'high' | 'medium' | 'low',
-         impact: risk.level === 'critical' ? 90 : risk.level === 'high' ? 70 : risk.level === 'medium' ? 50 : 30,
-         eta: 'Unknown',
+         impact: risk.impact ?? (risk.level === 'critical' ? 90 : risk.level === 'high' ? 70 : risk.level === 'medium' ? 50 : 30),
+         eta: risk.eta ?? 'Unknown',
          icon: getRiskIcon(risk.category),
       })) ||
       [];

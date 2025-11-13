@@ -81,13 +81,13 @@ export const Card = forwardRef<HTMLDivElement, ExtendedCardProps>(
             // variant별 기본 배경색 설정
             switch (variant) {
                case 'ai':
-                  defaultStyle.background = 'linear-gradient(135deg, rgba(139, 92, 246, 0.4) 0%, rgba(59, 130, 246, 0.1) 100%)';
+                  defaultStyle.background = 'linear-gradient(135deg, rgba(139, 92, 246, 0.2) 0%, rgba(59, 130, 246, 0.1) 100%)';
                   break;
                case 'neural':
                   defaultStyle.backgroundColor = 'rgba(31, 41, 55, 0.8)';
                   break;
                case 'cyber':
-                  defaultStyle.background = 'linear-gradient(90deg, rgba(139, 92, 246, 0.2) 0%, rgba(59, 130, 246, 0.1) 100%)';
+                  defaultStyle.background = 'linear-gradient(90deg, rgba(139, 92, 246, 0.1) 0%, rgba(59, 130, 246, 0.1) 100%)';
                   break;
                case 'glass':
                   defaultStyle.backgroundColor = 'rgba(31, 41, 55, 0.6)';

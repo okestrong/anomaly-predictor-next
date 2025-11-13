@@ -1091,6 +1091,7 @@ const ClusterTopologyScene = ({
          // Get pool detail from poolData.detail
          const poolDetail = poolData.detail;
          const poolInfo = poolDetail?.pool_info;
+         const poolState = calculatePoolState(poolDetail);
 
          if (infoPanelElement && infoTitle && infoContent) {
             infoTitle.textContent = `Pool: ${poolData.name}`;
@@ -1098,7 +1099,7 @@ const ClusterTopologyScene = ({
                <p>
                   <strong>Pool Name:</strong> ${poolData.name}<br/>
                   <strong>Pool ID:</strong> ${poolData.id}<br/>
-                  <strong>Health:</strong> ${poolData.health || 'healthy'}<br/>
+                  <strong>Health:</strong> ${poolState.status || 'N/A'}<br/>
                   <strong>Type:</strong> ${poolInfo?.type || 'N/A'}<br/>
                   <strong>Size:</strong> ${poolInfo?.size || 'N/A'}<br/>
                   <strong>Min Size:</strong> ${poolInfo?.min_size || 'N/A'}<br/>
@@ -1347,7 +1348,7 @@ const ClusterTopologyScene = ({
          {/*<pointLight args={['#ffffff', 50, 50, 1]} position={[0, -33, -13]} />*/}
          {/*<pointLight args={['#ffffff', 50, 50, 1]} position={[13, -33, 0]} />*/}
          {/*<pointLight args={['#ffffff', 50, 50, 1]} position={[-13, -33, 0]} />*/}
-         <Bubble position={[0, -35, 0]} scale={3} color={Colors.slate[100]} useBubble />
+         <Bubble position={[0, -35, 0]} scale={3} color={Colors.gray[100]} useBubble />
          <TextSphere ref={textSphereRef} position={[0, -36, 0]} scale={4} text="OKESTRO  OKESTRO" bgColor={Colors.white} textColor={Colors.blue[600]} />
          {/*Portal 상단 조명*/}
          {/*<rectAreaLight args={['#ffffff', 3, 30, 20]} position={[0, -45, 0]} rotation-x={Math.PI / 2} />*/}
@@ -1853,6 +1854,19 @@ export default function ClusterTopologyView() {
          });
       }
    }, []); // 의존성 제거 (useRef는 리렌더링 트리거 안함)
+
+   // Ctrl + F9 키로 패널 토글
+   useEffect(() => {
+      const handleKeyDown = (event: KeyboardEvent) => {
+         if (event.ctrlKey && (event.key === 'F9' || event.keyCode === 120)) {
+            event.preventDefault();
+            toggleAllPanels();
+         }
+      };
+
+      window.addEventListener('keydown', handleKeyDown);
+      return () => window.removeEventListener('keydown', handleKeyDown);
+   }, [toggleAllPanels]);
 
    const getSearchPlaceholder = () => {
       switch (searchTypeRef.current) {

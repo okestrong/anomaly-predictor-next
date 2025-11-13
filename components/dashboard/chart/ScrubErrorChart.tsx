@@ -201,7 +201,7 @@ export const ScrubErrorChart: React.FC<ScrubErrorChartProps> = ({
 
   return (
     <BaseChart
-      title="Scrub Errors"
+      title="PG Scrub Activities"
       icon={ShieldExclamationIcon}
       option={{}}
       height={240}

@@ -195,7 +195,7 @@ export interface PoolData {
 }
 
 // Cluster info
-export interface ClusterInfo {
+export interface TopologyClusterInfo {
    cluster_name: string;
    fsid: string;
    health: string;
@@ -247,7 +247,7 @@ export interface HostDetail {
 export interface TopologyResponse {
    success: boolean;
    timestamp: string;
-   cluster_info: ClusterInfo;
+   cluster_info: TopologyClusterInfo;
    data: PoolData[];
    total_osds: OSDDetail[];
    hosts: HostDetail[];

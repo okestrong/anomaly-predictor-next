@@ -117,6 +117,7 @@ export default function Bubble({
          //    setTargetScale(1);
          //    setHovered(false);
          // }}
+         renderOrder={0}
          castShadow
          receiveShadow
       >
@@ -125,8 +126,10 @@ export default function Bubble({
            원본은 MeshStandardMaterial + emissive/metalness/roughness 조합.
            여기서는 lamina LayerMaterial을 사용하여 물리 조명/전달감을 주고,
            Displace로 노이즈 기반 변형을 수행합니다.
+           👍 내부 글자를 더 선명하게 -> roughness 를 낮추면 된다.
+           👍 thickness 도 낮을수록 내부가 더 선명해지기는 하지만, 내부의 공이 함게 일그러지는 느낌이 사라짐. (높을수록 내부의 공이 Bubble 의 꾸물거림에 맞춰서 더 많이 일그러짐)
          */}
-         <LayerMaterial color={color} lighting={'physical'} transmission={1} roughness={0.15} thickness={2} metalness={0.21}>
+         <LayerMaterial color={color} lighting={'physical'} transmission={1} roughness={0.1} thickness={1.5} metalness={0.21}>
             <Displace ref={displaceRef} strength={1.8} scale={0.25} />
          </LayerMaterial>
       </mesh>

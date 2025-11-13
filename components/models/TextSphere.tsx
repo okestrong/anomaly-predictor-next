@@ -29,9 +29,17 @@ const TextSphere = forwardRef<
    });
 
    return (
-      <mesh ref={ref ?? meshRef} scale={scale} position={position} rotation={rotation ?? [0, Math.PI, 0 /* seam(경도 0) 뒤로 */]} {...rest}>
+      <mesh ref={ref ?? meshRef} scale={scale} position={position} rotation={rotation ?? [0, Math.PI, 0 /* seam(경도 0) 뒤로 */]} renderOrder={1} {...rest}>
          <sphereGeometry args={[2, 128, 128]} />
-         <meshStandardMaterial map={map} metalness={0.2} roughness={0.8} color={bgColor} />
+         <meshStandardMaterial
+            map={map}
+            metalness={0.2}
+            roughness={0.8}
+            color={bgColor}
+            emissive={textColor}
+            emissiveIntensity={0.8}
+            emissiveMap={map}
+         />
          {!!children && children}
       </mesh>
    );

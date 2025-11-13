@@ -276,6 +276,10 @@ button {
     cursor: pointer !important;
 }
 
+#devtools-indicator {
+   display: none !important;
+}
+
 /* 커스텀 스크롤바 */
 ::-webkit-scrollbar {
   width: 8px;

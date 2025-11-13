@@ -176,7 +176,7 @@ export interface AIInsights {
    predictions: PredictiveAnalytics[];
    recommendations: OptimizationRecommendation[];
    ragGuidance?: RAGGuidance;
-   highRiskSummary?: string;  // LLM-generated summary of high risk predictions
+   highRiskSummary?: string; // LLM-generated summary of high risk predictions
 }
 
 export interface AIModelInfo {
@@ -389,6 +389,7 @@ export interface ReportData {
 
    // Predictions Report specific fields
    clusterSummary?: ClusterSummary;
+   clusterInfo?: ClusterInfo;
    predictionsSummary?: PredictionsSummary;
    predictions?: PredictionDetail[];
    recommendedActions?: RecommendedAction[];
@@ -841,6 +842,21 @@ export interface ClusterSummary {
    upOsds: number;
    totalCapacity: number;
    usedCapacity: number;
+}
+
+export interface ClusterInfo {
+   health?: string;
+   activeAlerts?: number;
+   fsid?: string; // Cluster unique ID
+   version?: string; // Ceph version
+   hostCount?: number;
+   monCount?: number; // MON count
+   osdCount?: number; // OSD count
+   mgrCount?: number; // MGR count
+   poolCount?: number; // Pool count
+   uptime?: string; // Cluster uptime
+   publicNetwork?: string; // Public network CIDR
+   clusterNetwork?: string; // Cluster network CIDR
 }
 
 export interface PredictionsSummary {

@@ -7,6 +7,7 @@ import '@fontsource/orbitron/600.css';
 import '@fontsource/orbitron/700.css';
 import '@fontsource/orbitron/800.css';
 import '@fontsource/orbitron/900.css';
+import 'simplebar-react/dist/simplebar.min.css';
 import { ReactNode } from 'react';
 import { WebSocketProvider } from '@/providers/WebSocketProvider';
 import { TopologyProvider } from '@/providers/TopologyProvider';

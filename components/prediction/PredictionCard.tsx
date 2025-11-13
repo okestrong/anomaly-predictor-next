@@ -12,10 +12,10 @@ import parse from 'html-react-parser';
 
 // Cyberpunk-style gradient backgrounds for cards
 const gradientStyles = {
-   critical: 'bg-gradient-to-br from-red-900/20 via-red-800/10 to-orange-900/5 border-red-500/30',
-   high: 'bg-gradient-to-br from-orange-900/20 via-amber-800/10 to-yellow-900/5 border-orange-500/30',
-   medium: 'bg-gradient-to-br from-blue-900/20 via-cyan-800/10 to-teal-900/5 border-blue-500/30',
-   low: 'bg-gradient-to-br from-green-900/20 via-emerald-800/10 to-lime-900/5 border-green-500/30',
+   critical: 'bg-gradient-to-br from-red-700/20 via-red-600/10 to-orange-700/5 border-red-200/30',
+   high: 'bg-gradient-to-br from-orange-700/20 via-amber-600/10 to-yellow-700/5 border-orange-200/30',
+   medium: 'bg-gradient-to-br from-blue-700/20 via-cyan-600/10 to-teal-700/5 border-blue-300/30',
+   low: 'bg-gradient-to-br from-green-700/20 via-emerald-600/10 to-lime-700/5 border-green-200/30',
 };
 
 const severityColors = {
@@ -173,25 +173,25 @@ export default function PredictionCard({ prediction }: PredictionCardProps) {
                      </div>
 
                      <motion.article
-                        className="prose prose-gray max-w-none dark:prose-invert text-xs leading-relaxed !text-gray-100 pl-3 border-l-2 border-cyan-500/30 h-[220px] overflow-y-auto"
+                        className="prose prose-gray max-w-none dark:prose-invert text-xs leading-relaxed !text-gray-100 pl-3 border-l-2 border-cyan-500/30 h-[220px] overflow-y-auto whitespace-pre-wrap break-words"
                         initial={{ opacity: 0 }}
                         animate={{ opacity: 1 }}
                         transition={{ delay: 0.4 }}
                      >
-                        <Markdown
-                           remarkPlugins={[remarkGfm]}
-                           components={{
-                              h1: props => <h1 className="text-2xl font-bold" {...props} />,
-                              h2: props => <h2 className="text-2xl font-medium" {...props} />,
-                              h3: props => <h3 className="text-xl font-semibold" {...props} />,
-                              table: props => <table className="w-full border-collapse border border-gray-300" {...props} />,
-                              thead: props => <thead className="bg-gray-50" {...props} />,
-                              th: props => <th className="border border-gray-300 px-3 py-2 text-left bg-neutral-400 text-black" {...props} />,
-                              td: props => <td className="border border-gray-300 px-3 py-2 align-top" {...props} />,
-                           }}
-                        >
-                           {prediction.aiAnalysis}
-                        </Markdown>
+                        {/*<Markdown*/}
+                        {/*   remarkPlugins={[remarkGfm]}*/}
+                        {/*   components={{*/}
+                        {/*      h1: props => <h1 className="text-2xl font-bold" {...props} />,*/}
+                        {/*      h2: props => <h2 className="text-2xl font-medium" {...props} />,*/}
+                        {/*      h3: props => <h3 className="text-xl font-semibold" {...props} />,*/}
+                        {/*      table: props => <table className="w-full border-collapse border border-gray-300" {...props} />,*/}
+                        {/*      thead: props => <thead className="bg-gray-50" {...props} />,*/}
+                        {/*      th: props => <th className="border border-gray-300 px-3 py-2 text-left bg-neutral-400 text-black" {...props} />,*/}
+                        {/*      td: props => <td className="border border-gray-300 px-3 py-2 align-top" {...props} />,*/}
+                        {/*   }}*/}
+                        {/*>*/}
+                        {prediction.aiAnalysis.replace(/\\n/, '\n')}
+                        {/*</Markdown>*/}
                      </motion.article>
 
                      {/* Data stream effect */}

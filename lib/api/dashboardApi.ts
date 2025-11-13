@@ -74,6 +74,8 @@ export interface RiskItem {
    title: string;
    description: string;
    timestamp: number;
+   eta: string; // e.g., "2 hours", "3 days"
+   impact: number; // 0-100, calculated by LLM
 }
 
 export interface RiskFactor {

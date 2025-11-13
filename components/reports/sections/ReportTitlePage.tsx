@@ -13,6 +13,19 @@ interface HighRiskPrediction {
    timeToImpact: string;
 }
 
+interface ClusterInfo {
+   clusterId?: string; // fsid from backend
+   cephVersion?: string; // from backend
+   hostCount?: number; // from backend
+   monCount?: number; // from backend
+   osdCount?: number; // from backend
+   mgrCount?: number; // from backend
+   poolCount?: number; // from backend
+   uptime?: string; // from backend
+   publicNetwork?: string; // from backend
+   clusterNetwork?: string; // from backend
+}
+
 interface ReportTitlePageProps {
    reportTitle: string;
    generatedAt: string;
@@ -29,8 +42,9 @@ interface ReportTitlePageProps {
       totalCapacity: number;
       usedCapacity: number;
    };
+   clusterInfo?: ClusterInfo; // Optional cluster information from backend
    highRiskPredictions: HighRiskPrediction[];
-   highRiskSummary?: string;  // LLM-generated summary
+   highRiskSummary?: string; // LLM-generated summary
 }
 
 const getHealthColor = (health: string) => {
@@ -70,10 +84,16 @@ export default function ReportTitlePage({
    generatedAt,
    timeRange,
    clusterSummary,
+   clusterInfo,
    highRiskPredictions,
    highRiskSummary,
 }: ReportTitlePageProps) {
    const healthColors = getHealthColor(clusterSummary.health);
+
+   // Mock data for cluster name, site, and environment
+   const clusterName = 'Production Cluster 01';
+   const site = 'Seoul DC1';
+   const environment = 'Production';
 
    return (
       <div className="min-h-screen flex flex-col justify-between p-12 print:text-black page-break-after">
@@ -84,45 +104,97 @@ export default function ReportTitlePage({
                <p className="text-xl text-gray-600 print:text-gray-700">Ceph Cluster Analysis & Prediction Report</p>
             </div>
 
-            {/* Report Metadata */}
-            <div className="mb-12 grid grid-cols-2 gap-6">
+            {/* Report Metadata - 4:6 ratio */}
+            <div className="mb-6 grid grid-cols-[40%_60%] gap-6">
                <div>
                   <div className="text-sm font-medium text-gray-600 mb-1 print:text-gray-700">Generated At</div>
-                  <div className="text-lg font-semibold text-gray-900 print:text-black">
-                     {dayjs(generatedAt).format('YYYY-MM-DD HH:mm:ss')}
-                  </div>
+                  <div className="text-lg font-semibold text-gray-900 print:text-black">{dayjs(generatedAt).format('YYYY-MM-DD HH:mm:ss')}</div>
                </div>
                <div>
                   <div className="text-sm font-medium text-gray-600 mb-1 print:text-gray-700">Analysis Period</div>
                   <div className="text-lg font-semibold text-gray-900 print:text-black">
-                     {dayjs(timeRange.start).format('YYYY-MM-DD HH:mm')} ~{' '}
-                     {dayjs(timeRange.end).format('YYYY-MM-DD HH:mm')}
+                     {dayjs(timeRange.start).format('YYYY-MM-DD HH:mm')} ~ {dayjs(timeRange.end).format('YYYY-MM-DD HH:mm')}
                   </div>
                </div>
             </div>
 
+            {/* Cluster Information */}
+            <Card variant="glass" className="p-6 mb-8 print:border-2 print:border-cyan-300 print:bg-cyan-50">
+               <h3 className="text-lg font-bold text-gray-900 mb-4 print:text-black">Cluster Information</h3>
+               <div className="grid grid-cols-1 gap-3 text-sm">
+                  {/* Row 1: Cluster Name, ID, Site, Environment */}
+                  <div className="flex items-center gap-2 text-gray-800 print:text-black">
+                     <span className="font-semibold">Cluster:</span>
+                     <span>{clusterName}</span>
+                     <span className="mx-2">|</span>
+                     <span className="font-semibold">ID:</span>
+                     <span className="font-mono text-xs">{clusterInfo?.clusterId || 'N/A'}</span>
+                  </div>
+                  <div className="flex items-center gap-2 text-gray-800 print:text-black">
+                     <span className="font-semibold">Site:</span>
+                     <span>{site}</span>
+                     <span className="mx-2">|</span>
+                     <span className="font-semibold">Environment:</span>
+                     <span>{environment}</span>
+                  </div>
+                  {/* Row 2: Configuration */}
+                  <div className="pt-2 border-t border-gray-300 print:border-gray-400" />
+                  <div className="flex items-center gap-2 text-gray-800 print:text-black">
+                     <span className="font-semibold">Ceph Version:</span>
+                     <span>{clusterInfo?.cephVersion || 'N/A'}</span>
+                     <span className="mx-2">|</span>
+                     <span className="font-semibold">Deployment:</span>
+                     <span>Cephadm</span>
+                     {/*<span className="mx-2">|</span>*/}
+                     {/*<span className="font-semibold">Nodes:</span>
+                     <span>
+                        {clusterInfo?.monCount || 0} MON, {clusterInfo?.osdCount || clusterSummary.totalOsds} OSD, {clusterInfo?.mgrCount || 0} MGR,{' '}
+                        {clusterInfo?.hostCount || 0} HOST, {clusterInfo?.poolCount || 0} POOL
+                     </span>*/}
+                  </div>
+                  <div className="flex items-center gap-2 text-gray-800 print:text-black">
+                     <span className="font-semibold">Nodes:</span>
+                     <span>
+                        {clusterInfo?.monCount || 0} MON, {clusterInfo?.osdCount || clusterSummary.totalOsds} OSD, {clusterInfo?.mgrCount || 0} MGR,{' '}
+                        {clusterInfo?.hostCount || 0} HOST, {clusterInfo?.poolCount || 0} POOL
+                     </span>
+                     {/*<span className="font-semibold">Storage:</span>
+                     <span>
+                        {formatBytes(clusterSummary.totalCapacity)} (Raw) / {formatBytes(clusterSummary.totalCapacity * 0.33)} (Usable)
+                     </span>
+                     <span className="mx-2">|</span>
+                     <span className="font-semibold">Pools:</span>
+                     <span>{clusterInfo?.poolCount || 'N/A'}</span>*/}
+                  </div>
+                  <div className="flex items-center gap-2 text-gray-800 print:text-black">
+                     <span className="font-semibold">Uptime:</span>
+                     <span>{clusterInfo?.uptime || 'N/A'}</span>
+                     <span className="mx-2">|</span>
+                     <span className="font-semibold">Network:</span>
+                     <span>
+                        Public {clusterInfo?.publicNetwork || 'N/A'}, Cluster {clusterInfo?.clusterNetwork || 'N/A'}
+                     </span>
+                  </div>
+               </div>
+            </Card>
+
             {/* Cluster Status Summary */}
             <Card variant="glass" className="p-6 mb-8 print:border-2 print:border-gray-300 print:bg-white">
-               <h2 className="text-2xl font-bold text-gray-900 mb-6 print:text-black">Cluster Status Summary</h2>
-
+               {/*<h2 className="text-2xl font-bold text-gray-900 mb-6 print:text-black">Cluster Status Summary</h2>*/}
                <div className="grid grid-cols-2 gap-6">
                   {/* Health Status */}
                   <div className={`p-4 rounded-lg ${healthColors.bg}`}>
                      <div className="text-sm text-gray-600 mb-2 print:text-gray-700">Health Status</div>
                      <div className="flex items-center space-x-3">
                         <div className={`w-4 h-4 rounded-full ${healthColors.badge}`} />
-                        <div className={`text-2xl font-bold ${healthColors.text}`}>
-                           {clusterSummary.health.toUpperCase()}
-                        </div>
+                        <div className={`text-2xl font-bold ${healthColors.text}`}>{clusterSummary.health.toUpperCase()}</div>
                      </div>
                   </div>
 
                   {/* Capacity */}
                   <div className="p-4 bg-blue-50 rounded-lg print:bg-blue-50">
                      <div className="text-sm text-blue-600 mb-2 print:text-blue-800">Capacity Utilization</div>
-                     <div className="text-2xl font-bold text-blue-900 print:text-black">
-                        {clusterSummary.capacityUtilization.toFixed(1)}%
-                     </div>
+                     <div className="text-2xl font-bold text-blue-900 print:text-black">{clusterSummary.capacityUtilization.toFixed(1)}%</div>
                      <div className="text-xs text-blue-700 mt-1 print:text-blue-800">
                         {formatBytes(clusterSummary.usedCapacity)} / {formatBytes(clusterSummary.totalCapacity)}
                      </div>
@@ -131,9 +203,7 @@ export default function ReportTitlePage({
                   {/* Active Alerts */}
                   <div className="p-4 bg-orange-50 rounded-lg print:bg-orange-50">
                      <div className="text-sm text-orange-600 mb-2 print:text-orange-800">Active Alerts</div>
-                     <div className="text-2xl font-bold text-orange-900 print:text-black">
-                        {clusterSummary.activeAlerts}
-                     </div>
+                     <div className="text-2xl font-bold text-orange-900 print:text-black">{clusterSummary.activeAlerts}</div>
                   </div>
 
                   {/* OSDs */}
@@ -163,9 +233,7 @@ export default function ReportTitlePage({
                            />
                         </svg>
                      </div>
-                     <h2 className="text-2xl font-bold text-red-800 print:text-red-900">
-                        High Risk Predictions ({highRiskPredictions.length})
-                     </h2>
+                     <h2 className="text-2xl font-bold text-red-800 print:text-red-900">High Risk Predictions ({highRiskPredictions.length})</h2>
                   </div>
 
                   <div className="space-y-3">
@@ -175,11 +243,7 @@ export default function ReportTitlePage({
                            className="flex items-center justify-between p-3 bg-white rounded-lg border border-red-200 print:bg-white print:border-red-300"
                         >
                            <div className="flex items-center space-x-4 flex-1">
-                              <span
-                                 className={`px-3 py-1 rounded-full text-xs font-bold uppercase ${getSeverityColor(
-                                    prediction.severity,
-                                 )}`}
-                              >
+                              <span className={`px-3 py-1 rounded-full text-xs font-bold uppercase ${getSeverityColor(prediction.severity)}`}>
                                  {prediction.severity}
                               </span>
                               <div className="flex-1">
@@ -189,15 +253,11 @@ export default function ReportTitlePage({
                            <div className="flex items-center space-x-6 text-sm">
                               <div className="text-right">
                                  <div className="text-xs text-gray-500 print:text-gray-600">Probability</div>
-                                 <div className="font-bold text-red-600 print:text-red-700">
-                                    {(prediction.probability * 100).toFixed(1)}%
-                                 </div>
+                                 <div className="font-bold text-red-600 print:text-red-700">{(prediction.probability * 100).toFixed(1)}%</div>
                               </div>
                               <div className="text-right">
                                  <div className="text-xs text-gray-500 print:text-gray-600">Time to Impact</div>
-                                 <div className="font-bold text-orange-600 print:text-orange-700">
-                                    {prediction.timeToImpact}
-                                 </div>
+                                 <div className="font-bold text-orange-600 print:text-orange-700">{prediction.timeToImpact}</div>
                               </div>
                            </div>
                         </div>
@@ -209,7 +269,12 @@ export default function ReportTitlePage({
                      <div className="mt-4 p-4 bg-gradient-to-r from-red-50 to-orange-50 rounded-lg border border-red-200 print:bg-red-50 print:border-red-300">
                         <div className="flex items-start space-x-2 mb-2">
                            <svg className="w-5 h-5 text-red-600 mt-0.5 flex-shrink-0 print:text-red-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
+                              <path
+                                 strokeLinecap="round"
+                                 strokeLinejoin="round"
+                                 strokeWidth={2}
+                                 d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"
+                              />
                            </svg>
                            <div className="flex-1">
                               <h3 className="text-sm font-bold text-red-800 mb-2 print:text-red-900">AI 분석 요약</h3>
@@ -221,8 +286,8 @@ export default function ReportTitlePage({
 
                   <div className="mt-4 p-3 bg-red-100 rounded-lg print:bg-red-100">
                      <p className="text-sm text-red-800 print:text-red-900">
-                        <strong>⚠ Action Required:</strong> These high-risk predictions require immediate attention. Please
-                        review the detailed analysis and recommended actions in the AI Failure Predictions section.
+                        <strong>⚠ Action Required:</strong> These high-risk predictions require immediate attention. Please review the detailed analysis and
+                        recommended actions in the AI Failure Predictions section.
                      </p>
                   </div>
                </Card>

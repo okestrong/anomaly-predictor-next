@@ -64,7 +64,7 @@ export default function PredictionDashboard() {
             <div className="flex items-center justify-between mb-6">
                <div>
                   <h1 className="text-3xl font-bold text-white mb-2 flex items-baseline">
-                     Predictive Risk Analysis
+                     Predictive Incident Analysis
                      <span className="text-xl text-slate-300 ml-2">
                         by <span className="text-white">RAG</span>
                      </span>

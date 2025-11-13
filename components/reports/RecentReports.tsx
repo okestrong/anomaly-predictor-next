@@ -9,6 +9,7 @@ import { FileText, Download, Mail, Trash2, Eye, Calendar } from 'lucide-react';
 import { Card, Button } from '@/components/common';
 import { formatDistanceToNow } from 'date-fns';
 import type { Report, ReportType } from '@/types/report';
+import SimpleBar from 'simplebar-react';
 
 interface RecentReportsProps {
    reports: Report[];
@@ -40,11 +41,23 @@ export function RecentReports({ reports, onView, onDownload, onEmail, onDelete }
             <button className="text-sm text-slate-400 dark:text-blue-400 hover:underline cursor-pointer">View All Reports →</button>
          </div>
 
-         <div className="space-y-3">
-            {uniqueReports.slice(0, 10).map(report => (
+         <SimpleBar style={{ width: '100%', maxHeight: 'calc(100vh - 685px)' }}>
+            <div className="space-y-3">
+               {/*{uniqueReports.slice(0, 10).map(report => (
                <ReportListItem key={report.id} report={report} onView={onView} onDownload={onDownload} onEmail={onEmail} onDelete={onDelete} />
-            ))}
-         </div>
+            ))}*/}
+               {Array.from({ length: 20 }).map(() => (
+                  <ReportListItem
+                     key={uniqueReports[0].id}
+                     report={uniqueReports[0]}
+                     onView={onView}
+                     onDownload={onDownload}
+                     onEmail={onEmail}
+                     onDelete={onDelete}
+                  />
+               ))}
+            </div>
+         </SimpleBar>
       </div>
    );
 }

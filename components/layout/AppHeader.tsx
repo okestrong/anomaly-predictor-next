@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
    CircleStackIcon,
@@ -65,6 +65,7 @@ interface UserMenuItem {
 
 export default function AppHeader() {
    const pathname = usePathname();
+   const router = useRouter();
 
    // State
    const [currentTime, setCurrentTime] = useState('');
@@ -121,13 +122,13 @@ export default function AppHeader() {
                icon: CubeTransparentIcon,
                route: '/topology',
             },
-            {
+            /*{
                id: 'traffic',
                name: 'Cluster Traffic',
                description: 'Real-time data flow visualization',
                icon: CursorArrowRaysIcon,
                route: '/traffic',
-            },
+            },*/
          ],
       },
       {
@@ -472,11 +473,12 @@ export default function AppHeader() {
    const navigateToMenu = useCallback((menu: MenuItem) => {
       if (menu.submenu && menu.submenu.length > 0) {
          // Navigate to first submenu item
-         window.location.href = menu.submenu[0].route;
+         // window.location.href = menu.submenu[0].route;
       } else {
-         window.location.href = menu.route;
+         router.push(menu.route);
+         setActiveMenu(null);
+         // window.location.href = menu.route;
       }
-      setActiveMenu(null);
    }, []);
 
    const closeMenu = useCallback(() => {

@@ -1,7 +1,6 @@
 import { Metadata } from 'next';
 import AppHeader from '@/components/layout/AppHeader';
 import PredictionDashboard from '@/components/prediction/PredictionDashboard';
-import Footer from '@/components/common/Footer';
 
 export const metadata: Metadata = {
    title: 'Predictive Risk Analysis - Ceph Cluster',
@@ -13,7 +12,6 @@ export default function PredictionPage() {
       <div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-blue-950">
          <AppHeader />
          <PredictionDashboard />
-         <Footer />
       </div>
    );
 }
