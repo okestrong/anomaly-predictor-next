@@ -11,6 +11,7 @@ interface ExtendedButtonProps extends ButtonProps {
    rounded?: boolean;
    iconLeft?: React.ComponentType<{ className?: string }>;
    iconRight?: React.ComponentType<{ className?: string }>;
+   ariaLabel?: string;
    children?: React.ReactNode;
 }
 
@@ -31,6 +32,7 @@ export const Button = forwardRef<HTMLButtonElement, ExtendedButtonProps>(
          className,
          children,
          onClick,
+         ariaLabel,
          ...props
       },
       ref,
@@ -153,7 +155,15 @@ export const Button = forwardRef<HTMLButtonElement, ExtendedButtonProps>(
       }, [variant, size, block, outline, rounded]);
 
       return (
-         <button ref={ref} type={type} disabled={disabled || loading} className={cn(buttonClasses, className)} onClick={handleClick} {...props}>
+         <button
+            ref={ref}
+            type={type}
+            disabled={disabled || loading}
+            className={cn(buttonClasses, className)}
+            onClick={handleClick}
+            aria-label={ariaLabel}
+            {...props}
+         >
             {/* 로딩 스피너 */}
             {loading && <div className="animate-spin w-4 h-4 border-2 border-current border-t-transparent rounded-full mr-2" />}
 

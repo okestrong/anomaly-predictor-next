@@ -243,8 +243,8 @@ export default function RiskPanel() {
    return (
       <div className="col-span-2" onMouseEnter={() => setIsHovered(true)} onMouseLeave={() => setIsHovered(false)}>
          <Card
-            variant="cyber"
-            className="h-full"
+            variant="neural"
+            className="h-[calc(100vh-105px)]"
             header={
                <div className="flex items-center justify-between">
                   <div className="flex items-center space-x-2">
@@ -334,7 +334,7 @@ export default function RiskPanel() {
             </div>
 
             {/* Tab content - Fixed height container with sliding transitions */}
-            <div className="relative h-[590px] overflow-hidden">
+            <div className="relative h-[calc(100vh-495px)] overflow-hidden">
                {/* Risk Factors tab */}
                <div
                   className={`absolute inset-0 transition-transform duration-500 ease-out overflow-y-auto px-4 ${

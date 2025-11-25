@@ -66,9 +66,9 @@ export default function CapacityStatus() {
 
    return (
       <Card
-         variant="ai"
-         className="h-full relative overflow-hidden col-span-2"
-         bodyClassName="h-[830px] overflow-y-auto"
+         variant="neural"
+         className="h-[calc(100vh-105px)] relative overflow-hidden col-span-2"
+         bodyClassName="h-[calc(100vh-270px)] overflow-y-auto"
          header={
             <div className="flex items-center justify-between">
                <div className="flex items-center space-x-2">

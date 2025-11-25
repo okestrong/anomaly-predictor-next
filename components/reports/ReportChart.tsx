@@ -8,12 +8,7 @@
 import { useEffect, useRef } from 'react';
 import * as echarts from 'echarts/core';
 import { LineChart } from 'echarts/charts';
-import {
-   GridComponent,
-   TooltipComponent,
-   LegendComponent,
-   DataZoomComponent,
-} from 'echarts/components';
+import { GridComponent, TooltipComponent, LegendComponent, DataZoomComponent } from 'echarts/components';
 import { CanvasRenderer } from 'echarts/renderers';
 
 echarts.use([LineChart, GridComponent, TooltipComponent, LegendComponent, DataZoomComponent, CanvasRenderer]);
@@ -56,7 +51,7 @@ export function ReportChart({ trendData, height = 300 }: ReportChartProps) {
       const chart = chartInstance.current;
 
       // Prepare data
-      const times = trendData.data.map((point) => {
+      const times = trendData.data.map(point => {
          const date = new Date(point.timestamp);
          return date.toLocaleString('en-US', {
             month: 'short',
@@ -66,7 +61,7 @@ export function ReportChart({ trendData, height = 300 }: ReportChartProps) {
          });
       });
 
-      const values = trendData.data.map((point) => point.value);
+      const values = trendData.data.map(point => point.value);
 
       // Get color based on category
       const getColor = (category: string) => {
@@ -241,30 +236,26 @@ export function ReportChart({ trendData, height = 300 }: ReportChartProps) {
    }, []);
 
    return (
-      <div className="bg-secondary-800/30 backdrop-blur-sm rounded-lg p-2 border border-ai-primary/20 print:bg-white print:border-gray-300 print:p-2">
+      <div className="p-2 print:p-1">
          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1 mb-2">
-            <h3 className="text-sm font-semibold text-white print:text-black">{trendData.category} Trend</h3>
+            <h3 className="text-sm font-semibold text-gray-500 print:text-black">{trendData.category} Trend</h3>
             {trendData.prediction && (
                <div className="flex items-center gap-2 text-xs">
-                  <span className="text-slate-300 print:text-gray-600">
-                     Trend:{' '}
-                     <span className="font-medium text-white print:text-black capitalize">
-                        {trendData.prediction.trend}
-                     </span>
+                  <span className="text-slate-400 print:text-gray-600">
+                     Trend: <span className="font-medium text-slate-500 print:text-black capitalize">{trendData.prediction.trend}</span>
                   </span>
-                  <span className="text-slate-300 print:text-gray-600">
-                     Confidence:{' '}
-                     <span className="font-medium text-white print:text-black">{trendData.prediction.confidence}%</span>
+                  <span className="text-slate-400 print:text-gray-600">
+                     Confidence: <span className="font-medium text-gray-500 print:text-black">{trendData.prediction.confidence?.toFixed(2)}%</span>
                   </span>
                </div>
             )}
          </div>
 
-         <div className="w-full overflow-hidden print:overflow-visible print:w-[650px]">
+         <div className="w-full overflow-hidden print:overflow-visible print:w-full">
             <div
                ref={chartRef}
                style={{ width: '100%', height: `${height}px`, minHeight: `${height}px` }}
-               className="echarts-container w-full max-w-full print:!w-[650px]"
+               className="echarts-container w-full max-w-full print:!w-full print:max-h-[250px]"
                data-chart-ready="false"
             />
          </div>
@@ -272,7 +263,7 @@ export function ReportChart({ trendData, height = 300 }: ReportChartProps) {
          {trendData.insights && trendData.insights.length > 0 && (
             <div className="mt-2 space-y-1 max-h-16 overflow-y-auto print:max-h-none print:overflow-visible">
                {trendData.insights.slice(0, 2).map((insight, index) => (
-                  <div key={index} className="flex items-start gap-1 text-xs text-slate-300 print:text-gray-700">
+                  <div key={`insight-${insight}-${index}`} className="flex items-start gap-1 text-xs text-slate-400 print:text-gray-700">
                      <span className="text-ai-primary print:text-blue-600">•</span>
                      <span className="leading-tight">{insight}</span>
                   </div>

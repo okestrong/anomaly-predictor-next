@@ -1526,7 +1526,6 @@ const WorldTrafficView: FC<Props> = () => {
                      if (delta < 0.1) return; // Ignore small changes
 
                      lastFactorRef.current = factor;
-                     console.log('##### factor=', factor);
 
                      // Hysteresis to prevent oscillation
                      if (fxOn && factor < LOW) {

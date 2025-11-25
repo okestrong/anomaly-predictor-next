@@ -1,0 +1,498 @@
+.dashboard {
+    width: 100vw;
+    height: calc(100vh - 65px);
+    background: linear-gradient(135deg, #0a0a1a 0%, #1a0a2a 50%, #0a0a1a 100%);
+    color: #ffffff;
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    position: relative;
+}
+
+.dashboard::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background:
+            radial-gradient(ellipse at 20% 30%, rgba(0, 100, 255, 0.1) 0%, transparent 50%),
+            radial-gradient(ellipse at 80% 70%, rgba(255, 0, 100, 0.1) 0%, transparent 50%);
+    pointer-events: none;
+    z-index: 1;
+}
+
+/* Header */
+.header {
+    height: 80px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0 40px;
+    background: rgba(0, 0, 0, 0.5);
+    backdrop-filter: blur(10px);
+    border-bottom: 1px solid rgba(100, 100, 255, 0.2);
+    z-index: 10;
+    position: relative;
+}
+
+.title {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.titleGlow {
+    font-size: 28px;
+    font-weight: 800;
+    background: linear-gradient(135deg, #00ffff, #ff00ff);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    text-shadow: 0 0 40px rgba(0, 255, 255, 0.5);
+    letter-spacing: 2px;
+    animation: glow 2s ease-in-out infinite;
+}
+
+@keyframes glow {
+    0%, 100% { filter: brightness(1); }
+    50% { filter: brightness(1.2); }
+}
+
+.titleSub {
+    font-size: 12px;
+    color: rgba(255, 255, 255, 0.6);
+    text-transform: uppercase;
+    letter-spacing: 4px;
+}
+
+.connectionStatus {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 16px;
+    background: rgba(0, 0, 0, 0.3);
+    border-radius: 20px;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.statusDot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    animation: pulse 2s infinite;
+}
+
+.connected {
+    background: #00ff88;
+    box-shadow: 0 0 10px #00ff88;
+}
+
+.disconnected {
+    background: #ff3366;
+    box-shadow: 0 0 10px #ff3366;
+}
+
+@keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.5; }
+}
+
+/* Main Content */
+.mainContent {
+    flex: 1;
+    display: flex;
+    /*gap: 20px;*/
+    /*padding: 20px;*/
+    position: relative;
+    z-index: 2;
+}
+
+/* Panels */
+.leftPanel, .rightPanel {
+    width: 280px;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    overflow-y: auto;
+    padding: 0 10px;
+}
+
+.leftPanel::-webkit-scrollbar,
+.rightPanel::-webkit-scrollbar {
+    width: 4px;
+}
+
+.leftPanel::-webkit-scrollbar-track,
+.rightPanel::-webkit-scrollbar-track {
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 2px;
+}
+
+.leftPanel::-webkit-scrollbar-thumb {
+    background: rgba(0, 255, 255, 0.3);
+    border-radius: 2px;
+}
+
+.rightPanel::-webkit-scrollbar-thumb {
+    background: rgba(255, 0, 255, 0.3);
+    border-radius: 2px;
+}
+
+/* Center Canvas */
+.centerCanvas {
+    flex: 1;
+    border-radius: 20px;
+    overflow: hidden;
+    box-shadow:
+            0 0 60px rgba(0, 255, 255, 0.2),
+            inset 0 0 60px rgba(255, 0, 255, 0.1);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    position: relative;
+    cursor: grab;
+}
+
+.centerCanvas:active {
+    cursor: grabbing;
+}
+
+/* Info Popup */
+.infoPopup {
+    background: rgba(0, 0, 0, 0.95);
+    backdrop-filter: blur(20px);
+    border: 2px solid rgba(0, 255, 255, 0.5);
+    border-radius: 16px;
+    padding: 20px;
+    min-width: 250px;
+    max-width: 350px;
+    position: relative;
+    box-shadow:
+            0 0 40px rgba(0, 255, 255, 0.3),
+            inset 0 0 20px rgba(255, 0, 255, 0.1);
+    animation: popupAppear 0.3s ease-out;
+}
+
+@keyframes popupAppear {
+    from {
+        opacity: 0;
+        transform: scale(0.8);
+    }
+    to {
+        opacity: 1;
+        transform: scale(1);
+    }
+}
+
+.infoPopup h3 {
+    margin: 0 0 16px 0;
+    font-size: 18px;
+    font-weight: 600;
+    color: #00ffff;
+    text-shadow: 0 0 10px rgba(0, 255, 255, 0.5);
+}
+
+.infoPopup p {
+    margin: 8px 0;
+    font-size: 14px;
+    color: rgba(255, 255, 255, 0.9);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.infoPopup span {
+    font-weight: 600;
+}
+
+.closeBtn {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    background: transparent;
+    border: none;
+    color: rgba(255, 255, 255, 0.6);
+    font-size: 24px;
+    cursor: pointer;
+    transition: all 0.2s;
+    width: 30px;
+    height: 30px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%;
+}
+
+.closeBtn:hover {
+    color: #ff3366;
+    background: rgba(255, 51, 102, 0.1);
+    transform: scale(1.1);
+}
+
+/* Metric Cards */
+.metricCard {
+    background: linear-gradient(135deg, rgba(0, 0, 0, 0.6), rgba(20, 20, 40, 0.4));
+    backdrop-filter: blur(10px);
+    border: 1px solid rgba(100, 100, 255, 0.2);
+    border-radius: 12px;
+    padding: 16px;
+    transition: all 0.3s ease;
+}
+
+.metricCard:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 24px rgba(0, 255, 255, 0.2);
+    border-color: rgba(0, 255, 255, 0.4);
+}
+
+.metricCard h3 {
+    margin: 0 0 12px 0;
+    font-size: 14px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    color: rgba(0, 255, 255, 0.8);
+}
+
+.metric {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 8px 0;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+    font-size: 14px;
+}
+
+.metric:last-child {
+    border-bottom: none;
+}
+
+/* Health Status */
+.healthStatus {
+    padding: 12px;
+    border-radius: 8px;
+    text-align: center;
+    font-weight: 700;
+    letter-spacing: 1px;
+    animation: statusPulse 2s infinite;
+}
+
+.health-ok {
+    background: linear-gradient(135deg, rgba(0, 255, 136, 0.2), rgba(0, 255, 136, 0.1));
+    border: 1px solid #00ff88;
+    color: #00ff88;
+    text-shadow: 0 0 20px #00ff88;
+}
+
+.health-warn {
+    background: linear-gradient(135deg, rgba(255, 170, 0, 0.2), rgba(255, 170, 0, 0.1));
+    border: 1px solid #ffaa00;
+    color: #ffaa00;
+    text-shadow: 0 0 20px #ffaa00;
+}
+
+.health-err {
+    background: linear-gradient(135deg, rgba(255, 51, 102, 0.2), rgba(255, 51, 102, 0.1));
+    border: 1px solid #ff3366;
+    color: #ff3366;
+    text-shadow: 0 0 20px #ff3366;
+}
+
+/* Flow List */
+.flowList {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.flow {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 8px;
+    background: rgba(0, 0, 0, 0.3);
+    border-radius: 6px;
+    font-size: 13px;
+    transition: all 0.2s;
+}
+
+.flow:hover {
+    background: rgba(0, 0, 0, 0.5);
+    transform: translateX(4px);
+}
+
+/* Pool Cards */
+.poolCard {
+    margin-bottom: 12px;
+}
+
+.poolHeader {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 6px;
+    font-size: 13px;
+}
+
+.ioRate {
+    font-weight: 700;
+    color: #00ffff;
+}
+
+.ioBar {
+    height: 4px;
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 2px;
+    overflow: hidden;
+}
+
+.ioBarFill {
+    height: 100%;
+    background: linear-gradient(90deg, #00ffff, #ff00ff);
+    border-radius: 2px;
+    transition: width 0.3s ease;
+    animation: ioFlow 2s linear infinite;
+}
+
+@keyframes ioFlow {
+    0% { opacity: 0.6; }
+    50% { opacity: 1; }
+    100% { opacity: 0.6; }
+}
+
+/* Host Mini Cards */
+.hostMini {
+    padding: 12px;
+    background: rgba(0, 0, 0, 0.3);
+    border-radius: 8px;
+    margin-bottom: 12px;
+    transition: all 0.2s;
+}
+
+.hostMini:hover {
+    background: rgba(0, 0, 0, 0.5);
+    transform: translateX(4px);
+}
+
+.hostnameMini {
+    font-size: 12px;
+    font-weight: 600;
+    display: block;
+    margin-bottom: 8px;
+    color: #00ffff;
+}
+
+.perfBars {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.perfBar {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.perfBar span {
+    font-size: 10px;
+    color: rgba(255, 255, 255, 0.6);
+    min-width: 30px;
+}
+
+.barBg {
+    flex: 1;
+    height: 4px;
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 2px;
+    overflow: hidden;
+}
+
+.barFill {
+    height: 100%;
+    border-radius: 2px;
+    transition: all 0.3s ease;
+}
+
+/* Controls */
+.controls {
+    height: 60px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0 40px;
+    background: rgba(0, 0, 0, 0.5);
+    backdrop-filter: blur(10px);
+    border-top: 1px solid rgba(100, 100, 255, 0.2);
+    z-index: 10;
+}
+
+.intensityControl {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+}
+
+.intensityControl label {
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    color: rgba(255, 255, 255, 0.6);
+}
+
+.slider {
+    width: 200px;
+    height: 4px;
+    border-radius: 2px;
+    background: linear-gradient(90deg, #00ffff, #ff00ff);
+    outline: none;
+    -webkit-appearance: none;
+    appearance: none;
+}
+
+.slider::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    background: #ffffff;
+    cursor: pointer;
+    box-shadow: 0 0 10px rgba(0, 255, 255, 0.5);
+    transition: all 0.3s ease;
+}
+
+.slider::-webkit-slider-thumb:hover {
+    transform: scale(1.2);
+    box-shadow: 0 0 20px rgba(0, 255, 255, 0.8);
+}
+
+.intensityValue {
+    font-size: 18px;
+    font-weight: 700;
+    color: #00ffff;
+    min-width: 30px;
+    text-align: center;
+}
+
+.hint {
+    font-size: 12px;
+    color: rgba(255, 255, 255, 0.4);
+    font-style: italic;
+}
+
+.timestamp {
+    font-size: 12px;
+    color: rgba(255, 255, 255, 0.5);
+}
+
+/* Status colors */
+.up { color: #00ff88; }
+.down { color: #ff3366; }
+.control { color: #4488ff; }
+.compute { color: #44ff88; }
+.network { color: #ff8844; }
+.replication { border-left-color: #0066ff; }
+.recovery { border-left-color: #ff6600; }
+.client { border-left-color: #00ff66; }

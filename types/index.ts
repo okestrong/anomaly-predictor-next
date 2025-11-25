@@ -155,7 +155,7 @@ export interface ButtonProps extends BaseComponentProps {
    type?: 'button' | 'submit' | 'reset';
 }
 
-export type CardVariant = 'default' | 'ai' | 'neural' | 'cyber' | 'glass';
+export type CardVariant = 'default' | 'ai' | 'neural' | 'cyber' | 'glass' | 'none' | 'neon';
 export type CardSize = 'sm' | 'md' | 'lg';
 
 export interface CardProps extends BaseComponentProps {

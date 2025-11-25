@@ -6,7 +6,7 @@ import 'simplebar-react/dist/simplebar.min.css';
 import * as THREE from 'three';
 import { Canvas, useFrame, useThree } from '@react-three/fiber';
 import { Box, Environment, OrbitControls, Plane, Stars, Text as Text3D } from '@react-three/drei';
-import { Bloom, BrightnessContrast, EffectComposer } from '@react-three/postprocessing';
+import { BrightnessContrast, EffectComposer } from '@react-three/postprocessing';
 import gsap from 'gsap';
 import { AdaptiveLayoutManager } from '@/utils/layouts';
 import { calculatePgState, calculatePoolState, loadTexture } from '@/utils/utils';
@@ -18,12 +18,11 @@ import TextSphere from '@/components/models/TextSphere';
 import { PortalLight } from '@/components/models/PortalLight';
 import { Text } from 'troika-three-text';
 import RoundMirrorTable from '@/components/models/RoundMirrorTable';
-import Atmosphere from '@/components/models/Atmosphere';
 import RoundMirrorTextTable from '@/components/models/RoundMirrorTextTable';
 import { Stone } from '@/components/models/Stone';
 import GlassBall from '@/components/models/GlassBall';
 import { TrashIcon } from '@heroicons/react/24/solid';
-import { selectIsLoading, selectTopologyData, useTopologyStore, selectError } from '@/stores/topology';
+import { selectError, selectIsLoading, selectTopologyData, useTopologyStore } from '@/stores/topology';
 import { transformTopologyData } from '@/lib/transformTopologyData';
 import { PGEnergyEffect } from './PGEnergyEffect';
 import { toast } from 'react-toastify';
@@ -454,8 +453,6 @@ const SpaceshipHost = forwardRef<
          pointLightRef.current.visible = selectedHostIdRef?.current === hostData.name;
       }
    });
-
-   console.log('##### hostData=', hostData);
 
    return (
       <>
@@ -1135,22 +1132,30 @@ const ClusterTopologyScene = ({
    useEffect(() => {
       // Load textures and create topology
       const initScene = async () => {
-         // Load textures
-         texturesRef.current.albedoMap = await loadTexture('/3d/textures/earth/Albedo.jpg');
-         texturesRef.current.bumpMap = await loadTexture('/3d/textures/earth/Bump.jpg');
-         texturesRef.current.oceanMap = await loadTexture('/3d/textures/earth/Ocean.png');
-         // texturesRef.current.lightsMap = await loadTexture('/3d/textures/earth/night_lights_modified.png');
-         texturesRef.current.cloudsMap = await loadTexture('/3d/textures/earth/Clouds.png');
+         try {
+            // Load textures
+            texturesRef.current.albedoMap = await loadTexture('/3d/textures/earth/Albedo.jpg');
+            texturesRef.current.bumpMap = await loadTexture('/3d/textures/earth/Bump.jpg');
+            texturesRef.current.oceanMap = await loadTexture('/3d/textures/earth/Ocean.png');
+            // texturesRef.current.lightsMap = await loadTexture('/3d/textures/earth/night_lights_modified.png');
+            texturesRef.current.cloudsMap = await loadTexture('/3d/textures/earth/Clouds.png');
 
-         // const textureLoader = new THREE.TextureLoader();
-         // texturesRef.current.metalPlanetMap = textureLoader.load('/3d/textures/planet/Various_AluminiumFoil01_header.jpg');
-         // texturesRef.current.yellowMap = textureLoader.load('/3d/textures/planet/Metal_RedHotSteel_header.jpg');
-         // texturesRef.current.redMap = textureLoader.load('/3d/textures/cube/Leather_Tufted_header_red.jpg');
-         // texturesRef.current.hostMap = textureLoader.load('/3d/textures/planet/silver-metal-pattern-steel.webp');
+            // const textureLoader = new THREE.TextureLoader();
+            // texturesRef.current.metalPlanetMap = textureLoader.load('/3d/textures/planet/Various_AluminiumFoil01_header.jpg');
+            // texturesRef.current.yellowMap = textureLoader.load('/3d/textures/planet/Metal_RedHotSteel_header.jpg');
+            // texturesRef.current.redMap = textureLoader.load('/3d/textures/cube/Leather_Tufted_header_red.jpg');
+            // texturesRef.current.hostMap = textureLoader.load('/3d/textures/planet/silver-metal-pattern-steel.webp');
 
-         // Mark textures as loaded
-         setTexturesLoaded(true);
-         // Spinner will be hidden by the effect that checks both textures and topology API
+            console.log('Textures loaded successfully');
+         } catch (error) {
+            console.error('Error loading textures:', error);
+            // Continue even if some textures fail to load
+         } finally {
+            // Mark textures as loaded even if there were errors
+            // This ensures the loading screen doesn't hang forever
+            setTexturesLoaded(true);
+            // Spinner will be hidden by the effect that checks both textures and topology API
+         }
       };
 
       initScene();
@@ -1792,7 +1797,6 @@ export default function ClusterTopologyView() {
    // const togglePanel = (position: 'top' | 'left' | 'bottom' | 'right') => {};
 
    const toggleAllPanels = useCallback(() => {
-      console.log('##### toggle-all-panels 호출됨');
       const targetPositions: Array<'top' | 'left' | 'bottom' | 'right'> = ['top', 'left', 'bottom', 'right'];
 
       // useRef로 상태 확인 (리렌더링 없음)
@@ -1855,10 +1859,10 @@ export default function ClusterTopologyView() {
       }
    }, []); // 의존성 제거 (useRef는 리렌더링 트리거 안함)
 
-   // Ctrl + F9 키로 패널 토글
+   // Ctrl + F1, F1 키로 패널 토글
    useEffect(() => {
       const handleKeyDown = (event: KeyboardEvent) => {
-         if (event.ctrlKey && (event.key === 'F9' || event.keyCode === 120)) {
+         if (event.key === 'F1' || event.keyCode === 112) {
             event.preventDefault();
             toggleAllPanels();
          }
@@ -4530,8 +4534,6 @@ export default function ClusterTopologyView() {
                } else if (nodeType === 'Host') {
                   // Get host detail from nodeData.hostData.detail
                   const hostDetail = nodeData.hostData?.detail;
-                  console.log('##### nodeData=', nodeData);
-                  console.log('##### hostDetail=', hostDetail);
 
                   infoTitle.textContent = `Host: ${hostDetail?.hostname || nodeData.name || nodeData.id}`;
                   infoContent.innerHTML = `

@@ -65,6 +65,7 @@ interface ReportStore {
    fetchReports: (page?: number, pageSize?: number) => Promise<void>;
    fetchReportById: (reportId: string) => Promise<Report | null>;
    deleteReport: (reportId: string) => Promise<void>;
+   setReports: (reports: Report[]) => void;
 
    // Template management
    fetchTemplates: () => Promise<void>;
@@ -303,6 +304,13 @@ export const useReportStore = create<ReportStore>()(
                      });
                      throw error;
                   }
+               },
+
+               setReports: (reports: Report[]) => {
+                  set((state) => {
+                     state.reports = reports;
+                     state.reportsTotal = reports.length;
+                  });
                },
 
                // ===== Template Management =====

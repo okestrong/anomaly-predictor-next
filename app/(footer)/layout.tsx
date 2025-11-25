@@ -5,7 +5,7 @@ interface Props {
    children: ReactNode | ReactNode[];
 }
 
-export default function FooterLayout({ children }: Props) {
+export default function Layout({ children }: Props) {
    return (
       <div>
          <div>{children}</div>

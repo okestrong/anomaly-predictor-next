@@ -163,7 +163,7 @@ export default function PredictionDashboard() {
             </div>
 
             {/* Predictions Grid */}
-            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
                <AnimatePresence mode="popLayout">
                   {filteredPredictions.map(prediction => (
                      <PredictionCard key={prediction.id} prediction={prediction} />

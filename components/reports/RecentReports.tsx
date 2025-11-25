@@ -25,7 +25,11 @@ export function RecentReports({ reports, onView, onDownload, onEmail, onDelete }
 
    if (uniqueReports.length === 0) {
       return (
-         <Card title="Recent Reports" className="mb-8">
+         <Card
+            variant="none"
+            title="Recent Reports"
+            className="mb-8 bg-secondary-800/40 backdrop-blur-md rounded-lg border-ai-primary/30 hover:border-ai-primary/60 transition-all duration-300 hover:shadow-lg hover:shadow-ai-primary/20"
+         >
             <div className="text-center py-12">
                <FileText className="w-16 h-16 text-slate-300 dark:text-slate-600 mx-auto mb-4" />
                <p className="text-slate-400 dark:text-slate-400">No reports generated yet. Create your first report to get started.</p>
@@ -43,10 +47,10 @@ export function RecentReports({ reports, onView, onDownload, onEmail, onDelete }
 
          <SimpleBar style={{ width: '100%', maxHeight: 'calc(100vh - 685px)' }}>
             <div className="space-y-3">
-               {/*{uniqueReports.slice(0, 10).map(report => (
-               <ReportListItem key={report.id} report={report} onView={onView} onDownload={onDownload} onEmail={onEmail} onDelete={onDelete} />
-            ))}*/}
-               {Array.from({ length: 20 }).map(() => (
+               {uniqueReports.slice(0, 10).map(report => (
+                  <ReportListItem key={report.id} report={report} onView={onView} onDownload={onDownload} onEmail={onEmail} onDelete={onDelete} />
+               ))}
+               {/*{Array.from({ length: 20 }).map(() => (
                   <ReportListItem
                      key={uniqueReports[0].id}
                      report={uniqueReports[0]}
@@ -55,7 +59,7 @@ export function RecentReports({ reports, onView, onDownload, onEmail, onDelete }
                      onEmail={onEmail}
                      onDelete={onDelete}
                   />
-               ))}
+               }*/}
             </div>
          </SimpleBar>
       </div>

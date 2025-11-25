@@ -3,6 +3,9 @@
 import { Card } from '@/components/common';
 import dayjs from 'dayjs';
 import utc from 'dayjs/plugin/utc';
+import ClusterInformation from '@/components/reports/sections/ClusterInformation';
+import ExecutiveSummary from '@/components/reports/sections/ExecutiveSummary';
+import type { Report } from '@/types/report';
 
 dayjs.extend(utc);
 
@@ -24,10 +27,14 @@ interface ClusterInfo {
    uptime?: string; // from backend
    publicNetwork?: string; // from backend
    clusterNetwork?: string; // from backend
+   deployment?: string;
 }
 
 interface ReportTitlePageProps {
+   type: string;
+   currentReport: Report;
    reportTitle: string;
+   reportSubtitle?: string;
    generatedAt: string;
    timeRange: {
       start: string;
@@ -43,7 +50,7 @@ interface ReportTitlePageProps {
       usedCapacity: number;
    };
    clusterInfo?: ClusterInfo; // Optional cluster information from backend
-   highRiskPredictions: HighRiskPrediction[];
+   highRiskPredictions?: HighRiskPrediction[];
    highRiskSummary?: string; // LLM-generated summary
 }
 
@@ -80,7 +87,10 @@ const formatBytes = (bytes: number): string => {
 };
 
 export default function ReportTitlePage({
+   type,
+   currentReport,
    reportTitle,
+   reportSubtitle,
    generatedAt,
    timeRange,
    clusterSummary,
@@ -89,141 +99,161 @@ export default function ReportTitlePage({
    highRiskSummary,
 }: ReportTitlePageProps) {
    const healthColors = getHealthColor(clusterSummary.health);
-
-   // Mock data for cluster name, site, and environment
-   const clusterName = 'Production Cluster 01';
-   const site = 'Seoul DC1';
-   const environment = 'Production';
+   const predictions = (currentReport.data?.predictions || []).map(p => ({
+      id: p.id,
+      category: p.category,
+      name: p.name,
+      severity: p.severity as 'low' | 'medium' | 'high' | 'critical',
+      probability: p.probability,
+      confidence: p.confidence,
+      timeToImpact: p.timeToImpact,
+      aiAnalysis: p.aiAnalysis,
+      affectedComponents: p.affectedComponents,
+      recommendedActions: p.recommendedActions,
+      trend: p.trend as 'improving' | 'stable' | 'worsening',
+   }));
 
    return (
-      <div className="min-h-screen flex flex-col justify-between p-12 print:text-black page-break-after">
+      <div className="min-h-screen flex flex-col justify-between p-4 print:text-black">
          {/* Header */}
          <div>
-            <div className="mb-12 border-b-4 border-cyan-600 pb-6 print:border-cyan-700">
-               <h1 className="text-5xl font-bold text-gray-900 mb-4 print:text-black">{reportTitle}</h1>
-               <p className="text-xl text-gray-600 print:text-gray-700">Ceph Cluster Analysis & Prediction Report</p>
+            <div className="mb-4 border-b-4 border-cyan-600 pb-4 print:border-cyan-700">
+               <h1 className="text-3xl font-bold text-gray-900 mb-1.5 print:text-black">{reportTitle}</h1>
+               <p className="text-sm text-gray-600 print:text-gray-700">{reportSubtitle}</p>
+               {/*<p className="text-sm text-gray-600 print:text-gray-700">Ceph Cluster Analysis & Prediction Report</p>*/}
             </div>
 
             {/* Report Metadata - 4:6 ratio */}
-            <div className="mb-6 grid grid-cols-[40%_60%] gap-6">
+            <div className="mb-4 grid grid-cols-[40%_60%] gap-4">
                <div>
-                  <div className="text-sm font-medium text-gray-600 mb-1 print:text-gray-700">Generated At</div>
-                  <div className="text-lg font-semibold text-gray-900 print:text-black">{dayjs(generatedAt).format('YYYY-MM-DD HH:mm:ss')}</div>
+                  <div className="text-xs font-medium text-gray-600 mb-1 print:text-gray-700">Generated At</div>
+                  <div className="text-sm font-semibold text-gray-900 print:text-black">{dayjs.utc(generatedAt).local().format('YYYY-MM-DD HH:mm:ss')}</div>
                </div>
                <div>
-                  <div className="text-sm font-medium text-gray-600 mb-1 print:text-gray-700">Analysis Period</div>
-                  <div className="text-lg font-semibold text-gray-900 print:text-black">
-                     {dayjs(timeRange.start).format('YYYY-MM-DD HH:mm')} ~ {dayjs(timeRange.end).format('YYYY-MM-DD HH:mm')}
+                  <div className="text-xs font-medium text-gray-600 mb-1 print:text-gray-700">Analysis Period</div>
+                  <div className="text-sm font-semibold text-gray-900 print:text-black">
+                     {dayjs.utc(timeRange.start).local().format('YYYY-MM-DD HH:mm')} ~ {dayjs.utc(timeRange.end).local().format('YYYY-MM-DD HH:mm')}
                   </div>
                </div>
             </div>
 
             {/* Cluster Information */}
-            <Card variant="glass" className="p-6 mb-8 print:border-2 print:border-cyan-300 print:bg-cyan-50">
-               <h3 className="text-lg font-bold text-gray-900 mb-4 print:text-black">Cluster Information</h3>
-               <div className="grid grid-cols-1 gap-3 text-sm">
-                  {/* Row 1: Cluster Name, ID, Site, Environment */}
-                  <div className="flex items-center gap-2 text-gray-800 print:text-black">
-                     <span className="font-semibold">Cluster:</span>
-                     <span>{clusterName}</span>
-                     <span className="mx-2">|</span>
-                     <span className="font-semibold">ID:</span>
-                     <span className="font-mono text-xs">{clusterInfo?.clusterId || 'N/A'}</span>
-                  </div>
-                  <div className="flex items-center gap-2 text-gray-800 print:text-black">
-                     <span className="font-semibold">Site:</span>
-                     <span>{site}</span>
-                     <span className="mx-2">|</span>
-                     <span className="font-semibold">Environment:</span>
-                     <span>{environment}</span>
-                  </div>
-                  {/* Row 2: Configuration */}
-                  <div className="pt-2 border-t border-gray-300 print:border-gray-400" />
-                  <div className="flex items-center gap-2 text-gray-800 print:text-black">
-                     <span className="font-semibold">Ceph Version:</span>
-                     <span>{clusterInfo?.cephVersion || 'N/A'}</span>
-                     <span className="mx-2">|</span>
-                     <span className="font-semibold">Deployment:</span>
-                     <span>Cephadm</span>
-                     {/*<span className="mx-2">|</span>*/}
-                     {/*<span className="font-semibold">Nodes:</span>
-                     <span>
-                        {clusterInfo?.monCount || 0} MON, {clusterInfo?.osdCount || clusterSummary.totalOsds} OSD, {clusterInfo?.mgrCount || 0} MGR,{' '}
-                        {clusterInfo?.hostCount || 0} HOST, {clusterInfo?.poolCount || 0} POOL
-                     </span>*/}
-                  </div>
-                  <div className="flex items-center gap-2 text-gray-800 print:text-black">
-                     <span className="font-semibold">Nodes:</span>
-                     <span>
-                        {clusterInfo?.monCount || 0} MON, {clusterInfo?.osdCount || clusterSummary.totalOsds} OSD, {clusterInfo?.mgrCount || 0} MGR,{' '}
-                        {clusterInfo?.hostCount || 0} HOST, {clusterInfo?.poolCount || 0} POOL
-                     </span>
-                     {/*<span className="font-semibold">Storage:</span>
-                     <span>
-                        {formatBytes(clusterSummary.totalCapacity)} (Raw) / {formatBytes(clusterSummary.totalCapacity * 0.33)} (Usable)
-                     </span>
-                     <span className="mx-2">|</span>
-                     <span className="font-semibold">Pools:</span>
-                     <span>{clusterInfo?.poolCount || 'N/A'}</span>*/}
-                  </div>
-                  <div className="flex items-center gap-2 text-gray-800 print:text-black">
-                     <span className="font-semibold">Uptime:</span>
-                     <span>{clusterInfo?.uptime || 'N/A'}</span>
-                     <span className="mx-2">|</span>
-                     <span className="font-semibold">Network:</span>
-                     <span>
-                        Public {clusterInfo?.publicNetwork || 'N/A'}, Cluster {clusterInfo?.clusterNetwork || 'N/A'}
-                     </span>
-                  </div>
-               </div>
-            </Card>
+            <div className="mb-6">
+               <ClusterInformation
+                  data={{
+                     clusterName: 'Cluster-Seoul',
+                     site: 'Seoul DC1',
+                     environment: 'Production',
+                     clusterId: clusterInfo?.clusterId,
+                     cephVersion: clusterInfo?.cephVersion,
+                     deployment: clusterInfo?.deployment,
+                     hostCount: clusterInfo?.hostCount,
+                     monCount: clusterInfo?.monCount,
+                     osdCount: clusterInfo?.osdCount,
+                     mgrCount: clusterInfo?.mgrCount,
+                     poolCount: clusterInfo?.poolCount,
+                     uptime: clusterInfo?.uptime,
+                     publicNetwork: clusterInfo?.publicNetwork,
+                     clusterNetwork: clusterInfo?.clusterNetwork,
+                  }}
+               />
+            </div>
+            {type === 'DAILY' && (
+               <ExecutiveSummary
+                  data={{
+                     healthScore: currentReport.data?.clusterHealth?.healthScore || 85,
+                     kpis: {
+                        totalCapacity: currentReport.data?.keyMetrics?.capacity?.totalCapacity,
+                        usedCapacity: currentReport.data?.keyMetrics?.capacity?.usedCapacity,
+                        utilizationPercent: currentReport.data?.keyMetrics?.capacity?.utilizationPercent,
+                        totalOsds: currentReport.data?.keyMetrics?.osdStatus?.totalOsds,
+                        healthyOsds: currentReport.data?.keyMetrics?.osdStatus?.healthyOsds,
+                        avgLatency: currentReport.data?.keyMetrics?.performance?.avgLatency,
+                        totalIOPS: (currentReport.data?.keyMetrics?.performance?.readOps || 0) + (currentReport.data?.keyMetrics?.performance?.writeOps || 0),
+                        throughput:
+                           (currentReport.data?.keyMetrics?.performance?.readThroughput || 0) +
+                           (currentReport.data?.keyMetrics?.performance?.writeThroughput || 0),
+                     },
+                  }}
+               />
+            )}
 
             {/* Cluster Status Summary */}
-            <Card variant="glass" className="p-6 mb-8 print:border-2 print:border-gray-300 print:bg-white">
-               {/*<h2 className="text-2xl font-bold text-gray-900 mb-6 print:text-black">Cluster Status Summary</h2>*/}
-               <div className="grid grid-cols-2 gap-6">
-                  {/* Health Status */}
-                  <div className={`p-4 rounded-lg ${healthColors.bg}`}>
-                     <div className="text-sm text-gray-600 mb-2 print:text-gray-700">Health Status</div>
-                     <div className="flex items-center space-x-3">
-                        <div className={`w-4 h-4 rounded-full ${healthColors.badge}`} />
-                        <div className={`text-2xl font-bold ${healthColors.text}`}>{clusterSummary.health.toUpperCase()}</div>
+            {type === 'PREDICTIONS' && (
+               <div>
+                  {/* Summary Statistics */}
+                  <section className="border border-gray-300 bg-white mb-8 print:border print:border-gray-300">
+                     <div className="bg-gray-100 px-6 py-3 border-b border-gray-300">
+                        <h2 className="text-sm font-bold text-gray-900 uppercase tracking-wide">Prediction Overview</h2>
                      </div>
-                  </div>
-
-                  {/* Capacity */}
-                  <div className="p-4 bg-blue-50 rounded-lg print:bg-blue-50">
-                     <div className="text-sm text-blue-600 mb-2 print:text-blue-800">Capacity Utilization</div>
-                     <div className="text-2xl font-bold text-blue-900 print:text-black">{clusterSummary.capacityUtilization.toFixed(1)}%</div>
-                     <div className="text-xs text-blue-700 mt-1 print:text-blue-800">
-                        {formatBytes(clusterSummary.usedCapacity)} / {formatBytes(clusterSummary.totalCapacity)}
+                     <div className="p-6">
+                        <div className="grid grid-cols-4 gap-4">
+                           <div className="text-center p-4 border border-gray-200 bg-gray-50">
+                              <div className="text-xs text-gray-600 mb-1 uppercase font-semibold print:text-gray-700">Total Predictions</div>
+                              <div className="text-3xl font-bold text-gray-900 print:text-black">{predictions.length}</div>
+                           </div>
+                           <div className="text-center p-4 border border-red-200 bg-red-50">
+                              <div className="text-xs text-red-600 mb-1 uppercase font-semibold print:text-red-800">Critical</div>
+                              <div className="text-3xl font-bold text-red-900 print:text-black">
+                                 {predictions.filter(p => p.severity === 'critical').length}
+                              </div>
+                           </div>
+                           <div className="text-center p-4 border border-orange-200 bg-orange-50">
+                              <div className="text-xs text-orange-600 mb-1 uppercase font-semibold print:text-orange-800">High</div>
+                              <div className="text-3xl font-bold text-orange-900 print:text-black">{predictions.filter(p => p.severity === 'high').length}</div>
+                           </div>
+                           <div className="text-center p-4 border border-blue-200 bg-blue-50">
+                              <div className="text-xs text-blue-600 mb-1 uppercase font-semibold print:text-blue-800">Medium/Low</div>
+                              <div className="text-3xl font-bold text-blue-900 print:text-black">
+                                 {predictions.filter(p => p.severity === 'medium' || p.severity === 'low').length}
+                              </div>
+                           </div>
+                        </div>
                      </div>
-                  </div>
-
-                  {/* Active Alerts */}
-                  <div className="p-4 bg-orange-50 rounded-lg print:bg-orange-50">
-                     <div className="text-sm text-orange-600 mb-2 print:text-orange-800">Active Alerts</div>
-                     <div className="text-2xl font-bold text-orange-900 print:text-black">{clusterSummary.activeAlerts}</div>
-                  </div>
-
-                  {/* OSDs */}
-                  <div className="p-4 bg-green-50 rounded-lg print:bg-green-50">
-                     <div className="text-sm text-green-600 mb-2 print:text-green-800">OSDs Status</div>
-                     <div className="text-2xl font-bold text-green-900 print:text-black">
-                        {clusterSummary.upOsds} / {clusterSummary.totalOsds}
+                  </section>
+                  {/*<Card variant="default" className="p-6 mb-8 print:border-2 print:border-gray-300 !bg-white">
+                     <h2 className="text-2xl font-bold text-gray-900 mb-6 print:text-black">Cluster Status Summary</h2>
+                     <div className="grid grid-cols-2 gap-6">
+                        <div className={`p-4 ${healthColors.bg}`}>
+                           <div className="text-sm text-gray-600 mb-2 print:text-gray-700">Health Status</div>
+                           <div className="flex items-center space-x-3">
+                              <div className={`w-4 h-4 rounded-full ${healthColors.badge}`} />
+                              <div className={`text-2xl font-bold ${healthColors.text}`}>{clusterSummary.health.toUpperCase()}</div>
+                           </div>
+                        </div>
+                        Capacity
+                        <div className="p-4 bg-blue-50 print:bg-blue-50">
+                           <div className="text-sm text-blue-600 mb-2 print:text-blue-800">Capacity Utilization</div>
+                           <div className="text-2xl font-bold text-blue-900 print:text-black">{clusterSummary.capacityUtilization.toFixed(1)}%</div>
+                           <div className="text-xs text-blue-700 mt-1 print:text-blue-800">
+                              {formatBytes(clusterSummary.usedCapacity)} / {formatBytes(clusterSummary.totalCapacity)}
+                           </div>
+                        </div>
+                        Active Alerts
+                        <div className="p-4 bg-orange-50 print:bg-orange-50">
+                           <div className="text-sm text-orange-600 mb-2 print:text-orange-800">Active Alerts</div>
+                           <div className="text-2xl font-bold text-orange-900 print:text-black">{clusterSummary.activeAlerts}</div>
+                        </div>
+                        OSDs
+                        <div className="p-4 bg-green-50 print:bg-green-50">
+                           <div className="text-sm text-green-600 mb-2 print:text-green-800">OSDs Status</div>
+                           <div className="text-2xl font-bold text-green-900 print:text-black">
+                              {clusterSummary.upOsds} / {clusterSummary.totalOsds}
+                           </div>
+                           <div className="text-xs text-green-700 mt-1 print:text-green-800">
+                              {((clusterSummary.upOsds / clusterSummary.totalOsds) * 100).toFixed(1)}% UP
+                           </div>
+                        </div>
                      </div>
-                     <div className="text-xs text-green-700 mt-1 print:text-green-800">
-                        {((clusterSummary.upOsds / clusterSummary.totalOsds) * 100).toFixed(1)}% UP
-                     </div>
-                  </div>
+                  </Card>*/}
                </div>
-            </Card>
+            )}
 
             {/* High Risk Predictions Summary */}
-            {highRiskPredictions.length > 0 && (
-               <Card variant="glass" className="p-6 print:border-2 print:border-red-300 print:bg-red-50 print:break-inside-avoid">
+            {type === 'PREDICTIONS' && highRiskPredictions?.[0] && (
+               <Card variant="default" className="p-6 print:border-2 print:border-red-300 !bg-red-50 print:break-inside-avoid">
                   <div className="flex items-center space-x-3 mb-6">
-                     <div className="w-8 h-8 bg-red-500 rounded-lg flex items-center justify-center print:bg-red-600">
+                     <div className="w-8 h-8 bg-red-500 flex items-center justify-center print:bg-red-600">
                         <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                            <path
                               strokeLinecap="round"
@@ -239,8 +269,8 @@ export default function ReportTitlePage({
                   <div className="space-y-3">
                      {highRiskPredictions.map((prediction, index) => (
                         <div
-                           key={index}
-                           className="flex items-center justify-between p-3 bg-white rounded-lg border border-red-200 print:bg-white print:border-red-300"
+                           key={`high-pred-${prediction.name}-${index}`}
+                           className="flex items-center justify-between p-3 bg-white border border-red-200 print:bg-white print:border-red-300"
                         >
                            <div className="flex items-center space-x-4 flex-1">
                               <span className={`px-3 py-1 rounded-full text-xs font-bold uppercase ${getSeverityColor(prediction.severity)}`}>
@@ -266,7 +296,7 @@ export default function ReportTitlePage({
 
                   {/* LLM-generated summary */}
                   {highRiskSummary && (
-                     <div className="mt-4 p-4 bg-gradient-to-r from-red-50 to-orange-50 rounded-lg border border-red-200 print:bg-red-50 print:border-red-300">
+                     <div className="mt-4 p-4 bg-gradient-to-r from-red-50 to-orange-50 border border-red-200 print:bg-red-50 print:border-red-300">
                         <div className="flex items-start space-x-2 mb-2">
                            <svg className="w-5 h-5 text-red-600 mt-0.5 flex-shrink-0 print:text-red-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                               <path
@@ -284,7 +314,7 @@ export default function ReportTitlePage({
                      </div>
                   )}
 
-                  <div className="mt-4 p-3 bg-red-100 rounded-lg print:bg-red-100">
+                  <div className="mt-4 p-3 bg-red-100 print:bg-red-100">
                      <p className="text-sm text-red-800 print:text-red-900">
                         <strong>⚠ Action Required:</strong> These high-risk predictions require immediate attention. Please review the detailed analysis and
                         recommended actions in the AI Failure Predictions section.

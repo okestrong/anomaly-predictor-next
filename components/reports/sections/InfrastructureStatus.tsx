@@ -84,11 +84,11 @@ export default function InfrastructureStatus({ data }: InfrastructureStatusProps
             <h2 className="text-2xl font-semibold mb-4 print:text-black">Physical Infrastructure</h2>
 
             {/* Host Information */}
-            <Card variant="glass" className="p-6 mb-6 print:border print:border-gray-300 print:bg-white">
+            <Card variant="default" className="p-6 mb-6 print:border print:border-gray-300 print:bg-white">
                <h3 className="text-lg font-medium mb-3 text-white print:text-black">Host Configuration</h3>
                <div className="overflow-x-auto">
                   <table className="min-w-full divide-y divide-gray-200">
-                     <thead className="bg-gray-50 print:bg-gray-100">
+                     <thead className="bg-gray-50 print:bg-gray-50">
                         <tr>
                            <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider print:text-gray-700">Hostname</th>
                            <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider print:text-gray-700">CPU</th>
@@ -100,7 +100,7 @@ export default function InfrastructureStatus({ data }: InfrastructureStatusProps
                      <tbody className="bg-white divide-y divide-gray-200 print:bg-white">
                         {hosts.length > 0 ? (
                            hosts.map((host, idx) => (
-                              <tr key={idx} className="text-sm">
+                              <tr key={`host-${host.hostname || idx}`} className="text-sm">
                                  <td className="px-4 py-2 whitespace-nowrap font-medium text-gray-900 print:text-black">{host.hostname}</td>
                                  <td className="px-4 py-2 whitespace-nowrap text-gray-700 print:text-gray-800">
                                     {host.cpuCores || 'N/A'} cores
@@ -127,14 +127,141 @@ export default function InfrastructureStatus({ data }: InfrastructureStatusProps
                      </tbody>
                   </table>
                </div>
+
+               {/* Status Legend - Elegant design for report */}
+               <div className="mt-6 pt-6 border-t border-gray-200 print:border-gray-300">
+                  <h4 className="text-sm font-semibold text-gray-500 print:text-gray-800 mb-4 tracking-wide uppercase">Host Status Reference</h4>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                     {/* Healthy Status */}
+                     <div className="flex items-start gap-3 p-4 bg-gradient-to-br from-emerald-50 to-green-50 print:bg-emerald-50 border border-emerald-200 print:border-emerald-300">
+                        <div className="flex-shrink-0 w-10 h-10 rounded-full bg-emerald-500 print:bg-emerald-600 flex items-center justify-center shadow-sm">
+                           <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
+                           </svg>
+                        </div>
+                        <div className="flex-1 min-w-0">
+                           <div className="flex items-center gap-2 mb-1.5">
+                              <h5 className="text-sm font-bold text-emerald-900 print:text-emerald-900">Healthy</h5>
+                              <span className="text-xs text-emerald-600 print:text-emerald-700 font-medium">정상</span>
+                           </div>
+                           <ul className="space-y-1 text-xs text-emerald-800 print:text-emerald-900 leading-relaxed">
+                              <li className="flex items-start">
+                                 <span className="mr-1.5 mt-0.5 text-emerald-500">•</span>
+                                 <span>All OSDs operational</span>
+                              </li>
+                              <li className="flex items-start">
+                                 <span className="mr-1.5 mt-0.5 text-emerald-500">•</span>
+                                 <span>CPU/Memory usage &lt; 70%</span>
+                              </li>
+                              <li className="flex items-start">
+                                 <span className="mr-1.5 mt-0.5 text-emerald-500">•</span>
+                                 <span>Network communication normal</span>
+                              </li>
+                           </ul>
+                        </div>
+                     </div>
+
+                     {/* Degraded Status */}
+                     <div className="flex items-start gap-3 p-4 bg-gradient-to-br from-amber-50 to-yellow-50 print:bg-amber-50 border border-amber-200 print:border-amber-300">
+                        <div className="flex-shrink-0 w-10 h-10 rounded-full bg-amber-500 print:bg-amber-600 flex items-center justify-center shadow-sm">
+                           <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path
+                                 strokeLinecap="round"
+                                 strokeLinejoin="round"
+                                 strokeWidth={2.5}
+                                 d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"
+                              />
+                           </svg>
+                        </div>
+                        <div className="flex-1 min-w-0">
+                           <div className="flex items-center gap-2 mb-1.5">
+                              <h5 className="text-sm font-bold text-amber-900 print:text-amber-900">Degraded</h5>
+                              <span className="text-xs text-amber-600 print:text-amber-700 font-medium">성능 저하</span>
+                           </div>
+                           <ul className="space-y-1 text-xs text-amber-800 print:text-amber-900 leading-relaxed">
+                              <li className="flex items-start">
+                                 <span className="mr-1.5 mt-0.5 text-amber-500">•</span>
+                                 <span>Some OSDs offline</span>
+                              </li>
+                              <li className="flex items-start">
+                                 <span className="mr-1.5 mt-0.5 text-amber-500">•</span>
+                                 <span>High resource usage (70-90%)</span>
+                              </li>
+                              <li className="flex items-start">
+                                 <span className="mr-1.5 mt-0.5 text-amber-500">•</span>
+                                 <span>Network latency detected</span>
+                              </li>
+                           </ul>
+                        </div>
+                     </div>
+
+                     {/* Warning Status */}
+                     <div className="flex items-start gap-3 p-4 bg-gradient-to-br from-orange-50 to-red-50 print:bg-orange-50 border border-orange-200 print:border-orange-300">
+                        <div className="flex-shrink-0 w-10 h-10 rounded-full bg-orange-500 print:bg-orange-600 flex items-center justify-center shadow-sm">
+                           <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                           </svg>
+                        </div>
+                        <div className="flex-1 min-w-0">
+                           <div className="flex items-center gap-2 mb-1.5">
+                              <h5 className="text-sm font-bold text-orange-900 print:text-orange-900">Warning</h5>
+                              <span className="text-xs text-orange-600 print:text-orange-700 font-medium">경고</span>
+                           </div>
+                           <ul className="space-y-1 text-xs text-orange-800 print:text-orange-900 leading-relaxed">
+                              <li className="flex items-start">
+                                 <span className="mr-1.5 mt-0.5 text-orange-500">•</span>
+                                 <span>Threshold exceeded (&gt; 90%)</span>
+                              </li>
+                              <li className="flex items-start">
+                                 <span className="mr-1.5 mt-0.5 text-orange-500">•</span>
+                                 <span>OSD errors occurring</span>
+                              </li>
+                              <li className="flex items-start">
+                                 <span className="mr-1.5 mt-0.5 text-orange-500">•</span>
+                                 <span>Severe network issues</span>
+                              </li>
+                           </ul>
+                        </div>
+                     </div>
+
+                     {/* Down Status */}
+                     <div className="flex items-start gap-3 p-4 bg-gradient-to-br from-red-50 to-rose-50 print:bg-red-50 border border-red-200 print:border-red-300">
+                        <div className="flex-shrink-0 w-10 h-10 rounded-full bg-red-500 print:bg-red-600 flex items-center justify-center shadow-sm">
+                           <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12" />
+                           </svg>
+                        </div>
+                        <div className="flex-1 min-w-0">
+                           <div className="flex items-center gap-2 mb-1.5">
+                              <h5 className="text-sm font-bold text-red-900 print:text-red-900">Down</h5>
+                              <span className="text-xs text-red-600 print:text-red-700 font-medium">중단</span>
+                           </div>
+                           <ul className="space-y-1 text-xs text-red-800 print:text-red-900 leading-relaxed">
+                              <li className="flex items-start">
+                                 <span className="mr-1.5 mt-0.5 text-red-500">•</span>
+                                 <span>Host not responding</span>
+                              </li>
+                              <li className="flex items-start">
+                                 <span className="mr-1.5 mt-0.5 text-red-500">•</span>
+                                 <span>All OSDs offline</span>
+                              </li>
+                              <li className="flex items-start">
+                                 <span className="mr-1.5 mt-0.5 text-red-500">•</span>
+                                 <span>Immediate attention required</span>
+                              </li>
+                           </ul>
+                        </div>
+                     </div>
+                  </div>
+               </div>
             </Card>
 
             {/* Disk Inventory */}
-            <Card variant="glass" className="p-6 mb-6 print:border print:border-gray-300 print:bg-white">
+            <Card variant="default" className="p-6 mb-6 print:border print:border-gray-300 print:bg-white">
                <h3 className="text-lg font-medium mb-3 text-white print:text-black">Disk Inventory</h3>
                <div className="overflow-x-auto">
                   <table className="min-w-full divide-y divide-gray-200">
-                     <thead className="bg-gray-50 print:bg-gray-100">
+                     <thead className="bg-gray-50 print:bg-gray-50">
                         <tr>
                            <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider print:text-gray-700">OSD ID</th>
                            <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider print:text-gray-700">Host</th>
@@ -148,7 +275,7 @@ export default function InfrastructureStatus({ data }: InfrastructureStatusProps
                      <tbody className="bg-white divide-y divide-gray-200 print:bg-white">
                         {disks.length > 0 ? (
                            disks.map((disk, idx) => (
-                              <tr key={idx} className="text-xs">
+                              <tr key={`disk-${disk.osdId || idx}`} className="text-xs">
                                  <td className="px-3 py-2 whitespace-nowrap font-medium text-gray-900 print:text-black">{disk.osdId}</td>
                                  <td className="px-3 py-2 whitespace-nowrap text-gray-700 print:text-gray-800">{disk.hostname}</td>
                                  <td className="px-3 py-2 whitespace-nowrap text-gray-700 print:text-gray-800">{disk.device}</td>
@@ -168,7 +295,7 @@ export default function InfrastructureStatus({ data }: InfrastructureStatusProps
                                     </span>
                                  </td>
                                  <td className="px-3 py-2 text-gray-700 print:text-gray-800 flex flex-col items-start">
-                                    {disk.degradedReason?.map(r => <span>- {r}</span>)}
+                                    <span className="whitespace-pre-wrap break-words">{disk.degradedReason?.join(', ')}</span>
                                  </td>
                               </tr>
                            ))
@@ -190,11 +317,11 @@ export default function InfrastructureStatus({ data }: InfrastructureStatusProps
             <h2 className="text-2xl font-semibold mb-4 print:text-black">Logical Structure</h2>
 
             {/* Pool Configuration */}
-            <Card variant="glass" className="p-6 mb-6 print:border print:border-gray-300 print:bg-white">
+            <Card variant="default" className="p-6 mb-6 print:border print:border-gray-300 print:bg-white">
                <h3 className="text-lg font-medium mb-3 text-white print:text-black">Pool Configuration</h3>
                <div className="overflow-x-auto">
                   <table className="min-w-full divide-y divide-gray-200">
-                     <thead className="bg-gray-50 print:bg-gray-100">
+                     <thead className="bg-gray-50 print:bg-gray-50">
                         <tr>
                            <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider print:text-gray-700">Pool Name</th>
                            <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider print:text-gray-700">Type</th>
@@ -207,7 +334,7 @@ export default function InfrastructureStatus({ data }: InfrastructureStatusProps
                      <tbody className="bg-white divide-y divide-gray-200 print:bg-white">
                         {pools.length > 0 ? (
                            pools.map((pool, idx) => (
-                              <tr key={idx} className="text-sm">
+                              <tr key={`pool-${pool.name || idx}`} className="text-sm">
                                  <td className="px-4 py-2 whitespace-nowrap font-medium text-gray-900 print:text-black">{pool.name}</td>
                                  <td className="px-4 py-2 whitespace-nowrap text-gray-700 print:text-gray-800">
                                     {pool.type}
@@ -230,23 +357,6 @@ export default function InfrastructureStatus({ data }: InfrastructureStatusProps
                         )}
                      </tbody>
                   </table>
-               </div>
-            </Card>
-
-            {/* CRUSH Map Summary */}
-            <Card variant="glass" className="p-6 print:border print:border-gray-300 print:bg-white">
-               <h3 className="text-lg font-medium mb-3 text-white print:text-black">CRUSH Map Structure</h3>
-               <div className="bg-gray-50 p-4 rounded-lg print:bg-gray-100">
-                  <p className="text-sm text-gray-700 mb-2 print:text-gray-800">
-                     <strong className="print:text-black">Total Buckets:</strong> {data?.crushMap?.buckets?.length || 0}
-                  </p>
-                  <p className="text-sm text-gray-700 mb-2 print:text-gray-800">
-                     <strong className="print:text-black">Total Weight:</strong> {data?.crushMap?.totalWeight?.toFixed(2) || '0.00'}
-                  </p>
-                  <p className="text-sm text-gray-700 mb-2 print:text-gray-800">
-                     <strong className="print:text-black">Device Classes:</strong> {data?.crushMap?.deviceClasses?.join(', ') || 'None'}
-                  </p>
-                  <p className="text-xs text-gray-500 mt-3 print:text-gray-600">Detailed CRUSH Map visualization available in web view</p>
                </div>
             </Card>
          </section>

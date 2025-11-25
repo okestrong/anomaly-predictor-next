@@ -79,10 +79,10 @@ export default function DetailedTables({ data }: DetailedTablesProps) {
          {/* OSD Details Table */}
          <section>
             <h2 className="text-2xl font-semibold mb-4 print:text-black">OSD Details</h2>
-            <Card variant="glass" className="p-6 mb-6 print:border print:border-gray-300 print:bg-white">
+            <Card variant="default" className="p-6 mb-6 print:border print:border-gray-300 print:bg-white">
                <div className="overflow-x-auto">
                   <table className="min-w-full divide-y divide-gray-200 text-xs">
-                     <thead className="bg-gray-50 print:bg-gray-100">
+                     <thead className="bg-gray-50 print:bg-gray-50">
                         <tr>
                            <th className="px-2 py-2 text-left text-xs font-medium text-gray-500 uppercase print:text-gray-700">ID</th>
                            <th className="px-2 py-2 text-left text-xs font-medium text-gray-500 uppercase print:text-gray-700">Host</th>
@@ -98,8 +98,8 @@ export default function DetailedTables({ data }: DetailedTablesProps) {
                      </thead>
                      <tbody className="bg-white divide-y divide-gray-200 print:bg-white">
                         {osds.length > 0 ? (
-                           osds.map(osd => (
-                              <tr key={osd.id}>
+                           osds.map((osd, idx) => (
+                              <tr key={`osds-${osd.id}-${idx}`}>
                                  <td className="px-2 py-2 whitespace-nowrap font-medium text-gray-900 print:text-black">{osd.id}</td>
                                  <td className="px-2 py-2 whitespace-nowrap text-gray-700 print:text-gray-800">{osd.host}</td>
                                  <td className="px-2 py-2 whitespace-nowrap text-gray-700 print:text-gray-800">{osd.device}</td>
@@ -140,10 +140,10 @@ export default function DetailedTables({ data }: DetailedTablesProps) {
          {/* Pool Configuration Table */}
          <section className="page-break-before">
             <h2 className="text-2xl font-semibold mb-4 print:text-black">Pool Configuration</h2>
-            <Card variant="glass" className="p-6 mb-6 print:border print:border-gray-300 print:bg-white">
+            <Card variant="default" className="p-6 mb-6 print:border print:border-gray-300 print:bg-white">
                <div className="overflow-x-auto">
                   <table className="min-w-full divide-y divide-gray-200 text-xs">
-                     <thead className="bg-gray-50 print:bg-gray-100">
+                     <thead className="bg-gray-50 print:bg-gray-50">
                         <tr>
                            <th className="px-2 py-2 text-left text-xs font-medium text-gray-500 uppercase print:text-gray-700">Name</th>
                            <th className="px-2 py-2 text-center text-xs font-medium text-gray-500 uppercase print:text-gray-700">ID</th>
@@ -160,7 +160,7 @@ export default function DetailedTables({ data }: DetailedTablesProps) {
                      <tbody className="bg-white divide-y divide-gray-200 print:bg-white">
                         {pools.length > 0 ? (
                            pools.map(pool => (
-                              <tr key={pool.id}>
+                              <tr key={`pool-${pool.id}`}>
                                  <td className="px-2 py-2 whitespace-nowrap font-medium text-gray-900 print:text-black">{pool.name}</td>
                                  <td className="px-2 py-2 whitespace-nowrap text-center text-gray-700 print:text-gray-800">{pool.id}</td>
                                  <td className="px-2 py-2 whitespace-nowrap text-gray-700 print:text-gray-800">{pool.type}</td>
@@ -189,10 +189,10 @@ export default function DetailedTables({ data }: DetailedTablesProps) {
          {/* Client Information Table */}
          <section>
             <h2 className="text-2xl font-semibold mb-4 print:text-black">Client Connections</h2>
-            <Card variant="glass" className="p-6 mb-6 print:border print:border-gray-300 print:bg-white">
+            <Card variant="default" className="p-6 mb-6 print:border print:border-gray-300 print:bg-white">
                <div className="overflow-x-auto">
                   <table className="min-w-full divide-y divide-gray-200 text-xs">
-                     <thead className="bg-gray-50 print:bg-gray-100">
+                     <thead className="bg-gray-50 print:bg-gray-50">
                         <tr>
                            <th className="px-2 py-2 text-left text-xs font-medium text-gray-500 uppercase print:text-gray-700">Client</th>
                            <th className="px-2 py-2 text-left text-xs font-medium text-gray-500 uppercase print:text-gray-700">Address</th>
@@ -205,7 +205,7 @@ export default function DetailedTables({ data }: DetailedTablesProps) {
                      <tbody className="bg-white divide-y divide-gray-200 print:bg-white">
                         {clients.length > 0 ? (
                            clients.map((client, idx) => (
-                              <tr key={idx}>
+                              <tr key={`client-${client.name || client.address}-${idx}`}>
                                  <td className="px-2 py-2 whitespace-nowrap font-medium text-gray-900 print:text-black">{client.name}</td>
                                  <td className="px-2 py-2 whitespace-nowrap text-gray-700 print:text-gray-800">{client.address}</td>
                                  <td className="px-2 py-2 whitespace-nowrap text-right text-gray-700 print:text-gray-800">{client.readOps.toLocaleString()}</td>
@@ -232,10 +232,10 @@ export default function DetailedTables({ data }: DetailedTablesProps) {
          {/* Configuration Parameters */}
          <section className="page-break-before">
             <h2 className="text-2xl font-semibold mb-4 print:text-black">Configuration Parameters</h2>
-            <Card variant="glass" className="p-6 print:border print:border-gray-300 print:bg-white">
+            <Card variant="default" className="p-6 print:border print:border-gray-300 print:bg-white">
                <div className="overflow-x-auto">
                   <table className="min-w-full divide-y divide-gray-200 text-xs">
-                     <thead className="bg-gray-50 print:bg-gray-100">
+                     <thead className="bg-gray-50 print:bg-gray-50">
                         <tr>
                            <th className="px-2 py-2 text-left text-xs font-medium text-gray-500 uppercase print:text-gray-700">Parameter</th>
                            <th className="px-2 py-2 text-left text-xs font-medium text-gray-500 uppercase print:text-gray-700">Current Value</th>
@@ -246,7 +246,7 @@ export default function DetailedTables({ data }: DetailedTablesProps) {
                      <tbody className="bg-white divide-y divide-gray-200 print:bg-white">
                         {configParams.length > 0 ? (
                            configParams.map((param, idx) => (
-                              <tr key={idx}>
+                              <tr key={`config-${param.name}-${idx}`}>
                                  <td className="px-2 py-2 whitespace-nowrap font-mono text-xs text-gray-900 print:text-black">{param.name}</td>
                                  <td className="px-2 py-2 whitespace-nowrap font-semibold text-gray-900 print:text-black">{param.value}</td>
                                  <td className="px-2 py-2 whitespace-nowrap text-gray-700 print:text-gray-800">{param.default}</td>

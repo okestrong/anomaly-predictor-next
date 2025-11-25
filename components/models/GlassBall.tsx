@@ -62,7 +62,7 @@ export default function GlassBall({
    return (
       // <Float rotationIntensity={10} floatIntensity={10}>
       <group {...rest} dispose={null} ref={meshRef}>
-         <mesh geometry={(nodes.glass as any).geometry} material={materials.glass} scale={3.79} />
+         <mesh geometry={(nodes.glass as any).geometry} material={materials.glass} scale={3.79} castShadow />
          <mesh geometry={(nodes.metal as any).geometry} material={materials['Material.001']} scale={3.79} />
       </group>
       // </Float>

@@ -506,21 +506,35 @@ export const usePredictionStore = create<PredictionStore>()(
 
       getOverallRiskScore: () => {
         const { summary } = get()
-        // Prefer backend summary data
-        if (summary && summary.overall_risk_score !== undefined) {
+        // Prefer backend summary data (with validation)
+        if (summary && typeof summary.overall_risk_score === 'number' && !isNaN(summary.overall_risk_score)) {
           return summary.overall_risk_score * 100 // Convert to percentage
         }
 
         // Fallback to client-side calculation
         const predictions = Object.values(get().predictions)
-        const weightedSum = predictions.reduce((sum, p) => {
+
+        // Filter out predictions with invalid probability or confidence
+        const validPredictions = predictions.filter(p =>
+          typeof p.probability === 'number' &&
+          typeof p.confidence === 'number' &&
+          !isNaN(p.probability) &&
+          !isNaN(p.confidence)
+        )
+
+        // If no valid predictions, return 0
+        if (validPredictions.length === 0) {
+          return 0
+        }
+
+        const weightedSum = validPredictions.reduce((sum, p) => {
           const weight = p.severity === 'critical' ? 4 :
                         p.severity === 'high' ? 3 :
                         p.severity === 'medium' ? 2 : 1
           return sum + (p.probability * p.confidence * weight)
         }, 0)
 
-        const maxPossible = predictions.length * 4 // All critical with 100% prob and confidence
+        const maxPossible = validPredictions.length * 4 // All critical with 100% prob and confidence
         return (weightedSum / maxPossible) * 100
       },
 

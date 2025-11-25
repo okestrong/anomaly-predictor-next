@@ -35,14 +35,22 @@ export default function CapacityManagement({ data }: CapacityManagementProps) {
 
    const formatBytes = (bytes?: number) => {
       if (!bytes) return '0 B';
+
+      let byte = bytes;
+      let isMinus = false;
+      if (bytes < 0) {
+         byte = Math.abs(bytes);
+         isMinus = true;
+      }
+
       const units = ['B', 'KB', 'MB', 'GB', 'TB', 'PB'];
-      let size = bytes;
+      let size = byte;
       let unitIndex = 0;
       while (size >= 1024 && unitIndex < units.length - 1) {
          size /= 1024;
          unitIndex++;
       }
-      return `${size.toFixed(2)} ${units[unitIndex]}`;
+      return `${isMinus ? '-' : ''}${size.toFixed(2)} ${units[unitIndex]}`;
    };
 
    const getUtilizationColor = (percent: number) => {
@@ -63,21 +71,21 @@ export default function CapacityManagement({ data }: CapacityManagementProps) {
          {/* Current Usage Overview */}
          <section>
             <h2 className="text-2xl font-semibold mb-4 print:text-black">Current Usage Status</h2>
-            <Card variant="glass" className="p-6 mb-6 print:border print:border-gray-300 print:bg-white">
+            <Card variant="default" className="p-6 mb-6 print:border print:border-gray-300 print:bg-white">
                <div className="grid grid-cols-4 gap-4 mb-6">
-                  <div className="p-4 bg-gradient-to-br from-blue-50 to-blue-100 rounded-lg print:bg-blue-50">
+                  <div className="p-4 bg-gradient-to-br from-blue-100 to-blue-200 rounded-lg print:bg-blue-50">
                      <p className="text-xs text-blue-600 mb-1 print:text-blue-800">Total Capacity</p>
                      <p className="text-2xl font-bold text-blue-900 print:text-black">{formatBytes(currentUsage.totalCapacity)}</p>
                   </div>
-                  <div className="p-4 bg-gradient-to-br from-green-50 to-green-100 rounded-lg print:bg-green-50">
+                  <div className="p-4 bg-gradient-to-br from-green-100 to-green-200 rounded-lg print:bg-green-50">
                      <p className="text-xs text-green-600 mb-1 print:text-green-800">Available</p>
                      <p className="text-2xl font-bold text-green-900 print:text-black">{formatBytes(currentUsage.availableCapacity)}</p>
                   </div>
-                  <div className="p-4 bg-gradient-to-br from-orange-50 to-orange-100 rounded-lg print:bg-orange-50">
+                  <div className="p-4 bg-gradient-to-br from-orange-100 to-orange-200 rounded-lg print:bg-orange-50">
                      <p className="text-xs text-orange-600 mb-1 print:text-orange-800">Used</p>
                      <p className="text-2xl font-bold text-orange-900 print:text-black">{formatBytes(currentUsage.usedCapacity)}</p>
                   </div>
-                  <div className={`p-4 bg-gradient-to-br from-${utilizationColor.bg.split('-')[1]}-50 to-${utilizationColor.bg.split('-')[1]}-100 rounded-lg`}>
+                  <div className={`p-4 bg-gradient-to-br from-${utilizationColor.bg.split('-')[1]}-100 to-${utilizationColor.bg.split('-')[1]}-200 rounded-lg`}>
                      <p className={`text-xs ${utilizationColor.text} mb-1`}>Utilization</p>
                      <p className={`text-2xl font-bold ${utilizationColor.text}`}>{currentUsage.utilizationPercent?.toFixed(1) || '0.0'}%</p>
                   </div>
@@ -100,10 +108,10 @@ export default function CapacityManagement({ data }: CapacityManagementProps) {
          {/* Pool Usage Details */}
          <section>
             <h2 className="text-2xl font-semibold mb-4 print:text-black">Pool Usage Analysis</h2>
-            <Card variant="glass" className="p-6 mb-6 print:border print:border-gray-300 print:bg-white">
+            <Card variant="default" className="p-6 mb-6 print:border print:border-gray-300 print:bg-white">
                <div className="overflow-x-auto">
                   <table className="min-w-full divide-y divide-gray-200">
-                     <thead className="bg-gray-50 print:bg-gray-100">
+                     <thead className="bg-gray-50 print:bg-gray-50">
                         <tr>
                            <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider print:text-gray-700">Pool Name</th>
                            <th className="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase tracking-wider print:text-gray-700">Used</th>
@@ -117,7 +125,7 @@ export default function CapacityManagement({ data }: CapacityManagementProps) {
                            poolUsage.map((pool, idx) => {
                               const poolColor = getUtilizationColor(pool.utilizationPercent);
                               return (
-                                 <tr key={idx} className="text-sm">
+                                 <tr key={`capacity-pool-${pool.name}-${idx}`} className="text-sm">
                                     <td className="px-4 py-2 whitespace-nowrap font-medium text-gray-900 print:text-black">{pool.name}</td>
                                     <td className="px-4 py-2 whitespace-nowrap text-right text-gray-700 print:text-gray-800">{formatBytes(pool.used)}</td>
                                     <td className="px-4 py-2 whitespace-nowrap text-right text-gray-700 print:text-gray-800">{formatBytes(pool.available)}</td>
@@ -154,35 +162,55 @@ export default function CapacityManagement({ data }: CapacityManagementProps) {
 
             {/* Growth Trends */}
             {data?.trends && (
-               <Card variant="glass" className="p-4 mb-6 print:border print:border-gray-300 print:bg-white print:p-3 overflow-hidden">
-                  <h3 className="text-base font-medium mb-2 text-white print:text-black">Capacity Growth Trends</h3>
-                  <div data-chart="capacity-trend" className="w-full overflow-hidden">
+               <div className="mb-6">
+                  <h3 className="text-base font-semibold mb-3 text-gray-900 print:text-black">Capacity Growth Trends</h3>
+                  <div data-chart="capacity-trend" className="w-full overflow-hidden border border-gray-300 p-4 bg-white">
                      <ReportChart trendData={data.trends} height={260} />
                   </div>
-               </Card>
+               </div>
             )}
 
             {/* Predictions */}
-            <Card variant="glass" className="p-6 print:border print:border-gray-300 print:bg-white">
+            <Card variant="default" className="p-6 print:border print:border-gray-300 print:bg-white">
                <h3 className="text-lg font-medium mb-3 text-white print:text-black">Capacity Predictions</h3>
                <div className="grid grid-cols-2 gap-6">
                   <div>
-                     <div className="bg-blue-50 p-4 rounded-lg mb-4 print:bg-blue-50">
+                     <div className="bg-gradient-to-br from-blue-100 to-blue-200 p-4 mb-4">
                         <p className="text-sm text-blue-600 mb-1 print:text-blue-800">Growth Rate</p>
-                        <p className="text-xl font-bold text-blue-900 print:text-black">{formatBytes(predictions.growthRatePerDay)} / day</p>
+                        <p className="text-xl font-bold text-blue-900 print:text-black">{formatBytes(Math.floor(predictions.growthRatePerDay || 0))} / day</p>
                      </div>
-                     <div className="bg-amber-50 p-4 rounded-lg print:bg-amber-50">
-                        <p className="text-sm text-amber-600 mb-1 print:text-amber-800">Days Until Full</p>
-                        <p className="text-xl font-bold text-amber-900 print:text-black">{predictions.daysUntilFull || 'N/A'} days</p>
-                        {predictions.expectedFullDate && (
+                     <div
+                        className={`bg-gradient-to-br p-4 ${
+                           predictions.daysUntilFull && predictions.daysUntilFull > 0 ? 'from-amber-100 to-amber-200' : 'from-green-100 to-green-200'
+                        }`}
+                     >
+                        <p
+                           className={`text-sm mb-1 ${
+                              predictions.daysUntilFull && predictions.daysUntilFull > 0
+                                 ? 'text-amber-600 print:text-amber-800'
+                                 : 'text-green-600 print:text-green-800'
+                           }`}
+                        >
+                           Days Until Full
+                        </p>
+                        <p
+                           className={`text-xl font-bold ${
+                              predictions.daysUntilFull && predictions.daysUntilFull > 0 ? 'text-amber-900 print:text-black' : 'text-green-900 print:text-black'
+                           }`}
+                        >
+                           {predictions.daysUntilFull && predictions.daysUntilFull > 0 ? `${predictions.daysUntilFull.toFixed(2)} days` : 'N/A'}
+                        </p>
+                        {predictions.daysUntilFull && predictions.daysUntilFull > 0 && predictions.expectedFullDate ? (
                            <p className="text-xs text-amber-700 mt-1 print:text-amber-800">
                               Expected: {new Date(predictions.expectedFullDate).toLocaleDateString()}
                            </p>
+                        ) : (
+                           <p className="text-xs text-green-700 mt-1 print:text-green-800">Capacity usage is stable or decreasing</p>
                         )}
                      </div>
                   </div>
                   <div>
-                     <div className="bg-gradient-to-br from-purple-50 to-purple-100 p-6 rounded-lg print:bg-purple-50">
+                     <div className="bg-gradient-to-br from-purple-100 to-purple-200 p-6">
                         <p className="text-sm text-purple-600 mb-2 print:text-purple-800">Recommended Expansion</p>
                         <p className="text-2xl font-bold text-purple-900 mb-2 print:text-black">{formatBytes(predictions.recommendedExpansion)}</p>
                         <p className="text-xs text-purple-700 print:text-purple-800">Based on 6-month growth projection with 20% buffer</p>

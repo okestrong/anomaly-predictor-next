@@ -86,25 +86,42 @@ export class ReportAPI {
 
    /**
     * Get a single report by ID
-    * Tries multiple endpoints to support different report types (TREND, PREDICTIONS, DAILY)
+    * Tries generic endpoint first (has smart routing), then falls back to type-specific endpoints
     */
    static async getReportById(reportId: string): Promise<Report> {
-      // Try TREND endpoint first
+      console.log(`🔍 [FRONTEND] getReportById called for reportId: ${reportId}`);
+
+      // Try generic endpoint first - backend has smart routing based on report type registry
       try {
-         return await apiClient.get<Report>(`/api/v1/reports/trend/${reportId}`, {
+         console.log(`🎯 [FRONTEND] Trying generic endpoint: /api/v1/reports/${reportId}`);
+         const result = await apiClient.get<Report>(`/api/v1/reports/${reportId}`, {
             timeout: 30000,
          });
-      } catch (trendError) {
-         // If trend fails, try PREDICTIONS endpoint
+         console.log(`✅ [FRONTEND] Generic endpoint succeeded for ${reportId}`);
+         return result;
+      } catch (genericError) {
+         const errorDetails = genericError instanceof Error
+            ? { message: genericError.message, name: genericError.name, stack: genericError.stack }
+            : genericError;
+         console.error(`❌ [FRONTEND] Generic endpoint failed for ${reportId}`, errorDetails);
+         console.warn(`🔄 [FRONTEND] Falling back to type-specific endpoints`);
+         // If generic fails, try TREND endpoint
          try {
-            return await apiClient.get<Report>(`/api/v1/reports/predictions/${reportId}`, {
+            console.log(`🎯 [FRONTEND] Trying TREND endpoint: /api/v1/reports/trend/${reportId}`);
+            const result = await apiClient.get<Report>(`/api/v1/reports/trend/${reportId}`, {
                timeout: 30000,
             });
-         } catch (predictionsError) {
-            // If predictions fails, try generic DAILY endpoint
-            return await apiClient.get<Report>(`/api/v1/reports/${reportId}`, {
+            console.log(`✅ [FRONTEND] TREND endpoint succeeded for ${reportId}`);
+            return result;
+         } catch (trendError) {
+            console.warn(`❌ [FRONTEND] TREND endpoint failed for ${reportId}, trying PREDICTIONS endpoint`, trendError);
+            // If trend fails, try PREDICTIONS endpoint as last resort
+            console.log(`🎯 [FRONTEND] Trying PREDICTIONS endpoint: /api/v1/reports/predictions/${reportId}`);
+            const result = await apiClient.get<Report>(`/api/v1/reports/predictions/${reportId}`, {
                timeout: 30000,
             });
+            console.log(`✅ [FRONTEND] PREDICTIONS endpoint succeeded for ${reportId}`);
+            return result;
          }
       }
    }

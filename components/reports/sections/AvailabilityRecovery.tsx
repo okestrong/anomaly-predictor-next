@@ -9,15 +9,6 @@ interface AvailabilityRecoveryProps {
          scrubCompletionRate?: number;
          deepScrubCompletionRate?: number;
          pgConsistencyRate?: number;
-         backupCompliance?: number;
-      };
-      recoveryReadiness?: {
-         mtbf?: number;
-         mttr?: number;
-         rto?: number;
-         rpo?: number;
-         lastDisasterRecoveryTest?: string;
-         drTestResult?: string;
       };
       replicationStatus?: Array<{
          pool: string;
@@ -27,16 +18,16 @@ interface AvailabilityRecoveryProps {
       }>;
       scrubStatus?: Array<{
          pg: string;
-         lastScrub: string;
-         lastDeepScrub: string;
+         lastScrub?: string;
+         lastDeepScrub?: string;
          status: string;
+         scrubDuration?: number;
       }>;
    };
 }
 
 export default function AvailabilityRecovery({ data }: AvailabilityRecoveryProps) {
    const dataProtection = data?.dataProtection || {};
-   const recoveryReadiness = data?.recoveryReadiness || {};
    const replicationStatus = data?.replicationStatus || [];
    const scrubStatus = data?.scrubStatus || [];
 
@@ -46,26 +37,19 @@ export default function AvailabilityRecovery({ data }: AvailabilityRecoveryProps
       return { bg: 'bg-danger-500 print:bg-red-600', text: 'text-danger-500 print:text-red-800' };
    };
 
-   const formatDuration = (hours?: number) => {
-      if (!hours) return 'N/A';
-      if (hours < 1) return `${(hours * 60).toFixed(0)} minutes`;
-      if (hours < 24) return `${hours.toFixed(1)} hours`;
-      return `${(hours / 24).toFixed(1)} days`;
-   };
-
    return (
       <div className="space-y-8 print:text-black">
          <div className="mb-8">
             <h1 className="text-3xl font-bold text-gray-900 mb-2 print:text-black">Availability & Recovery</h1>
-            <p className="text-sm text-gray-800 print:text-gray-700">Data protection status, compliance rates, and disaster recovery readiness</p>
+            <p className="text-sm text-gray-800 print:text-gray-700">Data protection status and compliance rates</p>
          </div>
 
          {/* Data Protection Status */}
          <section>
             <h2 className="text-2xl font-semibold mb-4 print:text-black">Data Protection Status</h2>
-            <Card variant="glass" className="p-6 mb-6 print:border print:border-gray-300 print:bg-white">
-               <div className="grid grid-cols-3 gap-4 mb-6">
-                  <div className="p-4 bg-gradient-to-br from-blue-50 to-blue-100 rounded-lg print:bg-blue-50">
+            <Card variant="default" className="p-6 mb-6 print:border print:border-gray-300 print:bg-white">
+               <div className="grid grid-cols-4 gap-4 mb-6">
+                  <div className="p-4 bg-gradient-to-br from-blue-100 to-blue-200">
                      <p className="text-xs text-blue-600 mb-1 print:text-blue-800">Replication Compliance</p>
                      <p className="text-2xl font-bold text-blue-900 print:text-black">{dataProtection.replicationCompliance?.toFixed(1) || '0.0'}%</p>
                      <div className="w-full h-2 bg-gray-200 rounded-full mt-2 overflow-hidden print:bg-gray-300">
@@ -75,9 +59,11 @@ export default function AvailabilityRecovery({ data }: AvailabilityRecoveryProps
                         />
                      </div>
                   </div>
-                  <div className="p-4 bg-gradient-to-br from-green-50 to-green-100 rounded-lg print:bg-green-50">
-                     <p className="text-xs text-green-600 mb-1 print:text-green-800">Scrub Completion</p>
-                     <p className="text-2xl font-bold text-green-900 print:text-black">{dataProtection.scrubCompletionRate?.toFixed(1) || '0.0'}%</p>
+                  <div className="p-4 bg-gradient-to-br from-green-100 to-green-200 flex flex-col justify-between">
+                     <div>
+                        <p className="text-xs text-green-600 mb-1 print:text-green-800">Scrub Completion</p>
+                        <p className="text-2xl font-bold text-green-900 print:text-black">{dataProtection.scrubCompletionRate?.toFixed(1) || '0.0'}%</p>
+                     </div>
                      <div className="w-full h-2 bg-gray-200 rounded-full mt-2 overflow-hidden print:bg-gray-300">
                         <div
                            className={`h-full ${getComplianceColor(dataProtection.scrubCompletionRate || 0).bg}`}
@@ -85,7 +71,7 @@ export default function AvailabilityRecovery({ data }: AvailabilityRecoveryProps
                         />
                      </div>
                   </div>
-                  <div className="p-4 bg-gradient-to-br from-purple-50 to-purple-100 rounded-lg print:bg-purple-50">
+                  <div className="p-4 bg-gradient-to-br from-purple-100 to-purple-200 flex flex-col justify-between">
                      <p className="text-xs text-purple-600 mb-1 print:text-purple-800">PG Consistency</p>
                      <p className="text-2xl font-bold text-purple-900 print:text-black">{dataProtection.pgConsistencyRate?.toFixed(1) || '0.0'}%</p>
                      <div className="w-full h-2 bg-gray-200 rounded-full mt-2 overflow-hidden print:bg-gray-300">
@@ -101,7 +87,7 @@ export default function AvailabilityRecovery({ data }: AvailabilityRecoveryProps
                <h3 className="text-lg font-medium mb-3 text-white print:text-black">Replication Status by Pool</h3>
                <div className="overflow-x-auto">
                   <table className="min-w-full divide-y divide-gray-200">
-                     <thead className="bg-gray-50 print:bg-gray-100">
+                     <thead className="bg-gray-50 print:bg-gray-50">
                         <tr>
                            <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider print:text-gray-700">Pool</th>
                            <th className="px-4 py-2 text-center text-xs font-medium text-gray-500 uppercase tracking-wider print:text-gray-700">Target Size</th>
@@ -114,7 +100,7 @@ export default function AvailabilityRecovery({ data }: AvailabilityRecoveryProps
                      <tbody className="bg-white divide-y divide-gray-200 print:bg-white">
                         {replicationStatus.length > 0 ? (
                            replicationStatus.map((rep, idx) => (
-                              <tr key={idx} className="text-sm">
+                              <tr key={`replication-${rep.pool || idx}`} className="text-sm">
                                  <td className="px-4 py-2 whitespace-nowrap font-medium text-gray-900 print:text-black">{rep.pool}</td>
                                  <td className="px-4 py-2 whitespace-nowrap text-center text-gray-700 print:text-gray-800">{rep.targetSize}</td>
                                  <td className="px-4 py-2 whitespace-nowrap text-center text-gray-700 print:text-gray-800">{rep.currentSize}</td>
@@ -142,73 +128,13 @@ export default function AvailabilityRecovery({ data }: AvailabilityRecoveryProps
             </Card>
          </section>
 
-         {/* Recovery Readiness */}
+         {/* Recent Scrub Activity */}
          <section>
-            <h2 className="text-2xl font-semibold mb-4 print:text-black">Disaster Recovery Readiness</h2>
-            <Card variant="glass" className="p-6 mb-6 print:border print:border-gray-300 print:bg-white">
-               <div className="grid grid-cols-2 gap-6 mb-6">
-                  <div>
-                     <h3 className="text-lg font-medium mb-3 text-white print:text-black">Reliability Metrics</h3>
-                     <div className="space-y-3">
-                        <div className="p-3 bg-blue-50 rounded-lg print:bg-blue-50">
-                           <p className="text-xs text-blue-600 mb-1 print:text-blue-800">Mean Time Between Failures (MTBF)</p>
-                           <p className="text-xl font-bold text-blue-900 print:text-black">{formatDuration(recoveryReadiness.mtbf)}</p>
-                        </div>
-                        <div className="p-3 bg-green-50 rounded-lg print:bg-green-50">
-                           <p className="text-xs text-green-600 mb-1 print:text-green-800">Mean Time To Recover (MTTR)</p>
-                           <p className="text-xl font-bold text-green-900 print:text-black">{formatDuration(recoveryReadiness.mttr)}</p>
-                        </div>
-                     </div>
-                  </div>
-                  <div>
-                     <h3 className="text-lg font-medium mb-3 text-white print:text-black">Recovery Objectives</h3>
-                     <div className="space-y-3">
-                        <div className="p-3 bg-amber-50 rounded-lg print:bg-amber-50">
-                           <p className="text-xs text-amber-600 mb-1 print:text-amber-800">Recovery Time Objective (RTO)</p>
-                           <p className="text-xl font-bold text-amber-900 print:text-black">{formatDuration(recoveryReadiness.rto)}</p>
-                        </div>
-                        <div className="p-3 bg-purple-50 rounded-lg print:bg-purple-50">
-                           <p className="text-xs text-purple-600 mb-1 print:text-purple-800">Recovery Point Objective (RPO)</p>
-                           <p className="text-xl font-bold text-purple-900 print:text-black">{formatDuration(recoveryReadiness.rpo)}</p>
-                        </div>
-                     </div>
-                  </div>
-               </div>
-
-               {/* DR Test Results */}
-               <div className="p-4 bg-gradient-to-r from-gray-50 to-gray-100 rounded-lg print:bg-gray-100">
-                  <div className="flex items-start justify-between">
-                     <div>
-                        <p className="text-sm font-medium text-gray-900 mb-1 print:text-black">Last Disaster Recovery Test</p>
-                        <p className="text-xs text-gray-600 print:text-gray-700">
-                           {recoveryReadiness.lastDisasterRecoveryTest
-                              ? new Date(recoveryReadiness.lastDisasterRecoveryTest).toLocaleDateString()
-                              : 'No tests conducted'}
-                        </p>
-                     </div>
-                     <div className="text-right">
-                        <span
-                           className={`px-3 py-1 text-sm font-semibold rounded ${
-                              recoveryReadiness.drTestResult?.toLowerCase() === 'passed'
-                                 ? 'bg-success-500 text-white print:bg-green-600'
-                                 : recoveryReadiness.drTestResult?.toLowerCase() === 'failed'
-                                   ? 'bg-danger-500 text-white print:bg-red-600'
-                                   : 'bg-secondary-500 text-white print:bg-gray-600'
-                           }`}
-                        >
-                           {recoveryReadiness.drTestResult || 'Pending'}
-                        </span>
-                     </div>
-                  </div>
-               </div>
-            </Card>
-
-            {/* Scrub Status */}
-            <Card variant="glass" className="p-6 print:border print:border-gray-300 print:bg-white">
-               <h3 className="text-lg font-medium mb-3 text-white print:text-black">Recent Scrub Activity</h3>
+            <h2 className="text-2xl font-semibold mb-4 print:text-black">Recent Scrub Activity</h2>
+            <Card variant="default" className="p-6 print:border print:border-gray-300 print:bg-white">
                <div className="overflow-x-auto">
                   <table className="min-w-full divide-y divide-gray-200">
-                     <thead className="bg-gray-50 print:bg-gray-100">
+                     <thead className="bg-gray-50 print:bg-gray-50">
                         <tr>
                            <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider print:text-gray-700">PG</th>
                            <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider print:text-gray-700">Last Scrub</th>
@@ -221,13 +147,13 @@ export default function AvailabilityRecovery({ data }: AvailabilityRecoveryProps
                      <tbody className="bg-white divide-y divide-gray-200 print:bg-white">
                         {scrubStatus.length > 0 ? (
                            scrubStatus.slice(0, 5).map((scrub, idx) => (
-                              <tr key={idx} className="text-sm">
+                              <tr key={`scrub-${scrub.pg || idx}`} className="text-sm">
                                  <td className="px-3 py-2 whitespace-nowrap font-medium text-gray-900 print:text-black">{scrub.pg}</td>
                                  <td className="px-3 py-2 whitespace-nowrap text-gray-700 print:text-gray-800">
-                                    {new Date(scrub.lastScrub).toLocaleDateString()}
+                                    {scrub.lastScrub ? new Date(scrub.lastScrub).toLocaleDateString() : 'N/A'}
                                  </td>
                                  <td className="px-3 py-2 whitespace-nowrap text-gray-700 print:text-gray-800">
-                                    {new Date(scrub.lastDeepScrub).toLocaleDateString()}
+                                    {scrub.lastDeepScrub ? new Date(scrub.lastDeepScrub).toLocaleDateString() : 'N/A'}
                                  </td>
                                  <td className="px-3 py-2 whitespace-nowrap text-center">
                                     <span

@@ -34,7 +34,14 @@
       "Read(//Users/jclee/Documents/Okestro/Projects/DevSw/**)",
       "Bash(./gradlew dependencies:*)",
       "Bash(./gradlew clean:*)",
-      "Bash(javap:*)"
+      "Bash(javap:*)",
+      "Bash(./gradlew compileJava:*)",
+      "Bash(for line in 661 757 858 954 1038 1140 1244 2860)",
+      "Bash(do echo \"=== Line $line ===\")",
+      "Bash(done)",
+      "Bash(lsof:*)",
+      "Bash(jps:*)",
+      "Bash(ps:*)"
     ],
     "deny": [],
     "ask": []

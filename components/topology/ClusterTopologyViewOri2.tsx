@@ -413,8 +413,6 @@ const SpaceshipHost = forwardRef<
       }
    });
 
-   console.log('##### hostData=', hostData);
-
    return (
       <>
          <group
@@ -1775,7 +1773,6 @@ export default function ClusterTopologyViewOri2() {
    // const togglePanel = (position: 'top' | 'left' | 'bottom' | 'right') => {};
 
    const toggleAllPanels = useCallback(() => {
-      console.log('##### toggle-all-panels 호출됨');
       const targetPositions: Array<'top' | 'left' | 'bottom' | 'right'> = ['top', 'left', 'bottom', 'right'];
 
       // useRef로 상태 확인 (리렌더링 없음)
@@ -4224,8 +4221,6 @@ export default function ClusterTopologyViewOri2() {
                } else if (nodeType === 'Host') {
                   // Get host detail from nodeData.hostData.detail
                   const hostDetail = nodeData.hostData?.detail;
-                  console.log('##### nodeData=', nodeData);
-                  console.log('##### hostDetail=', hostDetail);
 
                   infoTitle.textContent = `Host: ${hostDetail?.hostname || nodeData.name || nodeData.id}`;
                   infoContent.innerHTML = `

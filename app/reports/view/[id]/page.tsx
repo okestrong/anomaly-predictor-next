@@ -5,20 +5,21 @@
 
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { useReportStore } from '@/stores/report';
 import { usePredictionStore } from '@/stores/prediction';
 import { toast } from 'react-toastify';
 import { EmailDialog } from '@/components/reports/EmailDialog';
 import { downloadBlob, ReportAPI } from '@/lib/api/reportApi';
+import { DashboardAPI } from '@/lib/api/dashboardApi';
 // Import new section components
 import ReportTitlePage from '@/components/reports/sections/ReportTitlePage';
+import ClusterInformation from '@/components/reports/sections/ClusterInformation';
 import ExecutiveSummary from '@/components/reports/sections/ExecutiveSummary';
 import InfrastructureStatus from '@/components/reports/sections/InfrastructureStatus';
 import PerformanceMetrics from '@/components/reports/sections/PerformanceMetrics';
 import CapacityManagement from '@/components/reports/sections/CapacityManagement';
-import AIInsightsSection from '@/components/reports/sections/AIInsightsSection';
 import AvailabilityRecovery from '@/components/reports/sections/AvailabilityRecovery';
 import OperationalHistory from '@/components/reports/sections/OperationalHistory';
 import DetailedTables from '@/components/reports/sections/DetailedTables';
@@ -27,195 +28,10 @@ import TrendReportView from '@/components/reports/views/TrendReportView';
 import { AppHeader } from '@/components/layout';
 import dayjs from 'dayjs';
 import utc from 'dayjs/plugin/utc';
+import ExecutiveAlerts from '@/components/reports/sections/ExecutiveAlerts';
 
 // Extend dayjs with UTC plugin
 dayjs.extend(utc);
-
-// Particles Background with subtle gray particles
-function ParticlesBackground() {
-   const canvasRef = useRef<HTMLCanvasElement>(null);
-   const animationIdRef = useRef<number | null>(null);
-   const particlesRef = useRef<any[]>([]);
-
-   useEffect(() => {
-      const canvas = canvasRef.current;
-      if (!canvas) return;
-
-      const ctx = canvas.getContext('2d', { alpha: true });
-      if (!ctx) return;
-
-      canvas.width = window.innerWidth;
-      canvas.height = window.innerHeight;
-
-      // Subtle gray colors for particles (darker than white background)
-      const particleColors = ['#d0d0d0', '#c5c5c5', '#b8b8b8', '#cacaca', '#bcbcbc'];
-
-      // Reduced particle count to 1/10
-      const PARTICLE_COUNT = 20;
-
-      // Create particles only once
-      if (particlesRef.current.length === 0) {
-         for (let i = 0; i < PARTICLE_COUNT; i++) {
-            particlesRef.current.push({
-               x: Math.random() * canvas.width,
-               y: Math.random() * canvas.height,
-               vx: (Math.random() - 0.5) * 0.8,
-               vy: (Math.random() - 0.5) * 0.8,
-               size: Math.random() * 4 + 1,
-               color: particleColors[Math.floor(Math.random() * particleColors.length)],
-               opacity: Math.random() * 0.8 + 0.3,
-               pulseSpeed: Math.random() * 0.05 + 0.01,
-               pulsePhase: Math.random() * Math.PI * 2,
-            });
-         }
-      }
-
-      let frameCount = 0;
-      let time = 0;
-
-      function animate() {
-         if (!ctx || !canvas) return;
-
-         frameCount++;
-         time += 0.016;
-
-         // Clear canvas
-         ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-         // Enhanced connection system - check more particles for connections
-         particlesRef.current.forEach((particle, i) => {
-            // Check connections for more particles, but with distance optimization
-            if (i % 2 === 0) {
-               particlesRef.current.slice(i + 1).forEach(other => {
-                  const dx = particle.x - other.x;
-                  const dy = particle.y - other.y;
-                  const distance = Math.sqrt(dx * dx + dy * dy);
-
-                  // Increased connection distance and better visuals
-                  if (distance < 120) {
-                     const alpha = (1 - distance / 120) * 0.25;
-                     const gradient = ctx.createLinearGradient(particle.x, particle.y, other.x, other.y);
-                     gradient.addColorStop(
-                        0,
-                        particle.color +
-                           Math.floor(alpha * 255)
-                              .toString(16)
-                              .padStart(2, '0'),
-                     );
-                     gradient.addColorStop(
-                        1,
-                        other.color +
-                           Math.floor(alpha * 255)
-                              .toString(16)
-                              .padStart(2, '0'),
-                     );
-
-                     ctx.strokeStyle = gradient;
-                     ctx.lineWidth = 0.8 + (1 - distance / 120) * 1.2;
-                     ctx.globalAlpha = alpha;
-                     ctx.beginPath();
-                     ctx.moveTo(particle.x, particle.y);
-                     ctx.lineTo(other.x, other.y);
-                     ctx.stroke();
-                  }
-               });
-            }
-         });
-
-         // Enhanced particle rendering with pulsing effects
-         particlesRef.current.forEach((particle, i) => {
-            // Update position
-            particle.x += particle.vx;
-            particle.y += particle.vy;
-
-            // Wrap around edges
-            if (particle.x < 0) particle.x = canvas.width;
-            if (particle.x > canvas.width) particle.x = 0;
-            if (particle.y < 0) particle.y = canvas.height;
-            if (particle.y > canvas.height) particle.y = 0;
-
-            // Update pulse phase
-            particle.pulsePhase += particle.pulseSpeed;
-            const pulseMultiplier = 1 + Math.sin(particle.pulsePhase) * 0.3;
-
-            // Enhanced glow effect with multiple layers
-            const currentSize = particle.size * pulseMultiplier;
-            const currentOpacity = particle.opacity * (0.8 + Math.sin(particle.pulsePhase) * 0.2);
-
-            // Outer glow
-            ctx.fillStyle = particle.color;
-            ctx.globalAlpha = currentOpacity * 0.1;
-            ctx.beginPath();
-            ctx.arc(particle.x, particle.y, currentSize * 4, 0, Math.PI * 2);
-            ctx.fill();
-
-            // Middle glow
-            ctx.globalAlpha = currentOpacity * 0.3;
-            ctx.beginPath();
-            ctx.arc(particle.x, particle.y, currentSize * 2.5, 0, Math.PI * 2);
-            ctx.fill();
-
-            // Inner glow
-            ctx.globalAlpha = currentOpacity * 0.5;
-            ctx.beginPath();
-            ctx.arc(particle.x, particle.y, currentSize * 1.5, 0, Math.PI * 2);
-            ctx.fill();
-
-            // Core particle
-            ctx.globalAlpha = currentOpacity;
-            ctx.beginPath();
-            ctx.arc(particle.x, particle.y, currentSize, 0, Math.PI * 2);
-            ctx.fill();
-
-            // Add sparkle effect for some particles
-            if (i % 10 === 0 && Math.sin(particle.pulsePhase) > 0.8) {
-               ctx.fillStyle = '#ffffff';
-               ctx.globalAlpha = 0.8;
-               ctx.beginPath();
-               ctx.arc(particle.x, particle.y, currentSize * 0.5, 0, Math.PI * 2);
-               ctx.fill();
-            }
-         });
-
-         ctx.globalAlpha = 1;
-
-         animationIdRef.current = requestAnimationFrame(animate);
-      }
-
-      animate();
-
-      const handleResize = () => {
-         canvas.width = window.innerWidth;
-         canvas.height = window.innerHeight;
-         // Redistribute particles on resize
-         particlesRef.current.forEach(particle => {
-            if (particle.x > canvas.width) particle.x = Math.random() * canvas.width;
-            if (particle.y > canvas.height) particle.y = Math.random() * canvas.height;
-         });
-      };
-
-      window.addEventListener('resize', handleResize);
-
-      return () => {
-         if (animationIdRef.current) {
-            cancelAnimationFrame(animationIdRef.current);
-         }
-         window.removeEventListener('resize', handleResize);
-         // Clear particles on unmount
-         particlesRef.current = [];
-      };
-   }, []);
-
-   return (
-      <canvas
-         ref={canvasRef}
-         className="absolute inset-0 z-0 opacity-70 pointer-events-none"
-         style={{
-            background: 'linear-gradient(150deg, #ffffff 0%, #ffffff 33%, #e7e5e4 33%, #e7e5e4 66%, #ffffff 66%, #ffffff 100%)',
-         }}
-      />
-   );
-}
 
 export default function ReportViewPage() {
    const params = useParams();
@@ -227,6 +43,7 @@ export default function ReportViewPage() {
    const [isEmailDialogOpen, setIsEmailDialogOpen] = useState(false);
    const [isExporting, setIsExporting] = useState(false);
    const [isReportReady, setIsReportReady] = useState(false);
+   const [capacityData, setCapacityData] = useState<any>(null);
 
    useEffect(() => {
       if (reportId) {
@@ -250,20 +67,25 @@ export default function ReportViewPage() {
       updateAllPredictions();
    }, [updateAllPredictions]);
 
+   // Fetch capacity data from dashboard API (includes dailyGrowthBytes and timeToFullDays)
+   useEffect(() => {
+      (async () => {
+         try {
+            const data = await DashboardAPI.getCapacity();
+            setCapacityData(data);
+         } catch (err) {
+            console.error('Failed to fetch capacity data:', err);
+         }
+      })();
+   }, []);
+
    // Check if report and charts are ready for PDF generation
    useEffect(() => {
       if (currentReport) {
          // Wait for charts to render
          const checkInterval = setInterval(() => {
+            // Both TREND and DAILY reports now use ECharts containers
             const chartContainers = document.querySelectorAll('.echarts-container');
-            const totalCharts = Object.keys(currentReport.data?.trends || {}).length || 0;
-
-            // If no charts, mark as ready immediately
-            if (totalCharts === 0) {
-               setIsReportReady(true);
-               clearInterval(checkInterval);
-               return;
-            }
 
             // Check if all charts are rendered (canvas elements exist)
             const renderedCharts = Array.from(chartContainers).filter(container => {
@@ -271,17 +93,44 @@ export default function ReportViewPage() {
                return canvas !== null;
             });
 
-            if (renderedCharts.length === totalCharts && totalCharts > 0) {
-               setIsReportReady(true);
-               clearInterval(checkInterval);
+            const totalRendered = renderedCharts.length;
+
+            if (currentReport.type === 'TREND') {
+               // TREND reports: Wait for at least 10 charts to render (out of ~17 total)
+               console.log(`TREND report: ${totalRendered} ECharts rendered (waiting for >= 10)`);
+               if (totalRendered >= 10) {
+                  console.log(`✓ TREND report ready: ${totalRendered} charts rendered`);
+                  setIsReportReady(true);
+                  clearInterval(checkInterval);
+               }
+            } else {
+               // DAILY reports: Wait for all charts based on trends data
+               const totalCharts = Object.keys(currentReport.data?.trends || {}).length || 0;
+
+               console.log(`DAILY report: ${totalRendered}/${totalCharts} ECharts rendered`);
+
+               // If no charts expected, mark as ready immediately
+               if (totalCharts === 0) {
+                  setIsReportReady(true);
+                  clearInterval(checkInterval);
+                  return;
+               }
+
+               if (totalRendered === totalCharts && totalCharts > 0) {
+                  console.log(`✓ DAILY report ready: ${totalRendered} charts rendered`);
+                  setIsReportReady(true);
+                  clearInterval(checkInterval);
+               }
             }
          }, 100);
 
-         // Timeout after 10 seconds
+         // Timeout: 20 seconds for TREND reports (more charts), 10 seconds for others
+         const timeoutDuration = currentReport.type === 'TREND' ? 20000 : 10000;
          const timeout = setTimeout(() => {
+            console.log(`Report ready timeout reached (${timeoutDuration}ms), marking as ready`);
             setIsReportReady(true);
             clearInterval(checkInterval);
-         }, 10000);
+         }, timeoutDuration);
 
          return () => {
             clearInterval(checkInterval);
@@ -343,532 +192,567 @@ export default function ReportViewPage() {
    }
 
    return (
-      <div className="min-h-screen relative print:bg-white" data-report-ready={isReportReady}>
-         <div className="print:hidden">
-            <AppHeader />
-         </div>
-         {/* 파티클 배경 */}
-         <div className="fixed inset-0 w-full h-full overflow-hidden z-0 print:hidden">
-            {/* Particles with diagonal gradient background */}
-            <ParticlesBackground />
-         </div>
+      <>
+         <style jsx>{`
+            @media print {
+               .print-bg-white {
+                  background: white !important;
+               }
+            }
+         `}</style>
+         <div
+            className="min-h-screen relative bg-slate-600 print-bg-white"
+            data-report-ready={isReportReady}
+            style={{
+               background:
+                  'radial-gradient(ellipse at top left, rgba(6, 182, 212, 0.15) 0%, transparent 50%), radial-gradient(ellipse at top right, rgba(59, 130, 246, 0.12) 0%, transparent 50%), radial-gradient(ellipse at bottom left, rgba(99, 102, 241, 0.1) 0%, transparent 50%), radial-gradient(ellipse at bottom right, rgba(168, 85, 247, 0.08) 0%, transparent 50%), linear-gradient(135deg, #1a1f2e 0%, #16213e 25%, #0f3460 50%, #16213e 75%, #1a1f2e 100%)',
+               backgroundAttachment: 'fixed',
+            }}
+         >
+            {/* Sophisticated mesh pattern */}
+            <div
+               className="absolute inset-0 opacity-[0.04] print:hidden pointer-events-none"
+               style={{
+                  backgroundImage: `
+                  repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(99, 179, 237, 0.03) 2px, rgba(99, 179, 237, 0.03) 4px),
+                  repeating-linear-gradient(90deg, transparent, transparent 2px, rgba(99, 179, 237, 0.03) 2px, rgba(99, 179, 237, 0.03) 4px)
+               `,
+                  backgroundSize: '60px 60px',
+               }}
+            />
 
-         {/* 메인 컨텐츠 */}
-         <div className="container mx-auto px-4 py-6 max-w-7xl relative z-10">
-            {/* Report Header */}
-            <div className="mb-8 no-print">
-               <div className="flex items-center justify-between mb-4">
-                  <div className="flex items-center gap-4">
-                     {/* Back Button */}
-                     <button
-                        onClick={() => router.push('/reports')}
-                        className="w-10 h-10 rounded-full bg-secondary-800/60 backdrop-blur-md border border-ai-primary/30 text-white flex items-center justify-center hover:bg-orange-400 hover:border-orange-500 hover:scale-110 transition-all duration-200 cursor-pointer group"
-                        aria-label="Back to reports"
-                     >
-                        <svg className="w-5 h-5 group-hover:translate-x-[-2px] transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-                        </svg>
-                     </button>
-                     <div>
-                        <h1 className="text-3xl font-bold text-slate-800 mb-2">{currentReport.title}</h1>
-                        <p className="text-slate-500">
-                           {currentReport.description}
-                           <br />
-                           {currentReport.timeRange && (
-                              <>
-                                 {' '}
-                                 covering {dayjs(currentReport.timeRange.start).format('YYYY-MM-DD HH:mm')} to{' '}
-                                 {dayjs(currentReport.timeRange.end).format('YYYY-MM-DD HH:mm')}
-                              </>
+            {/* Elegant glow accents */}
+            <div className="absolute top-0 left-0 w-full h-px bg-gradient-to-r from-transparent via-cyan-400/40 to-transparent print:hidden" />
+            <div className="absolute bottom-0 left-0 w-full h-px bg-gradient-to-r from-transparent via-blue-400/30 to-transparent print:hidden" />
+
+            {/* Corner accents */}
+            <div className="absolute top-0 left-0 w-64 h-64 bg-gradient-radial from-cyan-500/10 to-transparent print:hidden pointer-events-none" />
+            <div className="absolute top-0 right-0 w-64 h-64 bg-gradient-radial from-blue-500/10 to-transparent print:hidden pointer-events-none" />
+
+            <div className="print:hidden">
+               <AppHeader />
+            </div>
+
+            {/* 메인 컨텐츠 - A4 Paper Style */}
+            <div className="container mx-auto px-4 py-8 max-w-[850px] relative z-10 print:max-w-full print:px-0 print:py-0">
+               {/* Report Header - Professional Light Theme */}
+               <div className="mb-6 no-print bg-white shadow-sm border border-gray-200 p-6">
+                  <div className="flex items-center justify-between mb-6">
+                     <div className="flex items-center gap-4">
+                        {/* Back Button */}
+                        <button
+                           onClick={() => router.push('/reports')}
+                           className="h-10 aspect-square bg-gray-100 border border-gray-300 text-gray-700 flex items-center justify-center hover:bg-gray-200 hover:border-gray-400 transition-colors cursor-pointer group"
+                           aria-label="Back to reports"
+                        >
+                           <svg className="w-5 h-5 group-hover:translate-x-[-2px] transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                           </svg>
+                        </button>
+                        <div>
+                           <h1 className="text-2xl font-bold text-gray-900 mb-1">{currentReport.title}</h1>
+                           <p className="text-xs text-gray-600">
+                              {currentReport.description}
+                              {/* PREDICTIONS 리포트는 미래 예측이므로 시간 범위 표시 안함 */}
+                              {currentReport.type !== 'PREDICTIONS' && currentReport.timeRange && (
+                                 <>
+                                    <br />
+                                    {' • '}
+                                    {dayjs.utc(currentReport.timeRange.start).local().format('YYYY-MM-DD HH:mm')} to{' '}
+                                    {dayjs.utc(currentReport.timeRange.end).local().format('YYYY-MM-DD HH:mm')}
+                                 </>
+                              )}
+                           </p>
+                        </div>
+                     </div>
+                     <div className="flex gap-2">
+                        <button
+                           onClick={handleExportPDF}
+                           disabled={isExporting}
+                           className="px-4 py-2 bg-cyan-600 text-white text-sm font-medium hover:bg-cyan-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer flex items-center gap-2"
+                        >
+                           {isExporting && (
+                              <svg className="animate-spin h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                 <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                 <path
+                                    className="opacity-75"
+                                    fill="currentColor"
+                                    d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                                 ></path>
+                              </svg>
                            )}
+                           {isExporting ? 'Exporting...' : 'Export PDF'}
+                        </button>
+                        <button
+                           onClick={() => setIsEmailDialogOpen(true)}
+                           className="px-4 py-2 bg-gray-100 border border-gray-300 text-gray-700 text-sm font-medium hover:bg-gray-200 transition-colors cursor-pointer"
+                        >
+                           Email Report
+                        </button>
+                     </div>
+                  </div>
+
+                  {/* Report Metadata */}
+                  <div className="grid grid-cols-4 gap-4 pt-4 border-t border-gray-200">
+                     <div>
+                        <p className="text-xs text-gray-500 mb-1">Type</p>
+                        <p className="text-sm font-semibold text-gray-900 capitalize">{currentReport.type.replace('-', ' ')}</p>
+                     </div>
+                     <div>
+                        <p className="text-xs text-gray-500 mb-1">Status</p>
+                        <p className="text-sm font-semibold text-green-600">{currentReport.status}</p>
+                     </div>
+                     <div>
+                        <p className="text-xs text-gray-500 mb-1">Generated</p>
+                        <p className="text-sm font-semibold text-gray-900">{dayjs(currentReport.createdAt).format('YYYY-MM-DD HH:mm')}</p>
+                     </div>
+                     <div>
+                        <p className="text-xs text-gray-500 mb-1">{currentReport.type === 'PREDICTIONS' ? 'Analysis Type' : 'Period'}</p>
+                        <p className="text-sm font-semibold text-gray-900">
+                           {currentReport.type === 'PREDICTIONS' ? 'Forward-Looking Forecast' : currentReport.timeRange?.label}
                         </p>
                      </div>
                   </div>
-                  <div className="flex gap-3">
-                     <button
-                        onClick={handleExportPDF}
-                        disabled={isExporting}
-                        className="px-4 py-2 bg-ai-primary text-white rounded-lg hover:bg-ai-primary/90 hover:shadow-xl hover:shadow-ai-primary/50 hover:scale-105 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100 shadow-lg shadow-ai-primary/30 cursor-pointer flex items-center gap-2"
-                     >
-                        {isExporting && (
-                           <svg className="animate-spin h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                           </svg>
-                        )}
-                        {isExporting ? 'Exporting...' : 'Export PDF'}
-                     </button>
-                     <button
-                        onClick={() => setIsEmailDialogOpen(true)}
-                        className="px-4 py-2 bg-secondary-800/60 backdrop-blur-md border border-ai-primary/30 text-white rounded-lg hover:bg-secondary-800/80 hover:border-ai-primary/60 transition cursor-pointer"
-                     >
-                        Email Report
-                     </button>
-                  </div>
                </div>
 
-               {/* Report Metadata */}
-               <div className="grid grid-cols-2 md:grid-cols-4 gap-4 bg-secondary-800/80 backdrop-blur-md rounded-lg p-4 border border-ai-primary/30">
-                  <div>
-                     <p className="text-sm text-slate-300">Type</p>
-                     <p className="font-semibold text-white capitalize">{currentReport.type.replace('-', ' ')}</p>
-                  </div>
-                  <div>
-                     <p className="text-sm text-slate-300">Status</p>
-                     <p className="font-semibold text-green-400">{currentReport.status}</p>
-                  </div>
-                  <div>
-                     <p className="text-sm text-slate-300">Generated</p>
-                     <p className="font-semibold text-white">{dayjs(currentReport.createdAt).format('YYYY-MM-DD HH:mm:ss')}</p>
-                  </div>
-                  <div>
-                     <p className="text-sm text-slate-300">Period</p>
-                     <p className="font-semibold text-white">{currentReport.timeRange?.label}</p>
-                  </div>
-               </div>
-            </div>
+               {/* Enhanced Report Content - Conditional rendering based on report type */}
+               <div className="space-y-6 print:space-y-0">
+                  {/* TREND Report View */}
+                  {currentReport.type === 'TREND' && <TrendReportView report={currentReport} />}
 
-            {/* Enhanced Report Content - Conditional rendering based on report type */}
-            <div className="space-y-6 print:space-y-0">
-               {/* TREND Report View */}
-               {currentReport.type === 'TREND' && <TrendReportView report={currentReport} />}
-
-               {/* DAILY Report View - Legacy sections */}
-               {currentReport.type === 'DAILY' && (
-                  <>
-                     {/* Report Title Page */}
-                     <div className="hidden print:block">
-                        <ReportTitlePage
-                           reportTitle={currentReport.title}
-                           generatedAt={currentReport.createdAt}
-                           timeRange={currentReport.timeRange}
-                           clusterSummary={{
-                              health: currentReport.data?.clusterHealth?.health || 'HEALTH_WARN',
-                              capacityUtilization: currentReport.data?.keyMetrics?.capacity?.utilizationPercent || 0,
-                              activeAlerts: currentReport.data?.clusterHealth?.activeAlarms || 0,
-                              totalOsds: currentReport.data?.keyMetrics?.osdStatus?.totalOsds || 0,
-                              upOsds: currentReport.data?.keyMetrics?.osdStatus?.upOsds || 0,
-                              totalCapacity: currentReport.data?.keyMetrics?.capacity?.totalCapacity || 0,
-                              usedCapacity: currentReport.data?.keyMetrics?.capacity?.usedCapacity || 0,
-                           }}
-                           clusterInfo={{
-                              clusterId: currentReport.data?.clusterInfo?.fsid,
-                              cephVersion: currentReport.data?.clusterInfo?.version,
-                              monCount: currentReport.data?.clusterInfo?.monCount,
-                              osdCount: currentReport.data?.keyMetrics?.osdStatus?.totalOsds,
-                              mgrCount: currentReport.data?.clusterInfo?.mgrCount,
-                              poolCount: currentReport.data?.poolsSummary?.length,
-                              uptime: currentReport.data?.clusterInfo?.uptime,
-                              publicNetwork: currentReport.data?.clusterInfo?.publicNetwork,
-                              clusterNetwork: currentReport.data?.clusterInfo?.clusterNetwork,
-                           }}
-                           highRiskPredictions={getHighRiskPredictions().map(p => ({
-                              name: p.name,
-                              severity: p.severity as 'high' | 'critical',
-                              probability: p.probability,
-                              timeToImpact: p.timeToImpact,
-                           }))}
-                           highRiskSummary={currentReport.aiInsights?.highRiskSummary}
-                        />
-                     </div>
-
-                     {/* Executive Summary - Page 1 */}
-                     <section className="page-break-after print:bg-white print:text-black">
-                        <ExecutiveSummary
-                           data={{
-                              healthScore: currentReport.data?.clusterHealth?.healthScore || 85,
-                              kpis: {
-                                 totalCapacity: currentReport.data?.keyMetrics?.capacity?.totalCapacity,
-                                 usedCapacity: currentReport.data?.keyMetrics?.capacity?.usedCapacity,
-                                 utilizationPercent: currentReport.data?.keyMetrics?.capacity?.utilizationPercent,
-                                 totalOsds: currentReport.data?.keyMetrics?.osdStatus?.totalOsds,
-                                 healthyOsds: currentReport.data?.keyMetrics?.osdStatus?.healthyOsds,
-                                 avgLatency: currentReport.data?.keyMetrics?.performance?.avgLatency,
-                                 totalIOPS:
-                                    (currentReport.data?.keyMetrics?.performance?.readOps || 0) + (currentReport.data?.keyMetrics?.performance?.writeOps || 0),
-                                 throughput:
-                                    (currentReport.data?.keyMetrics?.performance?.readThroughput || 0) +
-                                    (currentReport.data?.keyMetrics?.performance?.writeThroughput || 0),
-                              },
-                              // Map AI predictions to risks
-                              risks:
-                                 currentReport.aiInsights?.predictions?.map(p => ({
-                                    level: p.impact,
-                                    category: p.category,
-                                    description: `${p.probability}% probability in ${p.estimatedTime}`,
-                                    impact: p.impact,
-                                 })) || [],
-                              // Map top alerts to critical issues
-                              criticalIssues:
-                                 currentReport.data?.alerts?.topAlerts?.map(a => ({
-                                    severity: a.severity,
-                                    title: a.title,
-                                    description: a.message,
-                                    action: a.resolveAction || 'Review and acknowledge',
-                                 })) || [],
-                           }}
-                        />
-                     </section>
-
-                     {/* Infrastructure Status - Pages 2-3 */}
-                     <section className="page-break-after print:bg-white print:text-black">
-                        <InfrastructureStatus
-                           data={{
-                              // Map hostsSummary to hosts format
-                              hosts:
-                                 currentReport.data?.hostsSummary?.map(h => ({
-                                    hostname: h.hostname,
-                                    cpuCores: h.coreCount,
-                                    cpuModel: h.cpuModel,
-                                    memoryGB: Math.round(h.memory / 1024 / 1024 / 1024),
-                                    cpuUsage: h.avgCpuUsage,
-                                    memUsage: +(h.avgMemUsage || 0).toFixed(2),
-                                    osdCount: h.osdCount,
-                                    status: h.upOsds === h.totalOsds ? 'healthy' : 'degraded',
-                                    networkRxMBps: h.networkRxMBps,
-                                    networkTxMBps: h.networkTxMBps,
-                                 })) || [],
-                              // Transform InventoryResponse[] to Disk[]
-                              disks:
-                                 currentReport.data?.disks?.flatMap(
-                                    host =>
-                                       host.devices
-                                          ?.filter(device => device.osd_ids && device.osd_ids.length > 0)
-                                          .flatMap(device =>
-                                             device.osd_ids.map(osdId => ({
-                                                osdId: osdId,
-                                                hostname: host.name,
-                                                device: device.path,
-                                                deviceClass: device.human_readable_type || 'unknown',
-                                                sizeBytes: device.sys_api?.size || 0,
-                                                usedBytes: 0, // Not available in current data structure
-                                                healthStatus: device.rejected_reasons && device.rejected_reasons.length > 0 ? 'degraded' : 'healthy',
-                                                degradedReason: device.rejected_reasons,
-                                             })),
-                                          ) || [],
-                                 ) || [],
-                              // Map poolsSummary to pools format
-                              pools:
-                                 currentReport.data?.poolsSummary?.map(p => ({
-                                    name: p.poolName,
-                                    type: 'replicated',
-                                    size: p.size,
-                                    minSize: p.minSize,
-                                    pgNum: p.pgNum,
-                                    used: p.usedBytes,
-                                    available: p.maxBytes - p.usedBytes,
-                                 })) || [],
-                              crushMap: undefined,
-                              networkTopology: undefined,
-                              pgDistribution: undefined,
-                           }}
-                        />
-                     </section>
-
-                     {/* Performance Metrics - Pages 4-6 */}
-                     <section className="page-break-after print:bg-white print:text-black">
-                        <PerformanceMetrics
-                           data={{
-                              iops: {
-                                 poolTrends: currentReport.data?.trends?.iops,
-                                 topClients: [], // No client data in API response
-                              },
-                              latency: {
-                                 distribution: currentReport.data?.trends?.latency,
-                                 // Calculate percentiles from trend data
-                                 percentiles: (() => {
-                                    const latencyData = currentReport.data?.trends?.latency?.data || [];
-                                    if (latencyData.length === 0) return { p50: 0, p95: 0, p99: 0 };
-                                    const sorted = [...latencyData].map(d => d.value).sort((a, b) => a - b);
-                                    return {
-                                       p50: sorted[Math.floor(sorted.length * 0.5)] || 0,
-                                       p95: sorted[Math.floor(sorted.length * 0.95)] || 0,
-                                       p99: sorted[Math.floor(sorted.length * 0.99)] || 0,
-                                    };
-                                 })(),
-                                 slowRequests: [], // No slow requests data in API response
-                              },
-                              throughput: {
-                                 trends: currentReport.data?.trends?.throughput,
-                                 recoveryImpact: undefined, // No recovery impact data in API response
-                              },
-                           }}
-                        />
-                     </section>
-
-                     {/* Capacity Management - Pages 7-8 */}
-                     <section className="page-break-after print:bg-white print:text-black">
-                        <CapacityManagement
-                           data={{
-                              currentUsage: {
-                                 totalCapacity: currentReport.data?.keyMetrics?.capacity?.totalCapacity,
-                                 usedCapacity: currentReport.data?.keyMetrics?.capacity?.usedCapacity,
-                                 availableCapacity: currentReport.data?.keyMetrics?.capacity?.availableCapacity,
-                                 utilizationPercent: currentReport.data?.keyMetrics?.capacity?.utilizationPercent,
-                              },
-                              // Map poolsSummary to poolUsage format
-                              poolUsage:
-                                 currentReport.data?.poolsSummary?.map(p => ({
-                                    name: p.poolName, // Component expects 'name', not 'poolName'
-                                    used: p.usedBytes,
-                                    available: p.maxBytes - p.usedBytes,
-                                    utilizationPercent: p.usagePercent,
-                                    objects: p.objectCount,
-                                 })) || [],
-                              // Transform prediction data to match component expectations
-                              predictions: currentReport.data?.trends?.capacity?.prediction
-                                 ? {
-                                      growthRatePerDay: 0, // Not available in API
-                                      expectedFullDate: undefined, // Not available in API
-                                      daysUntilFull: currentReport.data.trends.capacity.prediction.timeToThreshold,
-                                      recommendedExpansion: undefined, // Not available in API
-                                   }
-                                 : undefined,
-                              trends: currentReport.data?.trends?.capacity,
-                           }}
-                        />
-                     </section>
-
-                     {/* AI Insights - Pages 9-11 */}
-                     <section className="page-break-after print:bg-white print:text-black">
-                        <AIInsightsSection
-                           data={{
-                              anomalies: currentReport.aiInsights?.anomalies || [],
-                              predictions:
-                                 currentReport.aiInsights?.predictions?.map(p => ({
-                                    category: p.category,
-                                    probability: p.probability,
-                                    impact: p.impact,
-                                    estimatedTime: p.estimatedTime,
-                                    description: `${p.category} prediction with ${p.confidence}% confidence. Risk factors: ${p.riskFactors?.length || 0}`,
-                                 })) || [],
-                              recommendations:
-                                 currentReport.aiInsights?.recommendations?.map(r => ({
-                                    id: r.id,
-                                    title: r.title,
-                                    description: r.description,
-                                    priority: r.priority,
-                                    estimatedImpact: r.estimatedImpact,
-                                    implementation: r.commands?.join('; ') || 'No specific commands provided',
-                                 })) || [],
-                              analysisWindow: currentReport.timeRange?.label || 'Last 7 days',
-                              confidence: currentReport.data?.aiAnalysisConfidence || 95.0,
-                           }}
-                        />
-                     </section>
-
-                     {/* Availability & Recovery - Pages 12-13 */}
-                     <section className="page-break-after print:bg-white print:text-black">
-                        <AvailabilityRecovery
-                           data={{
-                              dataProtection: {
-                                 // Calculate compliance rates from PG status
-                                 replicationCompliance: 100, // Assume full replication compliance
-                                 scrubCompletionRate: 0, // Not available in API
-                                 deepScrubCompletionRate: 0, // Not available in API
-                                 pgConsistencyRate: currentReport.data?.keyMetrics?.pgStatus?.activePgs
-                                    ? ((currentReport.data.keyMetrics.pgStatus.activePgs - (currentReport.data.keyMetrics.pgStatus.inconsistentPgs || 0)) /
-                                         currentReport.data.keyMetrics.pgStatus.activePgs) *
-                                      100
-                                    : 100,
-                                 backupCompliance: 0, // Not available in API
-                              },
-                              recoveryReadiness: {
-                                 mtbf: undefined, // Not available in API
-                                 mttr: undefined, // Not available in API
-                                 rto: undefined, // Not available in API
-                                 rpo: undefined, // Not available in API
-                                 lastDisasterRecoveryTest: undefined, // Not available in API
-                                 drTestResult: undefined, // Not available in API
-                              },
-                              replicationStatus:
-                                 currentReport.data?.poolsSummary?.map(pool => ({
-                                    pool: pool.poolName,
-                                    targetSize: pool.size, // Desired replication factor
-                                    currentSize: pool.size, // Assume meeting target (could be improved with per-pool PG status)
-                                    compliance: (currentReport.data?.keyMetrics?.pgStatus?.degradedPgs || 0) === 0, // Compliant if no degraded PGs
-                                 })) || [],
-                              scrubStatus: [], // No scrub status data in API response
-                           }}
-                        />
-                     </section>
-
-                     {/* AI Failure Predictions */}
-                     <section className="page-break-after print:bg-white print:text-black">
-                        <PredictionSection
-                           predictions={Object.values(predictions).map(p => ({
-                              id: p.id,
-                              category: p.category,
-                              name: p.name,
-                              severity: p.severity,
-                              probability: p.probability,
-                              confidence: p.confidence,
-                              timeToImpact: p.timeToImpact,
-                              aiAnalysis: p.aiAnalysis,
-                              affectedComponents: p.affectedComponents,
-                              recommendedActions: p.recommendedActions,
-                              trend: p.trend,
-                           }))}
-                        />
-                     </section>
-
-                     {/* Operational History - Page 14 */}
-                     <section className="page-break-after print:bg-white print:text-black">
-                        <OperationalHistory
-                           data={{
-                              // Map events to operational history
-                              configChanges: [],
-                              maintenanceLogs:
-                                 currentReport.data?.events?.events
-                                    ?.filter(e => e.type === 'info')
-                                    .map(e => ({
-                                       timestamp: e.timestamp,
-                                       type: e.type,
-                                       category: 'Maintenance',
-                                       description: `${e.component}: ${e.message}`,
-                                       user: 'system',
-                                       severity: e.type,
-                                    })) || [],
-                              incidents:
-                                 currentReport.data?.events?.events
-                                    ?.filter(e => e.type === 'warning' || e.type === 'error')
-                                    .map(e => ({
-                                       timestamp: e.timestamp,
-                                       type: e.type,
-                                       category: 'Incident',
-                                       description: `${e.component}: ${e.message} - ${e.details || ''}`,
-                                       user: 'system',
-                                       severity: e.type,
-                                    })) || [],
-                              performanceTuning: [],
-                           }}
-                        />
-                     </section>
-
-                     {/* Detailed Tables - Pages 15+ */}
-                     <section className="print:bg-white print:text-black">
-                        <DetailedTables
-                           data={{
-                              // Map hostsSummary to OSD data
-                              osds:
-                                 currentReport.data?.hostsSummary?.flatMap(h =>
-                                    Array.from({ length: h.osdCount }, (_, i) => ({
-                                       id: i,
-                                       host: h.hostname,
-                                       status: i < h.upOsds ? 'up' : 'down',
-                                       weight: 1.0,
-                                       used: 0,
-                                       avail: 0,
-                                       usePercent: 0,
-                                       pgCount: 0,
-                                       device: `osd.${i}`,
-                                       deviceClass: 'hdd',
-                                    })),
-                                 ) || [],
-                              // Use poolsSummary directly with correct field names
-                              pools:
-                                 currentReport.data?.poolsSummary?.map(p => ({
-                                    name: p.poolName,
-                                    id: p.poolId,
-                                    type: 'replicated',
-                                    size: p.size,
-                                    minSize: p.minSize,
-                                    pgNum: p.pgNum,
-                                    pgpNum: p.pgNum, // Same as pgNum
-                                    crushRule: 'replicated_rule',
-                                    used: p.usedBytes,
-                                    available: p.maxBytes - p.usedBytes,
-                                 })) || [],
-                              clients: [], // No client data in API response
-                              configParams: [], // No config params in API response
-                           }}
-                        />
-                     </section>
-                  </>
-               )}
-
-               {/* PREDICTIONS Report View */}
-               {currentReport.type === 'PREDICTIONS' && (
-                  <>
-                     {/* Report Title Page */}
-                     <div className="hidden print:block">
-                        <ReportTitlePage
-                           reportTitle={currentReport.title}
-                           generatedAt={currentReport.createdAt}
-                           timeRange={currentReport.timeRange}
-                           clusterSummary={{
-                              health: currentReport.data?.clusterInfo?.health || 'HEALTH_WARN',
-                              capacityUtilization: currentReport.data?.clusterSummary?.capacityUtilization || 0,
-                              activeAlerts: currentReport.data?.clusterInfo?.activeAlerts || 0,
-                              totalOsds: currentReport.data?.clusterSummary?.totalOsds || 0,
-                              upOsds: currentReport.data?.clusterSummary?.upOsds || 0,
-                              totalCapacity: currentReport.data?.clusterSummary?.totalCapacity || 0,
-                              usedCapacity: currentReport.data?.clusterSummary?.usedCapacity || 0,
-                           }}
-                           clusterInfo={{
-                              clusterId: currentReport.data?.clusterInfo?.fsid,
-                              cephVersion: currentReport.data?.clusterInfo?.version,
-                              hostCount: currentReport.data?.clusterInfo?.hostCount,
-                              monCount: currentReport.data?.clusterInfo?.monCount,
-                              osdCount: currentReport.data?.clusterInfo?.osdCount,
-                              mgrCount: currentReport.data?.clusterInfo?.mgrCount,
-                              poolCount: currentReport.data?.clusterInfo?.poolCount,
-                              uptime: currentReport.data?.clusterInfo?.uptime,
-                              publicNetwork: currentReport.data?.clusterInfo?.publicNetwork,
-                              clusterNetwork: currentReport.data?.clusterInfo?.clusterNetwork,
-                           }}
-                           highRiskPredictions={
-                              currentReport.data?.predictionsSummary?.highRiskPredictions?.map(p => ({
+                  {/* DAILY Report View - Legacy sections */}
+                  {currentReport.type === 'DAILY' && (
+                     <>
+                        {/* Report Title Page */}
+                        <div className="hidden print:block">
+                           <ReportTitlePage
+                              type={currentReport.type}
+                              currentReport={currentReport}
+                              reportTitle={currentReport.title}
+                              reportSubtitle="Ceph Cluster Daily Trend & Health Report"
+                              generatedAt={currentReport.createdAt}
+                              timeRange={currentReport.timeRange}
+                              clusterSummary={{
+                                 health: currentReport.data?.clusterHealth?.health || 'UNKNOWN',
+                                 capacityUtilization: currentReport.data?.keyMetrics?.capacity?.utilizationPercent || 0,
+                                 activeAlerts: currentReport.data?.clusterHealth?.activeAlarms || 0,
+                                 totalOsds: currentReport.data?.keyMetrics?.osdStatus?.totalOsds || 0,
+                                 upOsds: currentReport.data?.keyMetrics?.osdStatus?.upOsds || 0,
+                                 totalCapacity: currentReport.data?.keyMetrics?.capacity?.totalCapacity || 0,
+                                 usedCapacity: currentReport.data?.keyMetrics?.capacity?.usedCapacity || 0,
+                              }}
+                              clusterInfo={{
+                                 clusterId: currentReport.data?.clusterInfo?.fsid,
+                                 cephVersion: currentReport.data?.clusterInfo?.version,
+                                 hostCount: currentReport.data?.clusterInfo?.hostCount,
+                                 monCount: currentReport.data?.clusterInfo?.monCount,
+                                 osdCount: currentReport.data?.keyMetrics?.osdStatus?.totalOsds,
+                                 mgrCount: currentReport.data?.clusterInfo?.mgrCount,
+                                 poolCount: currentReport.data?.poolsSummary?.length,
+                                 uptime: currentReport.data?.clusterInfo?.uptime,
+                                 publicNetwork: currentReport.data?.clusterInfo?.publicNetwork,
+                                 clusterNetwork: currentReport.data?.clusterInfo?.clusterNetwork,
+                                 deployment: currentReport.data?.clusterInfo?.deployment,
+                              }}
+                              highRiskPredictions={getHighRiskPredictions().map(p => ({
                                  name: p.name,
                                  severity: p.severity as 'high' | 'critical',
                                  probability: p.probability,
                                  timeToImpact: p.timeToImpact,
-                              })) || []
-                           }
-                           highRiskSummary={currentReport.data?.predictionsSummary?.highRiskSummary}
-                        />
-                     </div>
+                              }))}
+                              highRiskSummary={currentReport.aiInsights?.highRiskSummary}
+                           />
+                        </div>
 
-                     {/* Predictions Section - 12 Cards */}
-                     <section className="page-break-after print:bg-white print:text-black">
-                        <PredictionSection
-                           predictions={(currentReport.data?.predictions || []).map(p => ({
-                              id: p.id,
-                              category: p.category,
-                              name: p.name,
-                              severity: p.severity as 'low' | 'medium' | 'high' | 'critical',
-                              probability: p.probability,
-                              confidence: p.confidence,
-                              timeToImpact: p.timeToImpact,
-                              aiAnalysis: p.aiAnalysis,
-                              affectedComponents: p.affectedComponents,
-                              recommendedActions: p.recommendedActions,
-                              trend: p.trend as 'improving' | 'stable' | 'worsening',
-                           }))}
-                        />
-                     </section>
-                  </>
-               )}
+                        {/* Cluster Information - Web only (hidden in PDF) */}
+                        <section className="mb-6 print:mb-4 bg-white shadow-sm p-12 print:p-0 print:shadow-none">
+                           <div className="print:hidden">
+                              <ClusterInformation
+                                 data={{
+                                    clusterName: 'Cluster-Seoul',
+                                    site: 'Seoul DC1',
+                                    environment: 'Production',
+                                    clusterId: currentReport.data?.clusterInfo?.fsid,
+                                    cephVersion: currentReport.data?.clusterInfo?.version,
+                                    deployment: currentReport.data?.clusterInfo?.deployment,
+                                    hostCount: currentReport.data?.clusterInfo?.hostCount,
+                                    monCount: currentReport.data?.clusterInfo?.monCount,
+                                    osdCount: currentReport.data?.keyMetrics?.osdStatus?.totalOsds,
+                                    mgrCount: currentReport.data?.clusterInfo?.mgrCount,
+                                    poolCount: currentReport.data?.poolsSummary?.length,
+                                    uptime: currentReport.data?.clusterInfo?.uptime,
+                                    publicNetwork: currentReport.data?.clusterInfo?.publicNetwork,
+                                    clusterNetwork: currentReport.data?.clusterInfo?.clusterNetwork,
+                                 }}
+                              />
+                           </div>
+                        </section>
+
+                        {/* Executive Summary - Page 1 */}
+                        <section className="mb-6 bg-white shadow-sm p-12 print:shadow-none print:p-0 print:hidden">
+                           <ExecutiveSummary
+                              data={{
+                                 healthScore: currentReport.data?.clusterHealth?.healthScore || 85,
+                                 kpis: {
+                                    totalCapacity: currentReport.data?.keyMetrics?.capacity?.totalCapacity,
+                                    usedCapacity: currentReport.data?.keyMetrics?.capacity?.usedCapacity,
+                                    utilizationPercent: currentReport.data?.keyMetrics?.capacity?.utilizationPercent,
+                                    totalOsds: currentReport.data?.keyMetrics?.osdStatus?.totalOsds,
+                                    healthyOsds: currentReport.data?.keyMetrics?.osdStatus?.healthyOsds,
+                                    avgLatency: currentReport.data?.keyMetrics?.performance?.avgLatency,
+                                    totalIOPS:
+                                       (currentReport.data?.keyMetrics?.performance?.readOps || 0) +
+                                       (currentReport.data?.keyMetrics?.performance?.writeOps || 0),
+                                    throughput:
+                                       (currentReport.data?.keyMetrics?.performance?.readThroughput || 0) +
+                                       (currentReport.data?.keyMetrics?.performance?.writeThroughput || 0),
+                                 },
+                              }}
+                           />
+                           <div className="w-full h-6"></div>
+                           {/* Critical Issues & Action Items */}
+                           <ExecutiveAlerts currentReport={currentReport} />
+                        </section>
+
+                        {/*<section className="mb-6 bg-white shadow-sm p-12 page-break-after print:shadow-none print:p-0 print:min-h-0">
+                        </section>*/}
+
+                        {/* Infrastructure Status - Pages 2-3 */}
+                        <section className="mb-6 bg-white shadow-sm min-h-[800px] p-12 page-break-before print:shadow-none print:p-0 print:min-h-0">
+                           <InfrastructureStatus
+                              data={{
+                                 // Map hostsSummary to hosts format
+                                 hosts:
+                                    currentReport.data?.hostsSummary?.map(h => ({
+                                       hostname: h.hostname,
+                                       cpuCores: h.coreCount,
+                                       cpuModel: h.cpuModel,
+                                       memoryGB: Math.round(h.memory / 1024 / 1024 / 1024),
+                                       cpuUsage: h.avgCpuUsage,
+                                       memUsage: +(h.avgMemUsage || 0).toFixed(2),
+                                       osdCount: h.osdCount,
+                                       status: h.upOsds === h.totalOsds ? 'healthy' : 'degraded',
+                                       networkRxMBps: h.networkRxMBps,
+                                       networkTxMBps: h.networkTxMBps,
+                                    })) || [],
+                                 // Transform InventoryResponse[] to Disk[]
+                                 disks:
+                                    currentReport.data?.disks?.flatMap(
+                                       host =>
+                                          host.devices
+                                             ?.filter(device => device.osd_ids && device.osd_ids.length > 0)
+                                             .flatMap(device =>
+                                                device.osd_ids.map(osdId => ({
+                                                   osdId: osdId,
+                                                   hostname: host.name,
+                                                   device: device.path,
+                                                   deviceClass: device.human_readable_type || 'unknown',
+                                                   sizeBytes: device.sys_api?.size || 0,
+                                                   usedBytes: 0, // Not available in current data structure
+                                                   healthStatus: device.rejected_reasons && device.rejected_reasons.length > 0 ? 'degraded' : 'healthy',
+                                                   degradedReason: device.rejected_reasons,
+                                                })),
+                                             ) || [],
+                                    ) || [],
+                                 // Map poolsSummary to pools format
+                                 pools:
+                                    currentReport.data?.poolsSummary?.map(p => ({
+                                       name: p.poolName,
+                                       type: 'replicated',
+                                       size: p.size,
+                                       minSize: p.minSize,
+                                       pgNum: p.pgNum,
+                                       used: p.usedBytes,
+                                       available: p.maxBytes - p.usedBytes,
+                                    })) || [],
+                                 crushMap: undefined,
+                                 networkTopology: undefined,
+                                 pgDistribution: undefined,
+                              }}
+                           />
+                        </section>
+
+                        {/* Performance Metrics - Pages 4-6 */}
+                        <section className="mb-6 bg-white shadow-sm min-h-[800px] p-12 page-break-after print:shadow-none print:p-0 print:min-h-0">
+                           <PerformanceMetrics
+                              data={{
+                                 iops: {
+                                    poolTrends: currentReport.data?.trends?.iops,
+                                    topClients: [], // No client data in API response
+                                 },
+                                 latency: {
+                                    distribution: currentReport.data?.trends?.latency,
+                                    // Calculate percentiles from trend data
+                                    percentiles: (() => {
+                                       const latencyData = currentReport.data?.trends?.latency?.data || [];
+                                       if (latencyData.length === 0) return { p50: 0, p95: 0, p99: 0 };
+                                       const sorted = [...latencyData].map(d => d.value).sort((a, b) => a - b);
+                                       return {
+                                          p50: sorted[Math.floor(sorted.length * 0.5)] || 0,
+                                          p95: sorted[Math.floor(sorted.length * 0.95)] || 0,
+                                          p99: sorted[Math.floor(sorted.length * 0.99)] || 0,
+                                       };
+                                    })(),
+                                    slowRequests: [], // No slow requests data in API response
+                                 },
+                                 throughput: {
+                                    trends: currentReport.data?.trends?.throughput,
+                                    recoveryImpact: undefined, // No recovery impact data in API response
+                                 },
+                              }}
+                           />
+                        </section>
+
+                        {/* Capacity Management - Pages 7-8 */}
+                        <section className="mb-6 bg-white shadow-sm min-h-[800px] p-12 page-break-after print:shadow-none print:p-0 print:min-h-0">
+                           <CapacityManagement
+                              data={{
+                                 currentUsage: {
+                                    totalCapacity: currentReport.data?.keyMetrics?.capacity?.totalCapacity,
+                                    usedCapacity: currentReport.data?.keyMetrics?.capacity?.usedCapacity,
+                                    availableCapacity: currentReport.data?.keyMetrics?.capacity?.availableCapacity,
+                                    utilizationPercent: currentReport.data?.keyMetrics?.capacity?.utilizationPercent,
+                                 },
+                                 // Map poolsSummary to poolUsage format
+                                 poolUsage:
+                                    currentReport.data?.poolsSummary?.map(p => ({
+                                       name: p.poolName, // Component expects 'name', not 'poolName'
+                                       used: p.usedBytes,
+                                       available: p.maxBytes - p.usedBytes,
+                                       utilizationPercent: p.usagePercent,
+                                       objects: p.objectCount,
+                                    })) || [],
+                                 // Use capacity data from dashboard API (same method as PredictionService.predictClusterExpansion)
+                                 predictions: capacityData
+                                    ? (() => {
+                                         // Daily growth rate from Prometheus: delta(ceph_cluster_total_used_bytes[24h])
+                                         const dailyGrowthRate = capacityData.dailyGrowthBytes || 0;
+
+                                         // Days until full from Ceph API: /api/predict/failure/cluster/days-until-full
+                                         const daysUntilFull = capacityData.timeToFullDays || -1;
+
+                                         // Cap at reasonable maximum (10 years = 3650 days) to prevent Date overflow
+                                         const MAX_DAYS = 3650;
+                                         const cappedDays = daysUntilFull > MAX_DAYS ? -1 : daysUntilFull;
+
+                                         // Recommended expansion: 6 months of growth + 20% buffer
+                                         const sixMonthsGrowth = dailyGrowthRate * 180; // 6 months
+                                         const recommendedExpansion = sixMonthsGrowth > 0 ? sixMonthsGrowth * 1.2 : undefined;
+
+                                         return {
+                                            growthRatePerDay: dailyGrowthRate,
+                                            expectedFullDate:
+                                               cappedDays > 0 && cappedDays <= MAX_DAYS
+                                                  ? new Date(Date.now() + cappedDays * 24 * 60 * 60 * 1000).toISOString()
+                                                  : undefined,
+                                            daysUntilFull: cappedDays,
+                                            recommendedExpansion: recommendedExpansion,
+                                         };
+                                      })()
+                                    : undefined,
+                                 trends: currentReport.data?.trends?.capacity,
+                              }}
+                           />
+                        </section>
+
+                        {/* Availability & Recovery - Pages 12-13 */}
+                        <section className="mb-6 bg-white shadow-sm min-h-[800px] p-12 page-break-after print:shadow-none print:p-0 print:min-h-0">
+                           <AvailabilityRecovery
+                              data={{
+                                 dataProtection: {
+                                    // Use recovery metrics from backend
+                                    replicationCompliance: currentReport.data?.recoveryMetrics?.replicationCompliance || 0,
+                                    scrubCompletionRate: currentReport.data?.recoveryMetrics?.scrubCompletionRate || 0,
+                                    deepScrubCompletionRate: currentReport.data?.recoveryMetrics?.deepScrubCompletionRate || 0,
+                                    pgConsistencyRate: currentReport.data?.keyMetrics?.pgStatus?.activePgs
+                                       ? ((currentReport.data.keyMetrics.pgStatus.activePgs - (currentReport.data.keyMetrics.pgStatus.inconsistentPgs || 0)) /
+                                            currentReport.data.keyMetrics.pgStatus.activePgs) *
+                                         100
+                                       : 100,
+                                 },
+                                 replicationStatus:
+                                    currentReport.data?.poolsSummary?.map(pool => ({
+                                       pool: pool.poolName,
+                                       targetSize: pool.size, // Desired replication factor
+                                       currentSize: pool.size, // Assume meeting target (could be improved with per-pool PG status)
+                                       compliance: (currentReport.data?.keyMetrics?.pgStatus?.degradedPgs || 0) === 0, // Compliant if no degraded PGs
+                                    })) || [],
+                                 scrubStatus:
+                                    currentReport.data?.scrubStatus?.map(s => ({
+                                       pg: s.pg,
+                                       lastScrub: s.lastScrub,
+                                       lastDeepScrub: s.lastDeepScrub,
+                                       status: s.status,
+                                       scrubDuration: s.scrubDuration,
+                                    })) || [],
+                              }}
+                           />
+                        </section>
+
+                        {/* Operational History - Page 14 */}
+                        <section className="mb-6 bg-white shadow-sm min-h-[800px] p-12 page-break-after print:shadow-none print:p-0 print:min-h-0">
+                           <OperationalHistory
+                              data={{
+                                 // Map events to operational history
+                                 configChanges: [],
+                                 maintenanceLogs:
+                                    currentReport.data?.events?.events
+                                       ?.filter(e => e.type === 'info')
+                                       .map(e => ({
+                                          timestamp: e.timestamp,
+                                          type: e.type,
+                                          category: 'Maintenance',
+                                          description: `${e.component}: ${e.message}`,
+                                          user: 'system',
+                                          severity: e.type,
+                                       })) || [],
+                                 incidents:
+                                    currentReport.data?.events?.events
+                                       ?.filter(e => e.type === 'warning' || e.type === 'error')
+                                       .map(e => ({
+                                          timestamp: e.timestamp,
+                                          type: e.type,
+                                          category: 'Incident',
+                                          description: `${e.component}: ${e.message} - ${e.details || ''}`,
+                                          user: 'system',
+                                          severity: e.type,
+                                       })) || [],
+                                 performanceTuning: [],
+                              }}
+                           />
+                        </section>
+
+                        {/* Detailed Tables - Pages 15+ */}
+                        <section className="mb-6 bg-white shadow-sm min-h-[800px] p-12 print:shadow-none print:p-0 print:min-h-0">
+                           <DetailedTables
+                              data={{
+                                 // Map hostsSummary to OSD data
+                                 osds:
+                                    currentReport.data?.hostsSummary?.flatMap(h =>
+                                       Array.from({ length: h.osdCount }, (_, i) => ({
+                                          id: i,
+                                          host: h.hostname,
+                                          status: i < h.upOsds ? 'up' : 'down',
+                                          weight: 1.0,
+                                          used: 0,
+                                          avail: 0,
+                                          usePercent: 0,
+                                          pgCount: 0,
+                                          device: `osd.${i}`,
+                                          deviceClass: 'hdd',
+                                       })),
+                                    ) || [],
+                                 // Use poolsSummary directly with correct field names
+                                 pools:
+                                    currentReport.data?.poolsSummary?.map(p => ({
+                                       name: p.poolName,
+                                       id: p.poolId,
+                                       type: 'replicated',
+                                       size: p.size,
+                                       minSize: p.minSize,
+                                       pgNum: p.pgNum,
+                                       pgpNum: p.pgNum, // Same as pgNum
+                                       crushRule: 'replicated_rule',
+                                       used: p.usedBytes,
+                                       available: p.maxBytes - p.usedBytes,
+                                    })) || [],
+                                 clients: [], // No client data in API response
+                                 configParams: [], // No config params in API response
+                              }}
+                           />
+                        </section>
+                     </>
+                  )}
+
+                  {/* PREDICTIONS Report View */}
+                  {currentReport.type === 'PREDICTIONS' && (
+                     <>
+                        {/* Report Title Page */}
+                        <div className="hidden print:block">
+                           <ReportTitlePage
+                              type={currentReport.type}
+                              currentReport={currentReport}
+                              reportTitle={currentReport.title}
+                              reportSubtitle="Ceph Cluster Analysis & Prediction Report"
+                              generatedAt={currentReport.createdAt}
+                              timeRange={currentReport.timeRange}
+                              clusterSummary={{
+                                 health: currentReport.data?.clusterInfo?.health || 'UNKNOWN',
+                                 capacityUtilization: currentReport.data?.clusterSummary?.capacityUtilization || 0,
+                                 activeAlerts: currentReport.data?.clusterInfo?.activeAlerts || 0,
+                                 totalOsds: currentReport.data?.clusterSummary?.totalOsds || 0,
+                                 upOsds: currentReport.data?.clusterSummary?.upOsds || 0,
+                                 totalCapacity: currentReport.data?.clusterSummary?.totalCapacity || 0,
+                                 usedCapacity: currentReport.data?.clusterSummary?.usedCapacity || 0,
+                              }}
+                              clusterInfo={{
+                                 clusterId: currentReport.data?.clusterInfo?.fsid,
+                                 cephVersion: currentReport.data?.clusterInfo?.version,
+                                 hostCount: currentReport.data?.clusterInfo?.hostCount,
+                                 monCount: currentReport.data?.clusterInfo?.monCount,
+                                 osdCount: currentReport.data?.clusterInfo?.osdCount,
+                                 mgrCount: currentReport.data?.clusterInfo?.mgrCount,
+                                 poolCount: currentReport.data?.clusterInfo?.poolCount,
+                                 uptime: currentReport.data?.clusterInfo?.uptime,
+                                 publicNetwork: currentReport.data?.clusterInfo?.publicNetwork,
+                                 clusterNetwork: currentReport.data?.clusterInfo?.clusterNetwork,
+                              }}
+                              highRiskPredictions={
+                                 currentReport.data?.predictionsSummary?.highRiskPredictions?.map(p => ({
+                                    name: p.name,
+                                    severity: p.severity as 'high' | 'critical',
+                                    probability: p.probability,
+                                    timeToImpact: p.timeToImpact,
+                                 })) || []
+                              }
+                              highRiskSummary={currentReport.data?.predictionsSummary?.highRiskSummary}
+                           />
+                        </div>
+
+                        {/* Predictions Section - 12 Cards */}
+                        <section className="page-break-after print:bg-white print:text-black">
+                           <PredictionSection
+                              predictions={(currentReport.data?.predictions || []).map(p => ({
+                                 id: p.id,
+                                 category: p.category,
+                                 name: p.name,
+                                 severity: p.severity as 'low' | 'medium' | 'high' | 'critical',
+                                 probability: p.probability,
+                                 confidence: p.confidence,
+                                 timeToImpact: p.timeToImpact,
+                                 aiAnalysis: p.aiAnalysis,
+                                 affectedComponents: p.affectedComponents,
+                                 recommendedActions: p.recommendedActions,
+                                 trend: p.trend as 'improving' | 'stable' | 'worsening',
+                              }))}
+                           />
+                        </section>
+                     </>
+                  )}
+               </div>
+
+               {/* Back Button */}
+               <div className="mt-8 no-print">
+                  <button
+                     onClick={() => router.push('/reports')}
+                     className="group px-8 py-3 bg-slate-800 border-2 border-slate-700 text-white font-medium hover:bg-slate-900 hover:border-slate-600 transition-all duration-200 cursor-pointer flex items-center gap-3"
+                  >
+                     <svg className="w-5 h-5 transform group-hover:-translate-x-1 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+                     </svg>
+                     Back to Reports
+                  </button>
+               </div>
+
+               {/* Email Dialog */}
+               <EmailDialog
+                  isOpen={isEmailDialogOpen}
+                  onClose={() => setIsEmailDialogOpen(false)}
+                  onSend={handleSendEmail}
+                  reportTitle={currentReport?.title || 'Report'}
+               />
             </div>
-
-            {/* Back Button */}
-            <div className="mt-8 no-print">
-               <button
-                  onClick={() => router.push('/reports')}
-                  className="px-6 py-2 bg-secondary-800/60 backdrop-blur-md border border-ai-primary/30 text-white rounded-lg hover:bg-secondary-800/80 hover:border-ai-primary/60 transition cursor-pointer"
-               >
-                  ← Back to Reports
-               </button>
-            </div>
-
-            {/* Email Dialog */}
-            <EmailDialog
-               isOpen={isEmailDialogOpen}
-               onClose={() => setIsEmailDialogOpen(false)}
-               onSend={handleSendEmail}
-               reportTitle={currentReport?.title || 'Report'}
-            />
          </div>
-      </div>
+      </>
    );
 }

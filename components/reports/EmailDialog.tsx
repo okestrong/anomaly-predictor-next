@@ -19,7 +19,7 @@ export function EmailDialog({ isOpen, onClose, onSend, reportTitle }: EmailDialo
    const [recipients, setRecipients] = useState<string[]>(['']);
    const [subject, setSubject] = useState(`Ceph Cluster Report: ${reportTitle}`);
    const [message, setMessage] = useState(
-      'Please find the attached Ceph cluster report.\n\nThis report contains cluster health metrics, performance data, and AI-powered insights.'
+      'Please find the attached Ceph cluster report.\n\nThis report contains cluster health metrics, performance data, and AI-powered insights.',
    );
 
    const handleAddRecipient = () => {
@@ -37,7 +37,7 @@ export function EmailDialog({ isOpen, onClose, onSend, reportTitle }: EmailDialo
    };
 
    const handleSend = () => {
-      const validRecipients = recipients.filter((r) => r.trim() !== '' && r.includes('@'));
+      const validRecipients = recipients.filter(r => r.trim() !== '' && r.includes('@'));
       if (validRecipients.length === 0) {
          alert('Please enter at least one valid email address');
          return;
@@ -58,15 +58,10 @@ export function EmailDialog({ isOpen, onClose, onSend, reportTitle }: EmailDialo
                   </div>
                   <div>
                      <h2 className="text-xl font-bold text-slate-900 dark:text-white">Send Report via Email</h2>
-                     <p className="text-sm text-slate-600 dark:text-slate-400">
-                        {reportTitle}
-                     </p>
+                     <p className="text-sm text-slate-600 dark:text-slate-400">{reportTitle}</p>
                   </div>
                </div>
-               <button
-                  onClick={onClose}
-                  className="p-2 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg transition"
-               >
+               <button onClick={onClose} className="p-2 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg transition">
                   <X className="w-5 h-5 text-slate-600 dark:text-slate-400" />
                </button>
             </div>
@@ -75,16 +70,14 @@ export function EmailDialog({ isOpen, onClose, onSend, reportTitle }: EmailDialo
             <div className="p-6 space-y-4">
                {/* Recipients */}
                <div>
-                  <label className="block text-sm font-medium text-slate-900 dark:text-white mb-2">
-                     Recipients *
-                  </label>
+                  <label className="block text-sm font-medium text-slate-900 dark:text-white mb-2">Recipients *</label>
                   <div className="space-y-2">
                      {recipients.map((recipient, index) => (
-                        <div key={index} className="flex gap-2">
+                        <div key={`recipient-${recipient}-${index}`} className="flex gap-2">
                            <input
                               type="email"
                               value={recipient}
-                              onChange={(e) => handleRecipientChange(index, e.target.value)}
+                              onChange={e => handleRecipientChange(index, e.target.value)}
                               placeholder="email@example.com"
                               className="flex-1 px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-900 text-slate-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                            />
@@ -99,10 +92,7 @@ export function EmailDialog({ isOpen, onClose, onSend, reportTitle }: EmailDialo
                         </div>
                      ))}
                   </div>
-                  <button
-                     onClick={handleAddRecipient}
-                     className="mt-2 flex items-center gap-2 text-sm text-blue-600 dark:text-blue-400 hover:underline"
-                  >
+                  <button onClick={handleAddRecipient} className="mt-2 flex items-center gap-2 text-sm text-blue-600 dark:text-blue-400 hover:underline">
                      <Plus className="w-4 h-4" />
                      Add another recipient
                   </button>
@@ -110,25 +100,21 @@ export function EmailDialog({ isOpen, onClose, onSend, reportTitle }: EmailDialo
 
                {/* Subject */}
                <div>
-                  <label className="block text-sm font-medium text-slate-900 dark:text-white mb-2">
-                     Subject
-                  </label>
+                  <label className="block text-sm font-medium text-slate-900 dark:text-white mb-2">Subject</label>
                   <input
                      type="text"
                      value={subject}
-                     onChange={(e) => setSubject(e.target.value)}
+                     onChange={e => setSubject(e.target.value)}
                      className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-900 text-slate-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                   />
                </div>
 
                {/* Message */}
                <div>
-                  <label className="block text-sm font-medium text-slate-900 dark:text-white mb-2">
-                     Message
-                  </label>
+                  <label className="block text-sm font-medium text-slate-900 dark:text-white mb-2">Message</label>
                   <textarea
                      value={message}
-                     onChange={(e) => setMessage(e.target.value)}
+                     onChange={e => setMessage(e.target.value)}
                      rows={6}
                      className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-900 text-slate-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                   />
@@ -136,9 +122,7 @@ export function EmailDialog({ isOpen, onClose, onSend, reportTitle }: EmailDialo
 
                {/* Info */}
                <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
-                  <p className="text-sm text-blue-800 dark:text-blue-200">
-                     The report will be attached as a PDF file to the email.
-                  </p>
+                  <p className="text-sm text-blue-800 dark:text-blue-200">The report will be attached as a PDF file to the email.</p>
                </div>
             </div>
 
@@ -150,10 +134,7 @@ export function EmailDialog({ isOpen, onClose, onSend, reportTitle }: EmailDialo
                >
                   Cancel
                </button>
-               <button
-                  onClick={handleSend}
-                  className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition flex items-center gap-2"
-               >
+               <button onClick={handleSend} className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition flex items-center gap-2">
                   <Mail className="w-4 h-4" />
                   Send Email
                </button>

@@ -30,7 +30,7 @@ export default function DailyReportPage() {
                timeRange,
                options: {
                   includeAI: true,
-                  includePredictions: true,
+                  includePredictions: false, // Daily report doesn't need predictions
                   includeRecommendations: true,
                },
             });

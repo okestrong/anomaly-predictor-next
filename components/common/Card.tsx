@@ -29,7 +29,7 @@ export const Card = forwardRef<HTMLDivElement, ExtendedCardProps>(
       ref,
    ) => {
       const cardClasses = useMemo(() => {
-         const classes = ['ai-card neon-hover flex flex-col justify-between', 'print:bg-gray-200'];
+         const classes = ['flex flex-col justify-between rounded-none', 'print:bg-white'];
 
          // 변형별 스타일 (배경은 인라인 스타일로 처리하므로 배경색 클래스 제거)
          switch (variant) {
@@ -37,16 +37,28 @@ export const Card = forwardRef<HTMLDivElement, ExtendedCardProps>(
                classes.push('backdrop-blur-sm border border-ai-circuit/30', 'hover:border-ai-circuit/50 hover:shadow-ai-glow');
                break;
             case 'neural':
-               classes.push('backdrop-blur-sm', 'border border-secondary-700/50 shadow-neural', 'hover:shadow-ai-glow hover:border-ai-circuit/50');
+               classes.push(
+                  'ai-card neon-hover backdrop-blur-sm',
+                  'border border-secondary-700/50 shadow-neural',
+                  'hover:shadow-ai-glow hover:border-ai-circuit/50',
+               );
                break;
             case 'cyber':
-               classes.push('border border-ai-cyber/30 shadow-cyber', 'hover:border-ai-cyber/50 hover:shadow-ai-glow');
+               classes.push('ai-card neon-hover border border-ai-cyber/30 shadow-cyber !rounded-2xl', 'hover:border-ai-cyber/50 hover:shadow-ai-glow');
                break;
             case 'glass':
                classes.push('backdrop-blur-md', 'border border-white/10', 'hover:border-white/20');
                break;
+            case 'none':
+               classes.push('border');
+               break;
+            case 'neon':
+               classes.push(
+                  'border rounded-lg border-ai-primary/30 hover:border-ai-primary/60 transition-all duration-300 hover:shadow-lg hover:shadow-ai-primary/20',
+               );
+               break;
             default:
-               classes.push('backdrop-blur-sm', 'border border-secondary-700/50', 'hover:border-secondary-600');
+               classes.push('border !border-gray-300', 'hover:border-gray-400');
                break;
          }
 
@@ -92,8 +104,15 @@ export const Card = forwardRef<HTMLDivElement, ExtendedCardProps>(
                case 'glass':
                   defaultStyle.backgroundColor = 'rgba(31, 41, 55, 0.6)';
                   break;
+               case 'none':
+                  defaultStyle.backgroundColor = 'transparent';
+                  break;
+               case 'neon':
+                  defaultStyle.backgroundColor = 'bg-secondary-800/40 backdrop-blur-md';
+                  // TODO: backgroundColor 인데 class 를 지정하고 있음. 수정 필요.
+                  break;
                default:
-                  defaultStyle.backgroundColor = 'rgba(31, 41, 55, 0.8)';
+                  defaultStyle.backgroundColor = 'transparent';
                   break;
             }
          }
@@ -182,7 +201,7 @@ export const Card = forwardRef<HTMLDivElement, ExtendedCardProps>(
                   className={cn(
                      'p-6',
                      footerClasses,
-                     footerPadding !== 'none' ? 'border-t border-gray-200 dark:border-gray-700 bg-card-footer' : 'bg-transparent',
+                     footerPadding !== 'none' ? 'border-t border-gray-200 dark:border-gray-700 bg-card-footer rounded-b-2xl' : 'bg-transparent',
                   )}
                >
                   {footer}

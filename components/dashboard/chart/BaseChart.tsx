@@ -133,7 +133,7 @@ export const BaseChart: React.FC<BaseChartProps> = ({
    }, [loadData]);
 
    return (
-      <Card variant="cyber" className={cn('flex flex-col', className)}>
+      <Card variant="neon" className={cn('flex flex-col', className)}>
          {/* Header */}
          <div className="px-4 py-3 border-b border-secondary-700 flex items-center justify-between">
             <div className="flex items-center space-x-2">

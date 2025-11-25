@@ -300,6 +300,54 @@ export const loadTexture = async (url: string) => {
    });
 };
 
+/**
+ * Lighten a HEX color by a percentage
+ * @param color - HEX color string (e.g., '#ff0000')
+ * @param percent - Percentage to lighten (0-100)
+ * @returns Lightened HEX color string
+ */
+export const lighten = (color: string, percent: number): string => {
+   // Remove # if present
+   const hex = color.replace('#', '');
+
+   // Parse RGB values
+   const r = parseInt(hex.substring(0, 2), 16);
+   const g = parseInt(hex.substring(2, 4), 16);
+   const b = parseInt(hex.substring(4, 6), 16);
+
+   // Lighten: move towards white (255)
+   const newR = Math.min(255, Math.floor(r + (255 - r) * (percent / 100)));
+   const newG = Math.min(255, Math.floor(g + (255 - g) * (percent / 100)));
+   const newB = Math.min(255, Math.floor(b + (255 - b) * (percent / 100)));
+
+   // Convert back to HEX
+   return `#${newR.toString(16).padStart(2, '0')}${newG.toString(16).padStart(2, '0')}${newB.toString(16).padStart(2, '0')}`;
+};
+
+/**
+ * Darken a HEX color by a percentage
+ * @param color - HEX color string (e.g., '#ff0000')
+ * @param percent - Percentage to darken (0-100)
+ * @returns Darkened HEX color string
+ */
+export const darken = (color: string, percent: number): string => {
+   // Remove # if present
+   const hex = color.replace('#', '');
+
+   // Parse RGB values
+   const r = parseInt(hex.substring(0, 2), 16);
+   const g = parseInt(hex.substring(2, 4), 16);
+   const b = parseInt(hex.substring(4, 6), 16);
+
+   // Darken: move towards black (0)
+   const newR = Math.max(0, Math.floor(r - r * (percent / 100)));
+   const newG = Math.max(0, Math.floor(g - g * (percent / 100)));
+   const newB = Math.max(0, Math.floor(b - b * (percent / 100)));
+
+   // Convert back to HEX
+   return `#${newR.toString(16).padStart(2, '0')}${newG.toString(16).padStart(2, '0')}${newB.toString(16).padStart(2, '0')}`;
+};
+
 export function makeSphereTexture(gl: THREE.WebGLRenderer, text: string, bgColor: string = '#fff', textColor: string = '#00D4FF') {
    const DPR = typeof window !== 'undefined' ? Math.min(window.devicePixelRatio ?? 1, 2) : 1;
    const width = 2048 * DPR;

@@ -383,6 +383,8 @@ export interface ReportData {
    poolsSummary?: PoolSummary[]; // Added
    hostsSummary?: HostSummary[]; // Added
    disks?: InventoryResponse[]; // Added - disk inventory from hosts
+   scrubStatus?: ScrubStatus[]; // Added for scrub activity
+   recoveryMetrics?: RecoveryMetrics; // Added for DR readiness
    kpis?: KPISection;
    events?: EventTimeline;
    alerts?: AlertsSummary;
@@ -519,6 +521,24 @@ export interface HostSummary {
    avgMemUsage: number;
    networkRxMBps: number;
    networkTxMBps: number;
+}
+
+// ==================== Scrub Status ====================
+
+export interface ScrubStatus {
+   pg: string; // Placement Group ID
+   lastScrub?: string; // ISO date string
+   lastDeepScrub?: string; // ISO date string
+   status: string; // clean, active, scrubbing, etc.
+   scrubDuration?: number; // Duration in seconds
+}
+
+// ==================== Recovery Metrics ====================
+
+export interface RecoveryMetrics {
+   scrubCompletionRate?: number; // Percentage of PGs scrubbed in last 7 days
+   deepScrubCompletionRate?: number; // Percentage of PGs deep scrubbed in last 14 days
+   replicationCompliance?: number; // Percentage of PGs with correct replication
 }
 
 // ==================== Performance Metrics ====================
@@ -857,6 +877,7 @@ export interface ClusterInfo {
    uptime?: string; // Cluster uptime
    publicNetwork?: string; // Public network CIDR
    clusterNetwork?: string; // Cluster network CIDR
+   deployment?: string; // Cluster deployment method
 }
 
 export interface PredictionsSummary {

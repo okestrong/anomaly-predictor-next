@@ -2,20 +2,18 @@
 
 import { useState } from 'react';
 import { motion } from 'framer-motion';
-import { ExclamationTriangleIcon, ArrowTrendingUpIcon, ArrowTrendingDownIcon } from '@heroicons/react/24/outline';
+import { ArrowTrendingDownIcon, ArrowTrendingUpIcon, ExclamationTriangleIcon } from '@heroicons/react/24/outline';
 import { cn } from '@/lib/utils';
 import AIScanLoader from './AIScanLoader';
-import Markdown from 'react-markdown';
-import remarkGfm from 'remark-gfm';
 import regexifyString from 'regexify-string';
 import parse from 'html-react-parser';
 
 // Cyberpunk-style gradient backgrounds for cards
 const gradientStyles = {
-   critical: 'bg-gradient-to-br from-red-700/20 via-red-600/10 to-orange-700/5 border-red-200/30',
-   high: 'bg-gradient-to-br from-orange-700/20 via-amber-600/10 to-yellow-700/5 border-orange-200/30',
-   medium: 'bg-gradient-to-br from-blue-700/20 via-cyan-600/10 to-teal-700/5 border-blue-300/30',
-   low: 'bg-gradient-to-br from-green-700/20 via-emerald-600/10 to-lime-700/5 border-green-200/30',
+   critical: 'bg-gradient-to-br from-red-600/20 via-red-600/10 to-orange-700/10 border-red-200/30',
+   high: 'bg-gradient-to-br from-orange-600/20 via-amber-600/10 to-yellow-600/20 border-orange-200/30',
+   medium: 'bg-gradient-to-br from-blue-600/20 via-cyan-600/10 to-indigo-600/10 border-blue-300/30',
+   low: 'bg-gradient-to-br from-neutral-600/20 via-stone-600/10 to-gray-600/20 border-neutral-200/30',
 };
 
 const severityColors = {
@@ -57,7 +55,7 @@ export default function PredictionCard({ prediction }: PredictionCardProps) {
          {/* Loading state with AI scan animation */}
          {prediction.isLoading && (
             <div className="absolute inset-0 z-20 rounded-xl overflow-hidden">
-               <AIScanLoader height="h-full" />
+               <AIScanLoader height="h-full" severity={prediction.severity as 'critical' | 'high' | 'medium' | 'low'} />
             </div>
          )}
 
@@ -236,7 +234,7 @@ export default function PredictionCard({ prediction }: PredictionCardProps) {
                      const words = regexifyString({
                         pattern: /`+(.+?)`+/gim,
                         decorator: (match, index) =>
-                           `<span class="inline-flex items-center bg-green-900">${match
+                           `<span class="inline-flex items-center bg-teal-600 text-black rounded-sm px-1 my-0.5">${match
                               .replace(/`/gim, '')
                               .replace(/<(.+?)>/gim, '$1')
                               .replace(/\\[.]/gim, '.')}</span>`,

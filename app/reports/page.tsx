@@ -1,238 +1,84 @@
 /**
- * Reports Dashboard Page
- * Main dashboard for report generation and management
+ * 리포트 대시보드 페이지 (서버 컴포넌트)
+ * ISR을 사용한 리포트 생성 및 관리 메인 대시보드
  */
 
-'use client';
-
-import { useEffect, useRef, useState } from 'react';
-import { useRouter } from 'next/navigation';
-import { QuickReportCards, RecentReports, ReportHeader } from '@/components/reports';
-import { getDateRangePresets, useReportStore } from '@/stores/report';
-import { LoadingSpinner } from '@/components/common';
-import { toast } from 'react-toastify';
-import { downloadBlob, generateExportFilename } from '@/lib/api/reportApi';
+import { Suspense } from 'react';
 import { AppHeader } from '@/components/layout';
-import type { ReportType } from '@/types/report';
-import RotateSquareLoading from '@/components/reports/RotateSquareLoading';
+import { LoadingSpinner } from '@/components/common';
+import ReportsPageClient from '@/components/reports/ReportsPageClient';
+import { ReportAPI } from '@/lib/api/reportApi';
+import type { Report } from '@/types/report';
 
-export default function ReportsPage() {
-   const router = useRouter();
-   const [stats, setStats] = useState<any>(null);
-   const backgroundVideoRef = useRef<HTMLVideoElement>(null);
-   const hasFetchedRef = useRef(false);
-   const hasCleanedRef = useRef(false);
-   const [currentReportType, setCurrentReportType] = useState<ReportType | null>(null);
+// ==================== ISR 설정 ====================
+// 60초마다 자동으로 재검증 (백그라운드 자동 갱신)
+export const revalidate = 60;
 
-   const { reports, loadingReports, isGenerating, error, fetchReports, deleteReport, exportReport, generateReport, clearError } = useReportStore();
+// 선택사항: 특정 경우 동적 렌더링 강제
+// export const dynamic = 'force-dynamic';
 
-   // Clean up localStorage once on mount (중복 데이터 제거용)
-   useEffect(() => {
-      if (hasCleanedRef.current) return;
-      hasCleanedRef.current = true;
+// 선택사항: 더 세밀한 재검증 제어를 위한 태그 사용
+// export const tags = ['reports'];
 
-      try {
-         const stored = localStorage.getItem('report-store');
-         if (stored) {
-            const data = JSON.parse(stored);
-            // reports 필드 제거
-            if (data.state && data.state.reports) {
-               delete data.state.reports;
-               delete data.state.currentReport;
-               localStorage.setItem('report-store', JSON.stringify(data));
-               console.log('Cleaned up duplicate reports from localStorage');
-            }
-         }
-      } catch (err) {
-         console.error('Failed to clean localStorage:', err);
-      }
-   }, []);
+/**
+ * 서버에서 리포트 데이터 가져오기 (캐싱 포함)
+ */
+async function getReportsData() {
+   try {
+      // ISR 캐싱과 함께 API에서 리포트 가져오기
+      const reportsResponse = await ReportAPI.getReports(1, 10);
+      const reports: Report[] = reportsResponse.reports || [];
 
-   // Video background setup
-   useEffect(() => {
-      const video = backgroundVideoRef.current;
-      if (video) {
-         video.playbackRate = 1;
-      }
-   }, []);
+      // 통계 데이터 가져오기
+      const stats = await ReportAPI.getReportStats();
 
-   // Fetch initial data
-   useEffect(() => {
-      if (hasFetchedRef.current) return;
-      hasFetchedRef.current = true;
-
-      const loadData = async () => {
-         try {
-            await fetchReports(1, 10);
-
-            // Fetch stats
-            const { ReportAPI } = await import('@/lib/api/reportApi');
-            const statsData = await ReportAPI.getReportStats();
-            setStats(statsData);
-         } catch (err) {
-            console.error('Failed to load reports:', err);
-            toast.error('Failed to load reports');
-         }
+      return {
+         reports,
+         stats,
       };
+   } catch (error) {
+      console.error('[Reports Page] Failed to fetch data:', error);
 
-      loadData();
-   }, [fetchReports]);
-
-   // Handle errors
-   useEffect(() => {
-      if (error) {
-         toast.error(error);
-         clearError();
-      }
-   }, [error, clearError]);
-
-   // Handler functions
-   const handleViewReport = (reportId: string) => {
-      router.push(`/reports/view/${reportId}`);
-   };
-
-   const handleDownloadReport = async (reportId: string) => {
-      try {
-         const report = reports.find(r => r.id === reportId);
-         if (!report) {
-            toast.error('Report not found');
-            return;
-         }
-
-         toast.info('Generating export...');
-
-         const blob = await exportReport(reportId, {
-            format: 'pdf',
-            includeAI: true,
-            includeCharts: true,
-            orientation: 'portrait',
-            pageSize: 'A4',
-         });
-
-         const filename = generateExportFilename(report.type, 'pdf');
-         downloadBlob(blob, filename);
-
-         toast.success('Report downloaded successfully');
-      } catch (err) {
-         console.error('Failed to download report:', err);
-         toast.error('Failed to download report');
-      }
-   };
-
-   const handleEmailReport = (reportId: string) => {
-      // TODO: Implement email dialog
-      router.push(`/reports/email/${reportId}`);
-   };
-
-   const handleDeleteReport = async (reportId: string) => {
-      if (!confirm('Are you sure you want to delete this report?')) {
-         return;
-      }
-
-      try {
-         await deleteReport(reportId);
-         toast.success('Report deleted successfully');
-      } catch (err) {
-         console.error('Failed to delete report:', err);
-         toast.error('Failed to delete report');
-      }
-   };
-
-   const handleGenerateReport = async (reportType: ReportType) => {
-      try {
-         setCurrentReportType(reportType);
-         const presets = getDateRangePresets();
-
-         let timeRange;
-         switch (reportType) {
-            case 'DAILY':
-               timeRange = presets.today.getTimeRange();
-               break;
-            case 'TREND':
-               timeRange = presets.last7Days.getTimeRange();
-               break;
-            case 'PREDICTIONS':
-               timeRange = presets.last7Days.getTimeRange();
-               break;
-            default:
-               timeRange = presets.today.getTimeRange();
-         }
-
-         const report = await generateReport({
-            type: reportType,
-            timeRange,
-            options: {
-               includeAI: true,
-               includePredictions: true,
-               includeRecommendations: true,
-            },
-         });
-
-         // Redirect to view the generated report
-         router.push(`/reports/view/${report.id}`);
-      } catch (error) {
-         console.error('Failed to generate report:', error);
-         toast.error(`Failed to generate ${reportType.toLowerCase()} report`);
-      } finally {
-         setCurrentReportType(null);
-      }
-   };
-
-   if (loadingReports && reports.length === 0) {
-      return (
-         <div className="flex items-center justify-center min-h-screen bg-gradient-to-br from-secondary-900 via-ai-neural to-secondary-800">
-            <LoadingSpinner size="lg" />
-         </div>
-      );
+      // 오류 시 빈 데이터 반환 (우아한 성능 저하)
+      return {
+         reports: [],
+         stats: null,
+      };
    }
+}
+
+/**
+ * 리포트 페이지 - 서버 컴포넌트
+ *
+ * 이 페이지는 ISR (Incremental Static Regeneration)을 사용하여
+ * 리포트 데이터를 캐싱하고 60초마다 자동으로 재검증합니다.
+ *
+ * On-Demand 재검증:
+ * - 새로운 리포트가 생성되면 클라이언트가 /api/revalidate를 호출
+ * - 60초 간격을 기다리지 않고 즉시 캐시를 업데이트
+ *
+ * 장점:
+ * - 빠른 페이지 로드 (캐시에서 제공)
+ * - 최신 데이터 (60초마다 + 온디맨드 재검증)
+ * - 서버 부하 감소 (캐시된 응답)
+ */
+export default async function ReportsPage() {
+   // 서버에서 데이터 가져오기 (ISR 캐싱 적용)
+   const { reports, stats } = await getReportsData();
 
    return (
       <div className="min-h-screen relative">
          <AppHeader />
-         {/* 배경 비디오 */}
-         <div className="fixed inset-0 w-full h-full overflow-hidden z-0">
-            <video ref={backgroundVideoRef} className="w-full h-full object-cover" autoPlay muted loop playsInline>
-               <source src="/videos/digital_notebook.mp4" type="video/mp4" />
-            </video>
-            <div className="absolute inset-0 bg-gradient-to-br from-secondary-900/95 via-ai-neural/90 to-secondary-800/95"></div>
-         </div>
 
-         {/* 메인 컨텐츠 */}
-         <div className="container mx-auto px-4 py-6 max-w-7xl relative z-10">
-            {/* Header with stats */}
-            <ReportHeader stats={stats} />
-
-            {/* Recent Reports */}
-            <RecentReports
-               reports={reports}
-               onView={handleViewReport}
-               onDownload={handleDownloadReport}
-               onEmail={handleEmailReport}
-               onDelete={handleDeleteReport}
-            />
-
-            {/* Quick Report Cards */}
-            <QuickReportCards onGenerate={handleGenerateReport} />
-
-            {/* Scheduled Reports Section */}
-            {/* TODO: Implement ScheduledReports component */}
-
-            {/* Templates Section */}
-            {/* TODO: Implement ReportTemplates component */}
-         </div>
-
-         {/* Loading Overlay */}
-         <RotateSquareLoading
-            isVisible={isGenerating}
-            title={`Generating ${currentReportType ? currentReportType.charAt(0) + currentReportType.slice(1).toLowerCase() : ''} Report...`}
-            desc={
-               currentReportType === 'PREDICTIONS'
-                  ? 'Running AI analysis on 12 prediction categories'
-                  : currentReportType === 'TREND'
-                    ? 'Analyzing 7-day trend data with charts'
-                    : 'This may take a few moments'
+         <Suspense
+            fallback={
+               <div className="flex items-center justify-center min-h-screen bg-gradient-to-br from-secondary-900 via-ai-neural to-secondary-800">
+                  <LoadingSpinner size="lg" />
+               </div>
             }
-         />
+         >
+            <ReportsPageClient initialReports={reports} initialStats={stats} />
+         </Suspense>
       </div>
    );
 }

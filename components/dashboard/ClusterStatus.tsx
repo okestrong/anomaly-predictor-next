@@ -216,7 +216,7 @@ export default function ClusterStatus() {
    return (
       <div className="bg-transparent rounded-b-2xl relative wrapper">
          {/* Overlay stats */}
-         <div className="overlay-stats bg-secondary-800/80 shadow-cyber">
+         <div className="overlay-stats bg-secondary-800/80 shadow-cyber -translate-y-20">
             <div className="stat-item">
                <span className="label">IOPS</span>
                <span className="value">{Math.round(animatedStats.iops)}</span>
@@ -231,7 +231,7 @@ export default function ClusterStatus() {
             </div>
          </div>
 
-         <div className="relative grid grid-cols-1 lg:grid-cols-12 gap-6 pb-0 bg-secondary-800/80 p-8">
+         <div className="relative grid grid-cols-1 lg:grid-cols-12 gap-6 pb-0 bg-secondary-800/50 p-8">
             <div className="absolute left-8 top-[180px] flex items-center justify-between">
                <div className="flex items-center space-x-2">
                   <PresentationChartLineIcon className="w-5 h-5 text-ai-circuit" />
@@ -290,7 +290,7 @@ export default function ClusterStatus() {
          </div>
 
          <div className="flex items-center justify-between text-xs text-secondary-400 rounded-b-lg">
-            <svg width="100%" height="100%" viewBox="0 250 1440 150" xmlns="http://www.w3.org/2000/svg" className="w-full fill-secondary-800/80">
+            <svg width="100%" height="100%" viewBox="0 250 1440 150" xmlns="http://www.w3.org/2000/svg" className="w-full fill-secondary-800/50">
                <path
                   d="M 0,400 L 0,0 C 278,59.5 556,119 796,119 C 1036,119 1238,59.5 1440,0 L 1440,400 L 0,400 Z"
                   stroke="none"
