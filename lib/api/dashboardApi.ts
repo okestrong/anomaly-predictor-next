@@ -318,14 +318,16 @@ export class DashboardAPI {
     * Mark an alert as read
     */
    static async markAlertAsRead(alertId: string): Promise<{ status: string; message: string; timestamp: number }> {
-      return await apiClient.post(`/api/dashboard/alerts/${alertId}/mark-read`);
+      const encodedAlertId = encodeURIComponent(alertId);
+      return await apiClient.post(`/api/dashboard/alerts/${encodedAlertId}/mark-read`);
    }
 
    /**
     * Dismiss (remove) an alert
     */
    static async dismissAlert(alertId: string): Promise<{ status: string; message: string; timestamp: number }> {
-      return await apiClient.post(`/api/dashboard/alerts/${alertId}/dismiss`);
+      const encodedAlertId = encodeURIComponent(alertId);
+      return await apiClient.post(`/api/dashboard/alerts/${encodedAlertId}/dismiss`);
    }
 
    /**
