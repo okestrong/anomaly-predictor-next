@@ -6,7 +6,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { useParams, useRouter } from 'next/navigation';
+import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import { useReportStore } from '@/stores/report';
 import { usePredictionStore } from '@/stores/prediction';
 import { toast } from 'react-toastify';
@@ -36,7 +36,9 @@ dayjs.extend(utc);
 export default function ReportViewPage() {
    const params = useParams();
    const router = useRouter();
+   const searchParams = useSearchParams();
    const reportId = params?.id as string;
+   const reportType = searchParams.get('type') || undefined;
 
    const { currentReport, fetchReportById, error } = useReportStore();
    const { predictions, updateAllPredictions, getHighRiskPredictions } = usePredictionStore();
@@ -47,14 +49,24 @@ export default function ReportViewPage() {
 
    useEffect(() => {
       if (reportId) {
-         fetchReportById(reportId).catch(err => {
-            console.error('Failed to fetch report:', err);
-            toast.error('Failed to load report');
-            router.push('/reports');
-         });
+         // Check if report data was injected by Puppeteer (for PDF generation)
+         const injectedData = (window as any).__INJECTED_REPORT_DATA__;
+
+         if (injectedData) {
+            console.log('✅ [INJECTED] Using injected report data, skipping API call');
+            // Directly set the report data in the store
+            useReportStore.setState({ currentReport: injectedData });
+         } else {
+            console.log(`📄 [PAGE] Loading report ${reportId} with type: ${reportType || 'unknown'}`);
+            fetchReportById(reportId, reportType).catch(err => {
+               console.error('Failed to fetch report:', err);
+               toast.error('Failed to load report');
+               router.push('/reports');
+            });
+         }
       }
       // eslint-disable-next-line react-hooks/exhaustive-deps
-   }, [reportId]);
+   }, [reportId, reportType]);
 
    useEffect(() => {
       if (error) {
@@ -62,10 +74,12 @@ export default function ReportViewPage() {
       }
    }, [error]);
 
-   // Load predictions data for report
+   // Load predictions data ONLY for PREDICTIONS report type
    useEffect(() => {
-      updateAllPredictions();
-   }, [updateAllPredictions]);
+      if (currentReport?.type === 'PREDICTIONS') {
+         updateAllPredictions();
+      }
+   }, [currentReport?.type, updateAllPredictions]);
 
    // Fetch capacity data from dashboard API (includes dailyGrowthBytes and timeToFullDays)
    useEffect(() => {
@@ -191,23 +205,48 @@ export default function ReportViewPage() {
       );
    }
 
+   // Debug: Log report data for troubleshooting
+   if (process.env.NODE_ENV === 'development') {
+      console.log('📊 [REPORT DEBUG] Report type:', currentReport.type);
+      console.log('📊 [REPORT DEBUG] Report data keys:', currentReport.data ? Object.keys(currentReport.data) : 'NO DATA');
+      if (currentReport.type === 'DAILY') {
+         console.log('📊 [DAILY DEBUG] hostsSummary:', currentReport.data?.hostsSummary?.length || 0, 'items');
+         console.log('📊 [DAILY DEBUG] poolsSummary:', currentReport.data?.poolsSummary?.length || 0, 'items');
+         console.log('📊 [DAILY DEBUG] trends:', currentReport.data?.trends ? Object.keys(currentReport.data.trends) : 'NO TRENDS');
+      }
+      if (currentReport.type === 'TREND') {
+         console.log('📊 [TREND DEBUG] Full data:', JSON.stringify(currentReport.data, null, 2).substring(0, 1000));
+      }
+   }
+
    return (
       <>
          <style jsx>{`
+            .print-bg-white {
+               background:
+                  radial-gradient(ellipse at top left, rgba(6, 182, 212, 0.15) 0%, transparent 50%),
+                  radial-gradient(ellipse at top right, rgba(59, 130, 246, 0.12) 0%, transparent 50%),
+                  radial-gradient(ellipse at bottom left, rgba(99, 102, 241, 0.1) 0%, transparent 50%),
+                  radial-gradient(ellipse at bottom right, rgba(168, 85, 247, 0.08) 0%, transparent 50%),
+                  linear-gradient(135deg, #1a1f2e 0%, #16213e 25%, #0f3460 50%, #16213e 75%, #1a1f2e 100%);
+               background-attachment: fixed;
+            }
             @media print {
                .print-bg-white {
                   background: white !important;
+                  background-attachment: unset !important;
+                  min-height: auto !important;
                }
             }
          `}</style>
          <div
             className="min-h-screen relative bg-slate-600 print-bg-white"
             data-report-ready={isReportReady}
-            style={{
+            /*style={{
                background:
                   'radial-gradient(ellipse at top left, rgba(6, 182, 212, 0.15) 0%, transparent 50%), radial-gradient(ellipse at top right, rgba(59, 130, 246, 0.12) 0%, transparent 50%), radial-gradient(ellipse at bottom left, rgba(99, 102, 241, 0.1) 0%, transparent 50%), radial-gradient(ellipse at bottom right, rgba(168, 85, 247, 0.08) 0%, transparent 50%), linear-gradient(135deg, #1a1f2e 0%, #16213e 25%, #0f3460 50%, #16213e 75%, #1a1f2e 100%)',
                backgroundAttachment: 'fixed',
-            }}
+            }}*/
          >
             {/* Sophisticated mesh pattern */}
             <div
@@ -241,7 +280,10 @@ export default function ReportViewPage() {
                      <div className="flex items-center gap-4">
                         {/* Back Button */}
                         <button
-                           onClick={() => router.push('/reports')}
+                           onClick={() => {
+                              router.push('/reports');
+                              router.refresh(); // Force refresh to get latest data
+                           }}
                            className="h-10 aspect-square bg-gray-100 border border-gray-300 text-gray-700 flex items-center justify-center hover:bg-gray-200 hover:border-gray-400 transition-colors cursor-pointer group"
                            aria-label="Back to reports"
                         >
@@ -304,7 +346,7 @@ export default function ReportViewPage() {
                      </div>
                      <div>
                         <p className="text-xs text-gray-500 mb-1">Generated</p>
-                        <p className="text-sm font-semibold text-gray-900">{dayjs(currentReport.createdAt).format('YYYY-MM-DD HH:mm')}</p>
+                        <p className="text-sm font-semibold text-gray-900">{dayjs.utc(currentReport.createdAt).local().format('YYYY-MM-DD HH:mm')}</p>
                      </div>
                      <div>
                         <p className="text-xs text-gray-500 mb-1">{currentReport.type === 'PREDICTIONS' ? 'Analysis Type' : 'Period'}</p>
@@ -734,7 +776,10 @@ export default function ReportViewPage() {
                {/* Back Button */}
                <div className="mt-8 no-print">
                   <button
-                     onClick={() => router.push('/reports')}
+                     onClick={() => {
+                        router.push('/reports');
+                        router.refresh(); // Force refresh to get latest data
+                     }}
                      className="group px-8 py-3 bg-slate-800 border-2 border-slate-700 text-white font-medium hover:bg-slate-900 hover:border-slate-600 transition-all duration-200 cursor-pointer flex items-center gap-3"
                   >
                      <svg className="w-5 h-5 transform group-hover:-translate-x-1 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">

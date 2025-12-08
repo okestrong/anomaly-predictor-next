@@ -2,6 +2,28 @@
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080';
 const API_TIMEOUT = 90000; // 30 seconds
 
+// ========== Locale Utilities (i18n support) ==========
+
+/**
+ * 현재 locale 코드 가져오기
+ * 일단 'ko'로 하드코딩하고, 향후 i18n 라우팅 적용 시 URL path에서 추출
+ * @returns locale 코드 (예: "ko", "en")
+ */
+export const getCurrentLocale = (): string => {
+  // TODO: 향후 i18n 라우팅 적용 시 URL path에서 추출
+  // const pathLocale = window.location.pathname.split('/')[1];
+  // if (['ko', 'en', 'ja'].includes(pathLocale)) return pathLocale;
+  return 'ko'; // 현재는 한국어 고정
+};
+
+/**
+ * Accept-Language 헤더에 사용할 locale 반환
+ * navigator.language 형식(ko-KR)이 아닌 간단한 형식(ko) 사용
+ */
+export const getAcceptLanguage = (): string => {
+  return getCurrentLocale();
+};
+
 // Custom error class for API errors
 export class ApiError extends Error {
    constructor(
@@ -65,6 +87,7 @@ const getDefaultHeaders = (): HeadersInit => {
    const headers: HeadersInit = {
       'Content-Type': 'application/json',
       Accept: 'application/json',
+      'Accept-Language': getAcceptLanguage(), // i18n 지원: 현재 locale 전달
    };
 
    // Add authentication token if available (client-side only)

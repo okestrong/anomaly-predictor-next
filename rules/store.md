@@ -342,7 +342,7 @@ osds: [
 현재 Mock Data로 표시 중인 AI 예측을 실제 ML 모델과 연동
 
 ### 🔍 4. RAG 조치 가이드 완성
-ceph-doc-crawler API 연동 완료, UI 구현 필요
+ceph-doc-engine API 연동 완료, UI 구현 필요
 
 ## 현재 파일 구조 (Next.js 마이그레이션 완료)
 ```
@@ -444,6 +444,6 @@ public/
 현재 패널에 Mock 데이터로 표시 중인 AI 예측을 실제 기능으로 확장
 
 ### 우선순위 3: RAG 시스템 UI
-ceph-doc-crawler API는 완료, 사용자 인터페이스만 구현 필요
+ceph-doc-engine API는 완료, 사용자 인터페이스만 구현 필요
 
 이 프로젝트는 현재 매우 탄탄한 기술적 기반을 완성한 상태이며, 다음 단계는 실시간 데이터 연동을 통한 완전한 운영 시스템 구축입니다.

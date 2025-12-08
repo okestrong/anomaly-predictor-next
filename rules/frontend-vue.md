@@ -15,16 +15,16 @@
 #### 1. predictor-api
 - 현재 프로젝트(predictor-view) 의 백엔드를 담당하는 프로젝트
 - ollama 에서 제공하는 API 를 통해 llm 을 이용하고, 이를 통해 ceph 에서 수집한 data 를 기반으로 인공지능 기능(장애예측 등)을 수행하는 역할도 한다.
-- 인공지능 기능을 사용시 정확도 향상을 위해 RAG 기능을 이용하는데, 이때 ceph-doc-crawler 프로젝트의 Qdrant 의 정보를 조회한다.
+- 인공지능 기능을 사용시 정확도 향상을 위해 RAG 기능을 이용하는데, 이때 ceph-doc-engine 프로젝트의 Qdrant 의 정보를 조회한다.
 - 위치 : /Users/jclee/Documents/Okestro/Projects/DevSw/anomaly-predictor-api
 #### 2. predictor
 - go-ceph 를 이용하여 ceph 의 metric 등의 data 들을 주기적으로 prometheus 로 수집하고, 직접적으로 REST Api 로도 제공하는 프로젝트
 - ceph 내부에 custom service 로 등록된다.
 - 위치 : /Users/jclee/Documents/Okestro/Projects/DevSw/anomaly-predictor
-#### 3. ceph-doc-crawler
+#### 3. ceph-doc-engine
 - ceph 공식문서를 크롤링하고 이를 벡터화 하여 Qdrant 에 저장하는 프로젝트
 - predictor-api 에서 RAG 기능으로 Qdrant 의 정보를 참고한다.
-- 위치 : /Users/jclee/Documents/Okestro/Projects/DevSw/ceph-doc-crawler
+- 위치 : /Users/jclee/Documents/Okestro/Projects/DevSw/ceph-doc-engine
 
 ### 핵심 기능
 1. 실시간 클러스터 모니터링 대시보드
@@ -198,8 +198,8 @@ graph LR
 
 ### 5. RAG 기반 조치 가이드 (RAG-based Action Guide)
 
-#### 5.1 ceph-doc-crawler 통합
-RAG 시스템은 ceph-doc-crawler API를 통해 문서 검색을 수행하며, sentence-transformers 기반 임베딩 모델을 사용합니다.
+#### 5.1 ceph-doc-engine 통합
+RAG 시스템은 ceph-doc-engine API를 통해 문서 검색을 수행하며, sentence-transformers 기반 임베딩 모델을 사용합니다.
 
 **주요 특징:**
 - sentence-transformers/all-MiniLM-L6-v2 모델 기반 임베딩
@@ -254,9 +254,9 @@ RAG 시스템은 ceph-doc-crawler API를 통해 문서 검색을 수행하며, s
         </div>
       </div>
       
-      <!-- ceph-doc-crawler 참조 문서 -->
+      <!-- ceph-doc-engine 참조 문서 -->
       <div class="ceph-mt-4 ceph-pt-4 ceph-border-t">
-        <h5 class="ceph-text-sm ceph-font-medium ceph-mb-2">참조 문서 (ceph-doc-crawler):</h5>
+        <h5 class="ceph-text-sm ceph-font-medium ceph-mb-2">참조 문서 (ceph-doc-engine):</h5>
         <ul class="ceph-space-y-1">
           <li v-for="source in ragResponse.sources" :key="source">
             <a :href="source" class="ceph-text-primary-600 hover:ceph-underline ceph-text-sm">
@@ -289,7 +289,7 @@ RAG 시스템은 ceph-doc-crawler API를 통해 문서 검색을 수행하며, s
 
 #### 5.3 컨텍스트 기반 조치 제안
 - sentence-transformers를 통한 의미 기반 문서 검색
-- ceph-doc-crawler에서 수집한 Ceph 공식 문서 기반 답변
+- ceph-doc-engine에서 수집한 Ceph 공식 문서 기반 답변
 - 현재 클러스터 상태와 연계한 맞춤형 가이드
 - 안전성 검증된 명령어만 제공 (위험 명령어 자동 필터링)
 - 단계별 해결 가이드 생성 및 실행 검증
@@ -1339,7 +1339,7 @@ if (import.meta.env.PROD) {
 - [ ] AI 응답 표시 컴포넌트
 - [ ] 컨텍스트 기반 제안 UI
 - [ ] 명령어 자동 생성 뷰어
-- [x] ceph-doc-crawler API 서비스 연동 완료
+- [x] ceph-doc-engine API 서비스 연동 완료
 - [x] sentence-transformers 임베딩 모델 적용
 
 ### Phase 6: Ceph Squid 특화 기능 (Week 13-14)

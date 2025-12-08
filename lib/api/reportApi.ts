@@ -62,7 +62,7 @@ export class ReportAPI {
       const response = await apiClient.post<any>(
          endpoint,
          requestBody,
-         { timeout: 300000 }, // 5 minutes timeout for report generation
+         { timeout: 600000 }, // 5 minutes timeout for report generation
       );
 
       // Backend returns the report directly, not wrapped in GenerateReportResponse
@@ -85,27 +85,49 @@ export class ReportAPI {
    }
 
    /**
-    * Get a single report by ID
-    * Tries generic endpoint first (has smart routing), then falls back to type-specific endpoints
+    * Get a single report by ID with optional type for direct endpoint routing
+    * If type is provided, calls the correct endpoint directly without fallback
+    * If type is not provided, tries type-specific endpoints in order
     */
-   static async getReportById(reportId: string): Promise<Report> {
-      console.log(`🔍 [FRONTEND] getReportById called for reportId: ${reportId}`);
+   static async getReportById(reportId: string, reportType?: string): Promise<Report> {
+      console.log(`🔍 [FRONTEND] getReportById called for reportId: ${reportId}, type: ${reportType || 'unknown'}`);
 
-      // Try generic endpoint first - backend has smart routing based on report type registry
+      // If type is provided, call the correct endpoint directly
+      if (reportType) {
+         const endpoint =
+            reportType === 'DAILY'
+               ? `/api/v1/reports/daily/${reportId}`
+               : reportType === 'TREND'
+                 ? `/api/v1/reports/trend/${reportId}`
+                 : reportType === 'PREDICTIONS'
+                   ? `/api/v1/reports/predictions/${reportId}`
+                   : null;
+
+         if (endpoint) {
+            console.log(`🎯 [FRONTEND] Calling ${reportType} endpoint directly: ${endpoint}`);
+            const result = await apiClient.get<Report>(endpoint, {
+               timeout: 30000,
+            });
+            console.log(`✅ [FRONTEND] ${reportType} endpoint succeeded for ${reportId}`);
+            return result;
+         }
+      }
+
+      // Fallback: Try type-specific endpoints in order (DAILY, TREND, PREDICTIONS)
+      console.log(`⚠️  [FRONTEND] No type provided, using fallback chain`);
+
+      // Try DAILY endpoint first
       try {
-         console.log(`🎯 [FRONTEND] Trying generic endpoint: /api/v1/reports/${reportId}`);
-         const result = await apiClient.get<Report>(`/api/v1/reports/${reportId}`, {
+         console.log(`🎯 [FRONTEND] Trying DAILY endpoint: /api/v1/reports/daily/${reportId}`);
+         const result = await apiClient.get<Report>(`/api/v1/reports/daily/${reportId}`, {
             timeout: 30000,
          });
-         console.log(`✅ [FRONTEND] Generic endpoint succeeded for ${reportId}`);
+         console.log(`✅ [FRONTEND] DAILY endpoint succeeded for ${reportId}`);
          return result;
-      } catch (genericError) {
-         const errorDetails = genericError instanceof Error
-            ? { message: genericError.message, name: genericError.name, stack: genericError.stack }
-            : genericError;
-         console.error(`❌ [FRONTEND] Generic endpoint failed for ${reportId}`, errorDetails);
-         console.warn(`🔄 [FRONTEND] Falling back to type-specific endpoints`);
-         // If generic fails, try TREND endpoint
+      } catch (dailyError) {
+         console.warn(`❌ [FRONTEND] DAILY endpoint failed, trying TREND`);
+
+         // If DAILY fails, try TREND endpoint
          try {
             console.log(`🎯 [FRONTEND] Trying TREND endpoint: /api/v1/reports/trend/${reportId}`);
             const result = await apiClient.get<Report>(`/api/v1/reports/trend/${reportId}`, {
@@ -114,8 +136,9 @@ export class ReportAPI {
             console.log(`✅ [FRONTEND] TREND endpoint succeeded for ${reportId}`);
             return result;
          } catch (trendError) {
-            console.warn(`❌ [FRONTEND] TREND endpoint failed for ${reportId}, trying PREDICTIONS endpoint`, trendError);
-            // If trend fails, try PREDICTIONS endpoint as last resort
+            console.warn(`❌ [FRONTEND] TREND endpoint failed, trying PREDICTIONS`);
+
+            // If TREND fails, try PREDICTIONS endpoint as last resort
             console.log(`🎯 [FRONTEND] Trying PREDICTIONS endpoint: /api/v1/reports/predictions/${reportId}`);
             const result = await apiClient.get<Report>(`/api/v1/reports/predictions/${reportId}`, {
                timeout: 30000,

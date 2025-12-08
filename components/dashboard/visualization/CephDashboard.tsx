@@ -29,7 +29,7 @@ const getStatusColor = (status: string): string => {
    switch (status) {
       case 'HEALTH_OK':
       case 'up':
-         return Colors.emerald[600];
+         return Colors.blue[500];
       case 'HEALTH_WARN':
          return Colors.amber[500];
       case 'HEALTH_ERR':
@@ -462,7 +462,7 @@ function BumpyGround({ isDark }: { isDark: boolean }) {
 
    return (
       <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -2, 0]} receiveShadow geometry={geometry}>
-         <meshStandardMaterial roughness={isDark ? 0.2 : 1} color={isDark ? Colors.neutral[500] : Colors.white} metalness={0.6} />
+         <meshStandardMaterial roughness={isDark ? 0.2 : 1} color={isDark ? Colors.neutral[400] : Colors.white} metalness={0.75} />
          {/*<MeshReflectorMaterial
             blur={[300, 100]}
             resolution={2048}
@@ -555,9 +555,9 @@ function TrafficFlow({ intensityRate, flow, positions }: { intensityRate: number
             );
 
             return (
-               <Trail key={i} width={4} length={4} color={color} attenuation={t => t * t}>
+               <Trail key={i} width={2.8} length={4} color={color} attenuation={t => t * t}>
                   <mesh ref={el => (meshRefs.current[i] = el)} position={initialPos}>
-                     <sphereGeometry args={[0.4, 12, 12]} />
+                     <sphereGeometry args={[0.3, 12, 12]} />
                      <meshPhongMaterial color={color} emissive={color} emissiveIntensity={1.2} transparent opacity={0.9} />
                      {/*<pointLight color={Colors.cyan[500]} intensity={1} distance={0} decay={2} />*/}
                   </mesh>
@@ -1306,7 +1306,7 @@ function InfoPopup({ selectedNode, onClose }: { selectedNode: any; onClose: () =
                   <p>
                      Used: {formatBytes(data.usedBytes)} ({data.utilizationPercent.toFixed(1)}%)
                   </p>
-                  <p>PGs: {data.pgCount}</p>
+                  {/*<p>PGs: {data.pgCount}</p>*/}
                   <p>Read IOPS: {data.performanceMetrics.read_iops}</p>
                   <p>Write IOPS: {data.performanceMetrics.write_iops}</p>
                </>
@@ -1346,7 +1346,7 @@ function InfoPopup({ selectedNode, onClose }: { selectedNode: any; onClose: () =
 }
 
 // Safe EffectComposer wrapper with WebGL context check
-function SafeEffectComposer() {
+function SafeEffectComposer({ isDark }: { isDark: boolean }) {
    const { gl } = useThree();
 
    // Only render EffectComposer if WebGL context is available and valid
@@ -1359,7 +1359,7 @@ function SafeEffectComposer() {
       return (
          <EffectComposer multisampling={0} resolutionScale={1}>
             {/*<Bloom mipmapBlur luminanceThreshold={0.3} intensity={0.6} radius={0.4} />*/}
-            <BrightnessContrast brightness={0} contrast={0.2} />
+            <BrightnessContrast brightness={isDark ? 0 : 0.15} contrast={0.2} />
          </EffectComposer>
       );
    } catch (error) {
@@ -1369,7 +1369,17 @@ function SafeEffectComposer() {
 }
 
 // Main 3D Scene Component
-function CephTopology3D({ intensity, data, onNodeSelect }: { intensity: number; data: CephTopologyData; onNodeSelect: (node: any) => void }) {
+function CephTopology3D({
+   intensity,
+   data,
+   onNodeSelect,
+   isDark,
+}: {
+   intensity: number;
+   data: CephTopologyData;
+   onNodeSelect: (node: any) => void;
+   isDark: boolean;
+}) {
    const { camera } = useThree();
    const positions = useMemo(() => calculateNodePositions(data), [data.hosts.length, data.osds.length, data.daemons.length]);
    const cameraMoved = useRef(false);
@@ -1394,7 +1404,7 @@ function CephTopology3D({ intensity, data, onNodeSelect }: { intensity: number; 
 
    return (
       <>
-         <SafeEffectComposer />
+         <SafeEffectComposer isDark={isDark} />
          <group>
             {/* Connection Lines */}
             {/*<ConnectionLines positions={positions} data={data} />*/}
@@ -1697,7 +1707,9 @@ const CephDashboard = React.memo(
                         <CameraController />
 
                         {/* Main 3D Scene */}
-                        {topologyData && <CephTopology3D data={topologyData} onNodeSelect={setSelectedNode} intensity={trafficIntensity} />}
+                        {topologyData && (
+                           <CephTopology3D data={topologyData} onNodeSelect={setSelectedNode} intensity={trafficIntensity} isDark={cardVisible} />
+                        )}
 
                         {/* Info Popup */}
                         {selectedNode && <InfoPopup selectedNode={selectedNode} onClose={() => setSelectedNode(null)} />}

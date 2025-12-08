@@ -29,11 +29,11 @@ Vue 3 기반 원본 프로젝트에서 Next.js 15로의 마이그레이션이 **
 - Prometheus 연동 및 REST API 제공
 - 위치: /Users/jclee/Documents/Okestro/Projects/DevSw/anomaly-predictor
 
-#### 3. ceph-doc-crawler (RAG)
-- ollama (nomic-embed-text-v1.5) 기반 임베딩
+#### 3. ceph-doc-engine (RAG)
+- BAAI/bge-m3 기반 임베딩
 - Ceph 공식문서 크롤링
 - Qdrant 벡터 인덱싱 및 RAG 검색
-- 위치: /Users/jclee/Documents/Okestro/Projects/DevSw/ceph-doc-crawler
+- 위치: /Users/jclee/Documents/Okestro/Projects/DevSw/ceph-doc-engine
 
 ## 핵심 기능 (Core Features)
 
@@ -336,7 +336,7 @@ export function PredictionGrid() {
 
 ### 6. RAG 기반 조치 가이드
 
-#### 6.1 ceph-doc-crawler 통합 유지
+#### 6.1 ceph-doc-engine 통합 유지
 ```tsx
 // components/rag/RagSearchInterface.tsx
 'use client'

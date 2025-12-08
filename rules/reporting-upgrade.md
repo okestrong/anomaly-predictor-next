@@ -2445,7 +2445,7 @@ spring:
 go:
   ceph:
     service:
-      url: http://localhost:8081
+      url: http://localhost:8080
       timeout: 30000
 
 # AI Configuration  

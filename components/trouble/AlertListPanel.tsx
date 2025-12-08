@@ -8,6 +8,7 @@ import { AlertData } from '@/lib/api/dashboardApi';
 interface AlertListPanelProps {
   selectedAlert: AlertInfo | null;
   onAlertSelect: (alert: AlertInfo) => void;
+  disabled?: boolean;
 }
 
 // Convert AlertData from dashboard store to AlertInfo for trouble component
@@ -28,7 +29,7 @@ const convertAlertDataToAlertInfo = (alertData: AlertData): AlertInfo => ({
   }
 });
 
-export default function AlertListPanel({ selectedAlert, onAlertSelect }: AlertListPanelProps) {
+export default function AlertListPanel({ selectedAlert, onAlertSelect, disabled = false }: AlertListPanelProps) {
   const dashboardAlerts = useDashboardStore((state) => state.alerts);
   const fetchAlerts = useDashboardStore((state) => state.fetchAlerts);
   const [alerts, setAlerts] = useState<AlertInfo[]>([]);
@@ -178,9 +179,12 @@ export default function AlertListPanel({ selectedAlert, onAlertSelect }: AlertLi
             {filteredAlerts.map((alert) => (
               <button
                 key={alert.alertId}
-                onClick={() => onAlertSelect(alert)}
+                onClick={() => !disabled && onAlertSelect(alert)}
+                disabled={disabled}
                 className={`group relative w-full p-4 text-left rounded-xl transition-all duration-300 overflow-hidden ${
-                  selectedAlert?.alertId === alert.alertId
+                  disabled
+                    ? 'bg-gray-900/30 border-2 border-gray-800/50 cursor-not-allowed opacity-50'
+                    : selectedAlert?.alertId === alert.alertId
                     ? 'bg-gradient-to-br from-blue-600/20 to-blue-700/20 border-2 border-blue-500 shadow-lg shadow-blue-500/20 scale-[1.02]'
                     : 'bg-gray-900/50 border-2 border-gray-800 hover:border-gray-700 hover:bg-gray-900 hover:scale-[1.02] hover:shadow-xl hover:shadow-gray-900/50'
                 }`}

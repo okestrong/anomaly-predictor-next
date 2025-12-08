@@ -14,12 +14,12 @@ export class TopologyAPI {
    /**
     * Get topology data (with 5-minute cache)
     * Returns comprehensive cluster topology data including pools, PGs, OSDs, and hosts
-    * Uses 60-second timeout for stability
+    * Uses 120-second timeout for stability (may take longer depending on cluster size)
     */
    static async getTopology(): Promise<TopologyResponse> {
       return await apiClient.get<TopologyResponse>(
          '/api/topology',
-         { timeout: 60000 } // 60 seconds timeout
+         { timeout: 120000 } // 120 seconds timeout
       );
    }
 
@@ -31,7 +31,7 @@ export class TopologyAPI {
       return await apiClient.post<TopologyRefreshResponse>(
          '/api/topology/refresh',
          {},
-         { timeout: 60000 }
+         { timeout: 120000 } // 120 seconds timeout
       );
    }
 

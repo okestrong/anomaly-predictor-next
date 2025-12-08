@@ -149,8 +149,9 @@ export default function ReportsPageClient({ initialReports, initialStats }: Repo
       // Trigger revalidation after generation
       await triggerRevalidation();
 
-      // Redirect to view the generated report
-      router.push(`/reports/view/${report.id}`);
+      // Redirect to view the generated report with type parameter
+      // This helps when navigating back to /reports to ensure fresh data
+      router.push(`/reports/view/${report.id}?type=${reportType}`);
     } catch (error) {
       console.error('Failed to generate report:', error);
       toast.error(`Failed to generate ${reportType.toLowerCase()} report`);

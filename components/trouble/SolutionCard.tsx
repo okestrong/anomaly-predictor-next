@@ -7,11 +7,20 @@ import MarkdownRenderer from './MarkdownRenderer';
 interface SolutionCardProps {
   solution: Solution;
   index: number;
-  onSelect: () => void;
+  onExecute: () => void;
+  onExpanded?: () => void;
 }
 
-export default function SolutionCard({ solution, index, onSelect }: SolutionCardProps) {
+export default function SolutionCard({ solution, index, onExecute, onExpanded }: SolutionCardProps) {
   const [expanded, setExpanded] = useState(false);
+
+  const handleExpand = (expand: boolean) => {
+    setExpanded(expand);
+    if (expand && onExpanded) {
+      // 펼침 후 약간의 딜레이 후 스크롤
+      setTimeout(() => onExpanded(), 100);
+    }
+  };
 
   const getRiskLevelColor = (riskLevel: string) => {
     switch (riskLevel) {
@@ -72,7 +81,7 @@ export default function SolutionCard({ solution, index, onSelect }: SolutionCard
             </div>
           </div>
           <button
-            onClick={() => setExpanded(!expanded)}
+            onClick={() => handleExpand(!expanded)}
             className="flex-shrink-0 p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
           >
             <svg
@@ -193,14 +202,14 @@ export default function SolutionCard({ solution, index, onSelect }: SolutionCard
           {/* Action Button */}
           <div className="pt-4 border-t border-gray-200 dark:border-gray-700">
             <button
-              onClick={onSelect}
-              className={`w-full px-4 py-2 rounded-lg font-medium transition-colors ${
+              onClick={onExecute}
+              className={`w-full px-4 py-3 rounded-lg font-medium transition-colors ${
                 solution.readOnly
                   ? 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
                   : 'bg-blue-600 text-white hover:bg-blue-700'
               }`}
             >
-              {solution.readOnly ? '이 해결책 확인' : '이 해결책 실행하기'}
+              {solution.readOnly ? '📖 확인' : '🚀 이 해결책 실행하기'}
             </button>
           </div>
         </div>
@@ -210,7 +219,7 @@ export default function SolutionCard({ solution, index, onSelect }: SolutionCard
       {!expanded && (
         <div className="p-4 bg-gray-50 dark:bg-gray-900/50">
           <button
-            onClick={() => setExpanded(true)}
+            onClick={() => handleExpand(true)}
             className="w-full text-sm text-blue-600 dark:text-blue-400 hover:underline"
           >
             자세히 보기 →

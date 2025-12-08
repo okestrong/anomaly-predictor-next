@@ -118,12 +118,32 @@ export enum ResponseType {
    COMPLETED = 'COMPLETED',
    ERROR = 'ERROR',
    PROGRESS = 'PROGRESS',
+   STREAMING_CHUNK = 'STREAMING_CHUNK',
+   APPROVAL_STATUS_CHANGED = 'APPROVAL_STATUS_CHANGED',
+}
+
+/**
+ * 승인 상태 변경 메타데이터
+ */
+export interface ApprovalStatusChangedMetadata {
+   requestId: string;
+   status: string;
+   command: string;
+   args: string[];
+   decision: 'approve' | 'reject';
+   approver: string;
+   comment?: string;
 }
 
 export interface TroubleRequest {
    threadId?: string;
    alertInfo?: AlertInfo;
    message?: string;
+   /**
+    * 대상 언어 코드 (예: "ko", "en", "ja")
+    * 진단 및 해결책 번역에 사용
+    */
+   targetLanguage?: string;
 }
 
 export interface UserMessageRequest {

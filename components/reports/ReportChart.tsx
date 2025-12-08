@@ -10,6 +10,7 @@ import * as echarts from 'echarts/core';
 import { LineChart } from 'echarts/charts';
 import { GridComponent, TooltipComponent, LegendComponent, DataZoomComponent } from 'echarts/components';
 import { CanvasRenderer } from 'echarts/renderers';
+import { formatBytes } from '@/lib/formatUtils';
 
 echarts.use([LineChart, GridComponent, TooltipComponent, LegendComponent, DataZoomComponent, CanvasRenderer]);
 
@@ -91,7 +92,7 @@ export function ReportChart({ trendData, height = 300 }: ReportChartProps) {
             case 'Throughput':
                return `${value.toFixed(1)} MB/s`;
             case 'Capacity':
-               return `${value.toFixed(1)}%`;
+               return `${formatBytes(value)}`;
             default:
                return value.toFixed(1);
          }

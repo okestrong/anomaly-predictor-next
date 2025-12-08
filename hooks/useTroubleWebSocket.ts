@@ -1,23 +1,37 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
 import { Client, IMessage } from '@stomp/stompjs';
 import SockJS from 'sockjs-client';
-import { TroubleResponse, TroubleRequest, UserMessageRequest, SolutionSelectionRequest, ApprovalRequest } from '@/types/trouble';
+import {
+   TroubleResponse,
+   TroubleRequest,
+   UserMessageRequest,
+   SolutionSelectionRequest,
+   ApprovalRequest,
+   ApprovalStatusChangedMetadata,
+} from '@/types/trouble';
 
 interface UseTroubleWebSocketProps {
    threadId: string | null;
    onMessage: (response: TroubleResponse) => void;
+   onApprovalStatusChanged?: (metadata: ApprovalStatusChangedMetadata) => void;
 }
 
-export function useTroubleWebSocket({ threadId, onMessage }: UseTroubleWebSocketProps) {
+export function useTroubleWebSocket({ threadId, onMessage, onApprovalStatusChanged }: UseTroubleWebSocketProps) {
    const [connected, setConnected] = useState(false);
    const [connecting, setConnecting] = useState(false);
    const clientRef = useRef<Client | null>(null);
    const onMessageRef = useRef(onMessage);
+   const onApprovalStatusChangedRef = useRef(onApprovalStatusChanged);
 
    // onMessage ref 업데이트
    useEffect(() => {
       onMessageRef.current = onMessage;
    }, [onMessage]);
+
+   // onApprovalStatusChanged ref 업데이트
+   useEffect(() => {
+      onApprovalStatusChangedRef.current = onApprovalStatusChanged;
+   }, [onApprovalStatusChanged]);
 
    // WebSocket 연결
    useEffect(() => {
@@ -44,6 +58,19 @@ export function useTroubleWebSocket({ threadId, onMessage }: UseTroubleWebSocket
                   onMessageRef.current(response);
                } catch (error) {
                   console.error('Error parsing message:', error);
+               }
+            });
+
+            // 승인 상태 변경 구독 (전역)
+            client.subscribe('/topic/approvals', (message: IMessage) => {
+               try {
+                  const response: TroubleResponse = JSON.parse(message.body);
+                  console.log('📥 Received approval status change:', response);
+                  if (response.metadata && onApprovalStatusChangedRef.current) {
+                     onApprovalStatusChangedRef.current(response.metadata as ApprovalStatusChangedMetadata);
+                  }
+               } catch (error) {
+                  console.error('Error parsing approval status message:', error);
                }
             });
          },

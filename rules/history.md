@@ -89,7 +89,7 @@
 #### 연관 프로젝트 위치
 - **predictor-api**: `/Users/jclee/Documents/Okestro/Projects/DevSw/anomaly-predictor-api`
 - **predictor**: `/Users/jclee/Documents/Okestro/Projects/DevSw/anomaly-predictor`
-- **ceph-doc-crawler**: `/Users/jclee/Documents/Okestro/Projects/DevSw/ceph-doc-crawler`
+- **ceph-doc-engine**: `/Users/jclee/Documents/Okestro/Projects/DevSw/ceph-doc-engine`
 
 ### 🔍 테스트 및 검증 방법
 

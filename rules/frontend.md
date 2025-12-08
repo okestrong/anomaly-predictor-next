@@ -6,8 +6,8 @@
 #### 1. predictor-api
 - 현재 프로젝트(predictor-next) 의 백엔드를 담당하는 프로젝트
 - Java21 에 Spring Boot 3.5.4 기반으로 만들어진 REST Api 들을 제공
-- vLLM (https://vllm.hotk.co.kr) 을 통해 LLM (openai/gpt-oss-20b 모델) 을 이용하고, 이를 통해 ceph 에서 수집한 data 를 기반으로 ceph 의 장애를 예측하고 조치사항을 추천해주고, 이상을 탐지하고, 최적의 PG 개수를 알려주는 등의 인공지능을 사용한다.
-- 인공지능 기능을 사용시 정확도 향상을 위해 RAG 기능을 이용하는데, 이때 ceph-doc-crawler 프로젝트의 Qdrant 의 정보를 조회한다.
+- vLLM (https://gpt.hotk.co.kr) 을 통해 LLM (openai/gpt-oss-20b 모델) 을 이용하고, 이를 통해 ceph 에서 수집한 data 를 기반으로 ceph 의 장애를 예측하고 조치사항을 추천해주고, 이상을 탐지하고, 최적의 PG 개수를 알려주는 등의 인공지능을 사용한다.
+- 인공지능 기능을 사용시 정확도 향상을 위해 RAG 기능을 이용하는데, 이때 ceph-doc-engine 프로젝트의 Qdrant 의 정보를 조회한다.
 - 위치 : /Users/jclee/Documents/Okestro/Projects/DevSw/anomaly-predictor-api
 - 참고문서 : 위에 언급한 위치에 rules 폴더가 있고 하위에 PRD.md 와 backend.md 를 참고하면 된다.
 #### 2. predictor
@@ -15,10 +15,10 @@
 - ceph 내부에 custom service 로 등록된다.
 - 위치 : /Users/jclee/Documents/Okestro/Projects/DevSw/anomaly-predictor
 - 참고문서 : 위에 언급한 위치에 rules 폴더가 있고 하위에 Guide.md 를 참고하면 된다.
-#### 3. ceph-doc-crawler
+#### 3. ceph-doc-engine
 - ceph 공식문서를 크롤링하고 ollama (nomic-embed-text-v1.5) 를 이용하여 임베딩하여 Qdrant 에 저장하는 프로젝트
 - predictor-api 에서 RAG 기능으로 Qdrant 의 정보를 참고한다.
-- 위치 : /Users/jclee/Documents/Okestro/Projects/DevSw/ceph-doc-crawler
+- 위치 : /Users/jclee/Documents/Okestro/Projects/DevSw/ceph-doc-engine
 - 참고문서 : 위에 언급한 위치에 rules 폴더가 있고 하위에 PRD.md 와 requirements.md 를 참고하면 된다.
 #### [주의] 위에 언급한 연관 프로젝트들에 대한 설명과 위치를 메모리에 기억해놔라!!
 
@@ -42,7 +42,7 @@ Vue 3 원본 프로젝트에서 Next.js 15로의 모든 기능 마이그레이�
 ### 핵심 기능
 1. **실시간 클러스터 모니터링**: 8개 차트 + 3D 토폴로지
 2. **AI 기반 장애 예측**: 12개 예측 카테고리
-3. **RAG 기반 조치 가이드**: ceph-doc-crawler + ollama (nomic-embed-text-v1.5)
+3. **RAG 기반 조치 가이드**: ceph-doc-engine + Python3.11 (BAAI/BGE-M3)
 4. **ML 실시간 이상감지**: 이상 점수 + 히트맵 + 모델 성능
 5. **PG 최적화 도구**: 계산기 + 분포 분석 + 시뮬레이션
 6. **3D 클러스터 토폴로지**: 우주 환경 + 4계층 노드 + 인터랙션
@@ -1894,7 +1894,7 @@ export interface ClusterStatus {
 - ✅ AI 응답 표시 컴포넌트
 - ✅ 컨텍스트 기반 제안 UI
 - ✅ 명령어 자동 생성 뷰어
-- ✅ RAG API 서비스 연동 (ceph-doc-crawler 통합)
+- ✅ RAG API 서비스 연동 (ceph-doc-engine 통합)
 - ✅ sentence-transformers 임베딩 모델 적용
 
 ### Phase 7: Ceph Squid 특화 기능 (Week 15-16)

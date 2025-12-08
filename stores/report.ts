@@ -63,7 +63,7 @@ interface ReportStore {
 
    // Report management
    fetchReports: (page?: number, pageSize?: number) => Promise<void>;
-   fetchReportById: (reportId: string) => Promise<Report | null>;
+   fetchReportById: (reportId: string, reportType?: string) => Promise<Report | null>;
    deleteReport: (reportId: string) => Promise<void>;
    setReports: (reports: Report[]) => void;
 
@@ -259,7 +259,7 @@ export const useReportStore = create<ReportStore>()(
                   }
                },
 
-               fetchReportById: async (reportId: string): Promise<Report | null> => {
+               fetchReportById: async (reportId: string, reportType?: string): Promise<Report | null> => {
                   // Check if report is already loaded in store
                   const currentState = get();
                   if (currentState.currentReport?.id === reportId) {
@@ -269,7 +269,7 @@ export const useReportStore = create<ReportStore>()(
 
                   try {
                      const { ReportAPI } = await import('@/lib/api/reportApi');
-                     const report = await ReportAPI.getReportById(reportId);
+                     const report = await ReportAPI.getReportById(reportId, reportType);
 
                      set((state) => {
                         state.currentReport = report;

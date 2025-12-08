@@ -361,8 +361,8 @@ export const usePredictionStore = create<PredictionStore>()(
           })
         })
 
-        // Define all categories
-        const categories: PredictionCategory[] = [
+        // 11개 카테고리 (comprehensive 제외)
+        const individualCategories: PredictionCategory[] = [
           'osd-failure',
           'capacity-exhaustion',
           'performance-degradation',
@@ -373,66 +373,81 @@ export const usePredictionStore = create<PredictionStore>()(
           'hotspot-osd',
           'cluster-expansion',
           'smart-disk-failure',
-          'metric-disk-failure',
-          'comprehensive'
+          'metric-disk-failure'
         ]
 
-        // Function to update individual prediction
-        const updatePredictionCategory = async (category: PredictionCategory) => {
+        // Helper function to update a single prediction in store
+        const updatePredictionInStore = (category: PredictionCategory, apiPred: APIPredictionResponse) => {
+          set((state) => {
+            const existingPred = state.predictions[category]
+            if (existingPred) {
+              existingPred.category = category
+              existingPred.name = apiPred.categoryName
+              existingPred.description = predictionConfigs[category].description
+              existingPred.aiAnalysis = apiPred.aiAnalysis
+              existingPred.probability = apiPred.riskScore
+              existingPred.severity = convertRiskLevelToSeverity(apiPred.riskLevel)
+              existingPred.timeToImpact = parseTimeToFailure(apiPred.predictedTimeToFailure)
+              existingPred.confidence = apiPred.confidence
+              existingPred.affectedComponents = apiPred.affectedResources
+              existingPred.rootCauses = apiPred.rootCauses
+              existingPred.recommendedActions = apiPred.recommendedActions
+              existingPred.mlModel = apiPred.modelInfo.modelName
+              existingPred.lastUpdated = new Date(apiPred.timestamp)
+              existingPred.trend = apiPred.trend as 'improving' | 'stable' | 'worsening'
+              existingPred.historicalAccuracy = apiPred.modelInfo.accuracy
+              existingPred.isLoading = false
+            }
+          })
+        }
+
+        // 개별 카드가 완료되면 즉시 로딩 해제되도록 각각 병렬 호출
+        // 11개 예측을 각각 병렬로 가져오면서 완료 즉시 업데이트
+        const individualPromises = individualCategories.map(async (category) => {
           try {
             const apiPred = await PredictionAPI.getPrediction(category)
-
-            // Update state immediately when this prediction completes
-            set((state) => {
-              const existingPred = state.predictions[category]
-              if (existingPred) {
-                existingPred.category = category
-                existingPred.name = apiPred.categoryName
-                existingPred.description = predictionConfigs[category].description
-                existingPred.aiAnalysis = apiPred.aiAnalysis
-                existingPred.probability = apiPred.riskScore
-                existingPred.severity = convertRiskLevelToSeverity(apiPred.riskLevel)
-                existingPred.timeToImpact = parseTimeToFailure(apiPred.predictedTimeToFailure)
-                existingPred.confidence = apiPred.confidence
-                existingPred.affectedComponents = apiPred.affectedResources
-                existingPred.rootCauses = apiPred.rootCauses
-                existingPred.recommendedActions = apiPred.recommendedActions
-                existingPred.mlModel = apiPred.modelInfo.modelName
-                existingPred.lastUpdated = new Date(apiPred.timestamp)
-                existingPred.trend = apiPred.trend as 'improving' | 'stable' | 'worsening'
-                existingPred.historicalAccuracy = apiPred.modelInfo.accuracy
-                existingPred.isLoading = false
-              }
-            })
+            updatePredictionInStore(category, apiPred)
+            return apiPred
           } catch (error) {
             console.warn(`⚠️ Prediction failed for ${category}, using fallback`)
-            // Mark as not loading even on error
             set((state) => {
               if (state.predictions[category]) {
                 state.predictions[category].isLoading = false
               }
             })
+            return null
           }
-        }
+        })
 
-        // Launch all prediction requests independently (non-blocking)
-        // Each prediction will update state as soon as it completes
-        const predictionPromises = categories.map(cat => updatePredictionCategory(cat))
-
-        // Fetch summary separately
-        const summaryPromise = PredictionAPI.getPredictionSummary()
-          .then(apiSummary => {
-            set((state) => {
-              state.summary = apiSummary
-            })
-          })
-          .catch(error => {
-            console.warn('⚠️ Summary unavailable, using fallback')
-          })
-
-        // Wait for all to complete (but each updates independently as they finish)
         try {
-          await Promise.all([...predictionPromises, summaryPromise])
+          // 11개 결과를 기다림
+          const individualResults = await Promise.all(individualPromises)
+
+          // 성공한 결과만 필터링하여 comprehensive에 전달
+          const successfulPredictions = individualResults.filter((p): p is APIPredictionResponse => p !== null)
+
+          // comprehensive를 POST로 호출 (11개 결과 전달)
+          if (successfulPredictions.length > 0) {
+            try {
+              const comprehensivePred = await PredictionAPI.postComprehensive(successfulPredictions)
+              updatePredictionInStore('comprehensive', comprehensivePred)
+            } catch (error) {
+              console.warn('⚠️ Comprehensive prediction failed, using fallback')
+              set((state) => {
+                if (state.predictions['comprehensive']) {
+                  state.predictions['comprehensive'].isLoading = false
+                }
+              })
+            }
+          } else {
+            // 모든 개별 예측이 실패한 경우
+            set((state) => {
+              if (state.predictions['comprehensive']) {
+                state.predictions['comprehensive'].isLoading = false
+              }
+            })
+          }
+
           set((state) => {
             state.lastModelRun = new Date()
           })

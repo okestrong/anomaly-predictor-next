@@ -141,7 +141,7 @@ export default function Footer({ width }: FooterProps) {
                      <h3 className="text-gray-100 text-sm font-semibold mb-3">Inquiry</h3>
                      <div className="space-y-1.5 text-sm text-gray-300">
                         <p className="text-gray-100 font-medium">솔루션개발본부 IaaS 개발실 분산스토리지팀</p>
-                        <p>이재철 수석</p>
+                        <p>홍길동 수석</p>
                         <div className="flex gap-4 pt-2">
                            <a href="mailto:jc.lee@okestro.com" className="hover:text-blue-400 transition-colors">
                               jc.lee@okestro.com

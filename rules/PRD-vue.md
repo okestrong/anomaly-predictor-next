@@ -879,7 +879,7 @@ anomaly-predictor-view/
 - [ ] AI 응답 표시 컴포넌트
 - [ ] 컨텍스트 기반 제안 UI
 - [ ] 명령어 자동 생성 뷰어
-- [x] RAG API 서비스 연동 (ceph-doc-crawler 통합)
+- [x] RAG API 서비스 연동 (ceph-doc-engine 통합)
 - [x] sentence-transformers 임베딩 모델 적용
 
 ## Phase 7: Ceph Squid 특화 기능 (진행 예정)
@@ -961,7 +961,7 @@ anomaly-predictor-view/
    - ML 모델 연동 및 이상감지 대시보드
 
 3. **RAG 기반 지능형 조치 가이드**
-   - ceph-doc-crawler API 완전 통합
+   - ceph-doc-engine API 완전 통합
    - sentence-transformers 기반 문서 검색 최적화
    - AI 기반 문제 해결 가이드 UI 개발
 

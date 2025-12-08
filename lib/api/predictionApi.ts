@@ -73,21 +73,28 @@ export type PredictionCategory =
 export class PredictionAPI {
   /**
    * Get prediction for a specific category
-   * Uses 90 seconds timeout (LLM calls take 10+ seconds, consistent with summary API)
+   * Uses 300 seconds timeout (LLM + RAG with multiple tool calls can take very long)
    */
   static async getPrediction(category: PredictionCategory): Promise<PredictionResponse> {
     return await apiClient.get<PredictionResponse>(
       `/api/v1/prediction/${category}`,
-      { timeout: 90000 } // 90 seconds timeout for LLM processing
+      { timeout: 300000 } // 300 seconds (5분) timeout for LLM + RAG processing
     );
   }
 
   /**
-   * Get all predictions for all categories
-   * Fetches in parallel with 90 second timeout and graceful fallback
+   * Get all predictions for all categories (Optimized)
+   *
+   * 1단계: 11개 예측을 병렬로 가져옴 (comprehensive 제외)
+   * 2단계: 수집된 11개 결과를 POST로 전달하여 comprehensive 분석 수행
+   *
+   * 이 방식은 백엔드에서 11개 예측을 중복 호출하지 않아 API 호출 수를 절반으로 줄입니다.
+   * 기존: 프론트 11개 + 백엔드 comprehensive 내부 11개 = 22개 호출
+   * 최적화: 프론트 11개 + POST comprehensive = 12개 호출
    */
   static async getAllPredictions(): Promise<Record<PredictionCategory, PredictionResponse>> {
-    const categories: PredictionCategory[] = [
+    // 11개 카테고리 (comprehensive 제외)
+    const individualCategories: PredictionCategory[] = [
       'osd-failure',
       'capacity-exhaustion',
       'performance-degradation',
@@ -98,42 +105,51 @@ export class PredictionAPI {
       'hotspot-osd',
       'cluster-expansion',
       'smart-disk-failure',
-      'metric-disk-failure',
-      'comprehensive'
+      'metric-disk-failure'
     ];
 
-    // Fetch all predictions in parallel with fast failure
-    const predictions = await Promise.all(
-      categories.map(cat =>
+    // 1단계: 11개 예측 병렬 호출
+    const individualPredictions = await Promise.all(
+      individualCategories.map(cat =>
         PredictionAPI.getPrediction(cat)
           .catch(error => {
-            // Use warn instead of error for less noise
             if (process.env.NODE_ENV === 'development') {
               console.warn(`⚠️ Prediction unavailable for ${cat} (using fallback)`);
             }
-            // Return fallback prediction on error
             return PredictionAPI.createFallbackPrediction(cat);
           })
       )
     );
 
+    // 2단계: 수집된 11개 결과를 POST로 전달하여 comprehensive 분석
+    let comprehensivePrediction: PredictionResponse;
+    try {
+      comprehensivePrediction = await PredictionAPI.postComprehensive(individualPredictions);
+    } catch (error) {
+      if (process.env.NODE_ENV === 'development') {
+        console.warn(`⚠️ Comprehensive prediction unavailable (using fallback)`);
+      }
+      comprehensivePrediction = PredictionAPI.createFallbackPrediction('comprehensive');
+    }
+
     // Convert array to record
     const result: Record<string, PredictionResponse> = {};
-    categories.forEach((cat, index) => {
-      result[cat] = predictions[index];
+    individualCategories.forEach((cat, index) => {
+      result[cat] = individualPredictions[index];
     });
+    result['comprehensive'] = comprehensivePrediction;
 
     return result as Record<PredictionCategory, PredictionResponse>;
   }
 
   /**
    * Get prediction summary
-   * Uses 90 seconds timeout (summary takes ~45 seconds due to 12 parallel predictions with LLM calls)
+   * Uses 300 seconds timeout (summary executes 12 parallel predictions with LLM + RAG calls)
    */
   static async getPredictionSummary(): Promise<PredictionSummary> {
     return await apiClient.get<PredictionSummary>(
       '/api/v1/prediction/summary',
-      { timeout: 90000 } // 90 seconds - summary executes 12 predictions in parallel with LLM calls
+      { timeout: 300000 } // 300 seconds (5분) - summary executes 12 predictions in parallel with LLM calls
     );
   }
 
@@ -143,6 +159,23 @@ export class PredictionAPI {
   static async getPredictions(categories: PredictionCategory[]): Promise<PredictionResponse[]> {
     return await Promise.all(
       categories.map(cat => PredictionAPI.getPrediction(cat))
+    );
+  }
+
+  /**
+   * Get comprehensive prediction using POST (optimized)
+   *
+   * 프론트엔드에서 이미 수집한 11개 예측 결과를 전달하여
+   * 백엔드에서 중복 호출 없이 종합 분석을 수행합니다.
+   *
+   * @param predictions 11개 예측 결과 (comprehensive 제외)
+   * @returns 종합 분석 결과
+   */
+  static async postComprehensive(predictions: PredictionResponse[]): Promise<PredictionResponse> {
+    return await apiClient.post<PredictionResponse>(
+      '/api/v1/prediction/comprehensive',
+      { predictions },
+      { timeout: 300000 } // 300 seconds (5분) timeout for LLM + RAG processing
     );
   }
 

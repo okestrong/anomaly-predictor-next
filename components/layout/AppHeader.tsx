@@ -806,7 +806,7 @@ export default function AppHeader() {
                      </div>
 
                      {/* Current time */}
-                     <div className="hidden sm:block text-right w-[135px]">
+                     <div className="hidden sm:block text-right w-[140px]">
                         <div className="text-sm font-medium text-secondary">{currentTime}</div>
                         <div className="text-xs text-blue-500 flex items-center justify-end space-x-2">
                            <div className={cn('w-2 h-2 rounded-full neural-pulse', connectionStatusColor)} />

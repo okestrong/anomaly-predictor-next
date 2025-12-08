@@ -31,11 +31,11 @@ export default function PredictionDashboard() {
          isInitialMount.current = false;
       }
 
-      // Auto-refresh every 5 minutes if enabled
+      // Auto-refresh every 10 minutes if enabled
       const interval = autoRefresh
          ? setInterval(() => {
               updateAllPredictions();
-           }, 300000)
+           }, 600000)
          : null;
 
       return () => {

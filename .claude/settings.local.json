@@ -41,7 +41,9 @@
       "Bash(done)",
       "Bash(lsof:*)",
       "Bash(jps:*)",
-      "Bash(ps:*)"
+      "Bash(ps:*)",
+      "WebFetch(domain:langgraph4j.github.io)",
+      "Bash(python3:*)"
     ],
     "deny": [],
     "ask": []

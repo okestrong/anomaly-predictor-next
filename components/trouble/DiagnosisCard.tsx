@@ -1,14 +1,56 @@
 'use client';
 
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { DiagnosisResult } from '@/types/trouble';
 import MarkdownRenderer from './MarkdownRenderer';
 
 interface DiagnosisCardProps {
   diagnosis: DiagnosisResult;
+  /** 캐시 복원 시 타이핑 효과 스킵 */
+  skipTypingEffect?: boolean;
 }
 
-export default function DiagnosisCard({ diagnosis }: DiagnosisCardProps) {
+export default function DiagnosisCard({ diagnosis, skipTypingEffect = false }: DiagnosisCardProps) {
+  // Fake 타이핑 효과를 위한 상태
+  const [displayedDetails, setDisplayedDetails] = useState('');
+  const [isTypingComplete, setIsTypingComplete] = useState(false);
+
+  // diagnosis.details가 변경되면 타이핑 효과 시작
+  useEffect(() => {
+    if (!diagnosis.details) {
+      setDisplayedDetails('');
+      setIsTypingComplete(true);
+      return;
+    }
+
+    // 캐시 복원 시 타이핑 효과 스킵
+    if (skipTypingEffect) {
+      setDisplayedDetails(diagnosis.details);
+      setIsTypingComplete(true);
+      return;
+    }
+
+    setDisplayedDetails('');
+    setIsTypingComplete(false);
+    let currentIndex = 0;
+    const fullText = diagnosis.details;
+
+    // 빠른 타이핑 효과 (한 번에 여러 글자씩)
+    const interval = setInterval(() => {
+      if (currentIndex < fullText.length) {
+        // 한 번에 3-5글자씩 추가 (빠른 타이핑)
+        const chunkSize = Math.min(3, fullText.length - currentIndex);
+        currentIndex += chunkSize;
+        setDisplayedDetails(fullText.substring(0, currentIndex));
+      } else {
+        setIsTypingComplete(true);
+        clearInterval(interval);
+      }
+    }, 15); // 15ms마다 업데이트 (빠른 타이핑)
+
+    return () => clearInterval(interval);
+  }, [diagnosis.details, skipTypingEffect]);
+
   const getConfidenceColor = (confidence: number) => {
     if (confidence >= 0.8) return 'text-green-600 dark:text-green-400';
     if (confidence >= 0.5) return 'text-yellow-600 dark:text-yellow-400';
@@ -106,7 +148,10 @@ export default function DiagnosisCard({ diagnosis }: DiagnosisCardProps) {
             상세 분석:
           </div>
           <div className="text-sm">
-            <MarkdownRenderer content={diagnosis.details} />
+            <MarkdownRenderer content={displayedDetails} />
+            {!isTypingComplete && (
+              <span className="inline-block w-1.5 h-4 bg-blue-500 animate-pulse ml-1"></span>
+            )}
           </div>
         </div>
       )}

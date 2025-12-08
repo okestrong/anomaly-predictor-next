@@ -473,6 +473,12 @@ button {
 
 /* Print styles for PDF generation */
 @media print {
+    /* PDF 배경 흰색으로 강제 */
+    html,
+    body {
+        background: white !important;
+        background-color: white !important;
+    }
   /* Force page break before each section */
   .page-break-before {
     page-break-before: always !important;

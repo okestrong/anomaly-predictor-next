@@ -9,9 +9,11 @@
 import { Report } from '@/types/report';
 import { TrendReportData } from '@/types/reportTypes';
 import { ReportChart } from '@/components/reports/ReportChart';
-import { formatBytes, formatNumber } from '@/lib/formatUtils';
 import dayjs from 'dayjs';
+import utc from 'dayjs/plugin/utc';
 import ReportTitlePage from '@/components/reports/sections/ReportTitlePage';
+
+dayjs.extend(utc);
 
 interface TrendReportViewProps {
    report: Report;
@@ -43,7 +45,7 @@ export default function TrendReportView({ report }: TrendReportViewProps) {
                </div>
                <div>
                   <p className="text-xs font-medium text-gray-600 mb-1">Generated At</p>
-                  <p className="font-semibold text-gray-900">{dayjs(report.createdAt).format('YYYY-MM-DD HH:mm')}</p>
+                  <p className="font-semibold text-gray-900">{dayjs.utc(report.createdAt).local().format('YYYY-MM-DD HH:mm')}</p>
                </div>
                <div>
                   <p className="text-xs font-medium text-gray-600 mb-1">Report ID</p>
@@ -106,13 +108,13 @@ export default function TrendReportView({ report }: TrendReportViewProps) {
                         </div>
                         <div className="grid grid-cols-4 gap-4 bg-gray-50 p-4 border border-gray-200 mt-4">
                            <div>
-                              <p className="text-xs text-gray-600 mb-1 font-semibold">Average</p>
-                              <p className="text-lg font-bold text-gray-900">{formatBytes(trendData.capacity.statistics.average)}</p>
+                              <p className="text-xs text-gray-600 mb-1 font-semibold">Average Utilization</p>
+                              <p className="text-lg font-bold text-gray-900">{trendData.capacity.statistics.average?.toFixed(2)}%</p>
                            </div>
                            <div>
                               <p className="text-xs text-gray-600 mb-1 font-semibold">Min / Max</p>
                               <p className="text-lg font-bold text-gray-900">
-                                 {formatBytes(trendData.capacity.statistics.min)} / {formatBytes(trendData.capacity.statistics.max)}
+                                 {trendData.capacity.statistics.min?.toFixed(2)}% / {trendData.capacity.statistics.max?.toFixed(2)}%
                               </p>
                            </div>
                            <div>
@@ -126,12 +128,12 @@ export default function TrendReportView({ report }: TrendReportViewProps) {
                                          : 'text-gray-700'
                                  }`}
                               >
-                                 {trendData.capacity.statistics.trend} ({trendData.capacity.statistics.changePercent.toFixed(2)}%)
+                                 {trendData.capacity.statistics.trend} ({trendData.capacity.statistics.changePercent?.toFixed(2)}%)
                               </p>
                            </div>
                            <div>
                               <p className="text-xs text-gray-600 mb-1 font-semibold">Std Dev</p>
-                              <p className="text-lg font-bold text-gray-900">{formatBytes(trendData.capacity.statistics.standardDeviation)}</p>
+                              <p className="text-lg font-bold text-gray-900">{trendData.capacity.statistics.standardDeviation?.toFixed(2)}%</p>
                            </div>
                         </div>
                         {trendData.capacity.insights && trendData.capacity.insights.length > 0 && (
@@ -514,7 +516,9 @@ export default function TrendReportView({ report }: TrendReportViewProps) {
             <section className="mb-6 bg-white shadow-sm min-h-[800px] p-12 page-break-before print:shadow-none print:p-0 print:min-h-0">
                <div className="mb-8">
                   <h1 className="text-3xl font-bold text-gray-900 mb-2 print:text-black">9. Trend Summary & Key Findings</h1>
-                  <p className="text-sm text-gray-800 print:text-gray-700">Comprehensive analysis of {report.timeRange?.label?.toLowerCase() || 'trend'} patterns</p>
+                  <p className="text-sm text-gray-800 print:text-gray-700">
+                     Comprehensive analysis of {report.timeRange?.label?.toLowerCase() || 'trend'} patterns
+                  </p>
                </div>
                <div className="grid gap-6 mb-6">
                   <div className="border border-gray-300 bg-white p-6">
