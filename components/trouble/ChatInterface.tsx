@@ -21,51 +21,25 @@ import CommandParameterDialog from './CommandParameterDialog';
 import WebTerminal from './WebTerminal';
 import { getCurrentLocale } from '@/lib/api/client';
 import { useApprovalStore } from '@/stores/approvalStore';
+import {
+   ChatSession,
+   TerminalLine,
+   PendingCommand,
+   getAlertTimestamp,
+   saveSession,
+   loadSession,
+   hasSession as checkHasSession,
+   saveAlertMeta,
+   loadAlertMeta,
+   migrateOldKeys,
+   cleanupOldHistory,
+} from '@/lib/alertSessionStorage';
 
 interface ChatInterfaceProps {
    alert: AlertInfo;
    threadId: string;
    onProcessingChange?: (isProcessing: boolean) => void;
 }
-
-// Alert별 고유 키 생성 (title + description 기반)
-const generateAlertKey = (alert: AlertInfo): string => {
-   const key = `trouble-chat-${alert.alertId}`;
-   return key;
-};
-
-// 채팅 세션 데이터 타입
-interface ChatSession {
-   messages: Message[];
-   diagnosis: DiagnosisResult | null;
-   solutions: Solution[];
-   isCompleted: boolean;
-   lastUpdated: string;
-}
-
-// localStorage에서 세션 불러오기
-const loadChatSession = (alertKey: string): ChatSession | null => {
-   if (typeof window === 'undefined') return null;
-   try {
-      const data = localStorage.getItem(alertKey);
-      if (data) {
-         return JSON.parse(data);
-      }
-   } catch (e) {
-      console.error('Failed to load chat session:', e);
-   }
-   return null;
-};
-
-// localStorage에 세션 저장
-const saveChatSession = (alertKey: string, session: ChatSession) => {
-   if (typeof window === 'undefined') return;
-   try {
-      localStorage.setItem(alertKey, JSON.stringify(session));
-   } catch (e) {
-      console.error('Failed to save chat session:', e);
-   }
-};
 
 export default function ChatInterface({ alert, threadId, onProcessingChange }: ChatInterfaceProps) {
    const [messages, setMessages] = useState<Message[]>([]);
@@ -106,10 +80,14 @@ export default function ChatInterface({ alert, threadId, onProcessingChange }: C
    // 수동 웹 터미널 상태 (사용자가 직접 여는 터미널)
    const [manualWebTerminalOpen, setManualWebTerminalOpen] = useState(false);
 
+   // 웹 터미널 데이터 저장용 상태
+   const [terminalLines, setTerminalLines] = useState<TerminalLine[]>([]);
+   const [terminalPendingCommands, setTerminalPendingCommands] = useState<Record<string, PendingCommand>>({});
+
    const messagesEndRef = useRef<HTMLDivElement>(null);
    const inputRef = useRef<HTMLTextAreaElement>(null);
    const hasStartedRef = useRef(false);
-   const currentAlertKeyRef = useRef<string>('');
+   const currentAlertTimestampRef = useRef<number>(0);
 
    // Approval store
    const { updateApprovalStatus, getGroupStatus } = useApprovalStore();
@@ -146,32 +124,40 @@ export default function ChatInterface({ alert, threadId, onProcessingChange }: C
       onApprovalStatusChanged: handleApprovalStatusChanged,
    });
 
+   // 마이그레이션 및 클린업 (마운트 시 한 번만)
+   useEffect(() => {
+      migrateOldKeys();
+      cleanupOldHistory();
+   }, []);
+
    // alert 변경 시 세션 관리 (localStorage 연동)
    useEffect(() => {
-      const alertKey = generateAlertKey(alert);
+      const alertTimestamp = getAlertTimestamp(alert);
 
       // 같은 alert인 경우 무시 (무한루프 방지)
-      if (currentAlertKeyRef.current === alertKey) {
+      if (currentAlertTimestampRef.current === alertTimestamp) {
          return;
       }
 
       // 이전 세션 저장 (이전 alert가 있는 경우)
-      if (currentAlertKeyRef.current && messages.length > 0) {
-         saveChatSession(currentAlertKeyRef.current, {
+      if (currentAlertTimestampRef.current && messages.length > 0) {
+         saveSession(currentAlertTimestampRef.current, {
             messages,
             diagnosis,
             solutions,
             isCompleted: !isProcessing,
             lastUpdated: new Date().toISOString(),
+            terminalLines,
+            pendingCommands: terminalPendingCommands,
          });
       }
 
-      // 현재 alert 키 업데이트
-      currentAlertKeyRef.current = alertKey;
+      // 현재 alert timestamp 업데이트
+      currentAlertTimestampRef.current = alertTimestamp;
       hasStartedRef.current = false;
 
-      // 기존 세션 확인
-      const existingSession = loadChatSession(alertKey);
+      // 기존 세션 확인 (active와 history 모두에서 찾음)
+      const existingSession = loadSession(alertTimestamp);
 
       if (existingSession && existingSession.messages.length > 0) {
          // 기존 세션 복원
@@ -182,6 +168,9 @@ export default function ChatInterface({ alert, threadId, onProcessingChange }: C
          setSessionRestored(true);
          setIsProcessing(false);
          hasStartedRef.current = true; // 이미 시작된 것으로 표시
+         // 터미널 데이터 복원
+         setTerminalLines(existingSession.terminalLines || []);
+         setTerminalPendingCommands(existingSession.pendingCommands || {});
       } else {
          // 새 세션 초기화
          setMessages([]);
@@ -189,7 +178,16 @@ export default function ChatInterface({ alert, threadId, onProcessingChange }: C
          setSolutions([]);
          setShowSolutions(false);
          setSessionRestored(false);
+         setTerminalLines([]);
+         setTerminalPendingCommands({});
       }
+
+      // Alert 메타 정보 저장 (세션 존재 여부 및 alertInfo 저장)
+      saveAlertMeta(alertTimestamp, {
+         alertInfo: alert,
+         timestamp: alertTimestamp,
+         hasSession: checkHasSession(alertTimestamp),
+      });
 
       // 공통 초기화
       setStreamingMessage('');
@@ -198,7 +196,7 @@ export default function ChatInterface({ alert, threadId, onProcessingChange }: C
       setPendingApprovals(new Map());
       setCommandStatuses(new Map());
       setSolutionsAwaitingApproval(new Map());
-   }, [alert.alertId]); // alertId만 의존성으로 사용
+   }, [alert.alertId, alert.timestamp]); // alertId와 timestamp를 의존성으로 사용
 
    // 진단 타이핑 완료 후 해결책 표시
    useEffect(() => {
@@ -226,19 +224,28 @@ export default function ChatInterface({ alert, threadId, onProcessingChange }: C
       onProcessingChange?.(isProcessing);
    }, [isProcessing, onProcessingChange]);
 
-   // 세션 자동 저장 (messages, diagnosis, solutions 변경 시)
+   // 세션 자동 저장 (messages, diagnosis, solutions, 터미널 데이터 변경 시)
    useEffect(() => {
-      const alertKey = currentAlertKeyRef.current;
-      if (alertKey && messages.length > 0) {
-         saveChatSession(alertKey, {
+      const alertTimestamp = currentAlertTimestampRef.current;
+      if (alertTimestamp && messages.length > 0) {
+         saveSession(alertTimestamp, {
             messages,
             diagnosis,
             solutions,
             isCompleted: !isProcessing,
             lastUpdated: new Date().toISOString(),
+            terminalLines,
+            pendingCommands: terminalPendingCommands,
+         });
+
+         // 메타 정보도 업데이트 (hasSession = true)
+         saveAlertMeta(alertTimestamp, {
+            alertInfo: alert,
+            timestamp: alertTimestamp,
+            hasSession: true,
          });
       }
-   }, [messages, diagnosis, solutions, isProcessing]);
+   }, [messages, diagnosis, solutions, isProcessing, terminalLines, terminalPendingCommands]);
 
    // 초기 실행 (한 번만, 세션이 복원되지 않은 경우에만)
    useEffect(() => {
@@ -1189,6 +1196,12 @@ export default function ChatInterface({ alert, threadId, onProcessingChange }: C
                         solutionTitle={webTerminalSolution.solution.title}
                         sessionId={threadId}
                         approvedCommands={webTerminalSolution.approvedCommands}
+                        onTerminalDataChange={(lines, pendingCmds) => {
+                           setTerminalLines(lines);
+                           setTerminalPendingCommands(pendingCmds);
+                        }}
+                        initialLines={terminalLines}
+                        initialPendingCommands={terminalPendingCommands}
                         onComplete={() => {
                            setWebTerminalSolution(null);
                            setMessages(prev => [
@@ -1211,6 +1224,12 @@ export default function ChatInterface({ alert, threadId, onProcessingChange }: C
                         commands={[]}
                         solutionTitle="수동 터미널"
                         sessionId={threadId}
+                        onTerminalDataChange={(lines, pendingCmds) => {
+                           setTerminalLines(lines);
+                           setTerminalPendingCommands(pendingCmds);
+                        }}
+                        initialLines={terminalLines}
+                        initialPendingCommands={terminalPendingCommands}
                         onComplete={() => {
                            setManualWebTerminalOpen(false);
                         }}

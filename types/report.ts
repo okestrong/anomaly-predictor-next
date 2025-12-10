@@ -493,9 +493,12 @@ export interface ReportData {
 export interface PoolSummary {
    poolName: string;
    poolId: number;
+   type: string; // 'replicated' or 'erasure'
+   crushRule: string; // CRUSH rule name
    size: number;
    minSize: number;
    pgNum: number;
+   pgpNum?: number;
    maxBytes: number;
    usedBytes: number;
    usagePercent: number;

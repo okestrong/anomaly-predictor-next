@@ -4,6 +4,10 @@ import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { CommandToExecute, ApprovalStatusChangedMetadata } from '@/types/trouble';
 import { executeCommand, executeApprovedCommand, CommandResponse } from '@/lib/executorApi';
 import { useApprovalStore, ApprovalStatus } from '@/stores/approvalStore';
+import {
+   TerminalLine as StorageTerminalLine,
+   PendingCommand as StoragePendingCommand,
+} from '@/lib/alertSessionStorage';
 
 interface WebTerminalProps {
    commands: CommandToExecute[];
@@ -14,6 +18,11 @@ interface WebTerminalProps {
    approvedCommands?: Map<string, string>;
    // 승인 상태 변경 콜백 (외부에서 WebSocket으로 받은 상태 변경을 전달)
    onApprovalStatusChanged?: (callback: (metadata: ApprovalStatusChangedMetadata) => void) => void;
+   // 터미널 데이터 저장 콜백 (명령어 실행시마다 호출)
+   onTerminalDataChange?: (lines: StorageTerminalLine[], pendingCommands: Record<string, StoragePendingCommand>) => void;
+   // 초기 터미널 데이터 (세션 복원용)
+   initialLines?: StorageTerminalLine[];
+   initialPendingCommands?: Record<string, StoragePendingCommand>;
 }
 
 interface TerminalLine {
@@ -38,6 +47,9 @@ export default function WebTerminal({
    sessionId,
    onComplete,
    approvedCommands,
+   onTerminalDataChange,
+   initialLines,
+   initialPendingCommands,
 }: WebTerminalProps) {
    const [lines, setLines] = useState<TerminalLine[]>([]);
    const [inputValue, setInputValue] = useState('');
@@ -46,9 +58,13 @@ export default function WebTerminal({
    const [historyIndex, setHistoryIndex] = useState(-1);
    const [selectedCommandIndex, setSelectedCommandIndex] = useState<number | null>(null);
    const [pendingCommands, setPendingCommands] = useState<Map<string, PendingCommand>>(new Map());
+   const [terminalHeight, setTerminalHeight] = useState(256); // 기본 높이 256px (h-64)
    const terminalRef = useRef<HTMLDivElement>(null);
    const inputRef = useRef<HTMLInputElement>(null);
    const initializedRef = useRef(false);
+   const isResizingRef = useRef(false);
+   const startYRef = useRef(0);
+   const startHeightRef = useRef(0);
 
    // Approval store 구독
    const approvals = useApprovalStore(state => state.approvals);
@@ -73,7 +89,34 @@ export default function WebTerminal({
       if (initializedRef.current) return;
       initializedRef.current = true;
 
-      const initialLines: TerminalLine[] = [
+      // 세션에서 복원된 데이터가 있는 경우
+      if (initialLines && initialLines.length > 0) {
+         // timestamp를 Date 객체로 변환
+         const restoredLines: TerminalLine[] = initialLines.map(line => ({
+            ...line,
+            timestamp: new Date(line.timestamp),
+         }));
+         setLines(restoredLines);
+
+         // pendingCommands 복원
+         if (initialPendingCommands) {
+            const restoredPendingCommands = new Map<string, PendingCommand>();
+            Object.entries(initialPendingCommands).forEach(([key, value]) => {
+               restoredPendingCommands.set(key, {
+                  ...value,
+                  status: value.status as ApprovalStatus,
+               });
+            });
+            setPendingCommands(restoredPendingCommands);
+         }
+
+         // 입력 필드에 포커스
+         setTimeout(() => inputRef.current?.focus(), 100);
+         return;
+      }
+
+      // 새 터미널 시작
+      const newInitialLines: TerminalLine[] = [
          {
             type: 'info',
             content: `웹 터미널이 시작되었습니다. (${solutionTitle})`,
@@ -83,45 +126,64 @@ export default function WebTerminal({
 
       if (commands.length > 0) {
          // 솔루션 기반 터미널: 명령어 목록 표시
-         initialLines.push({
+         newInitialLines.push({
             type: 'info',
             content: '아래 명령어들을 실행할 수 있습니다. <placeholder> 값은 실제 값으로 대체해주세요.',
             timestamp: new Date(),
          });
-         initialLines.push({ type: 'info', content: '─'.repeat(60), timestamp: new Date() });
+         newInitialLines.push({ type: 'info', content: '─'.repeat(60), timestamp: new Date() });
 
          // 실행할 명령어 목록 표시
          commands.forEach((cmd, idx) => {
             const fullCommand = `${cmd.command} ${cmd.args.join(' ')}`;
             const hasPlaceholder = /<[^>]+>/.test(fullCommand);
-            initialLines.push({
+            newInitialLines.push({
                type: hasPlaceholder ? 'info' : 'info',
                content: `[${idx + 1}] ${fullCommand}${hasPlaceholder ? ' ⚠️ (placeholder 포함)' : ''}`,
                timestamp: new Date(),
             });
          });
 
-         initialLines.push({ type: 'info', content: '─'.repeat(60), timestamp: new Date() });
-         initialLines.push({
+         newInitialLines.push({ type: 'info', content: '─'.repeat(60), timestamp: new Date() });
+         newInitialLines.push({
             type: 'info',
             content: '명령어를 직접 입력하거나, 위 명령어를 복사하여 placeholder를 수정 후 실행하세요.',
             timestamp: new Date(),
          });
       } else {
          // 수동 터미널: 자유 입력 안내
-         initialLines.push({
+         newInitialLines.push({
             type: 'info',
             content: '명령어를 직접 입력하여 실행할 수 있습니다.',
             timestamp: new Date(),
          });
-         initialLines.push({ type: 'info', content: '─'.repeat(60), timestamp: new Date() });
+         newInitialLines.push({ type: 'info', content: '─'.repeat(60), timestamp: new Date() });
       }
 
-      setLines(initialLines);
+      setLines(newInitialLines);
 
       // 입력 필드에 포커스
       setTimeout(() => inputRef.current?.focus(), 100);
    }, []); // 빈 의존성 배열 - 마운트 시 한 번만 실행
+
+   // 터미널 데이터 변경 시 상위 컴포넌트에 알림
+   useEffect(() => {
+      if (!onTerminalDataChange || lines.length === 0) return;
+
+      // lines를 저장용 형식으로 변환 (Date를 string으로)
+      const storageLines: StorageTerminalLine[] = lines.map(line => ({
+         ...line,
+         timestamp: line.timestamp.toISOString(),
+      }));
+
+      // pendingCommands를 Record로 변환
+      const storagePendingCommands: Record<string, StoragePendingCommand> = {};
+      pendingCommands.forEach((value, key) => {
+         storagePendingCommands[key] = value;
+      });
+
+      onTerminalDataChange(storageLines, storagePendingCommands);
+   }, [lines, pendingCommands, onTerminalDataChange]);
 
    // 자동 스크롤
    useEffect(() => {
@@ -129,6 +191,41 @@ export default function WebTerminal({
          terminalRef.current.scrollTop = terminalRef.current.scrollHeight;
       }
    }, [lines]);
+
+   // 세로 리사이즈 핸들러
+   const handleResizeStart = useCallback((e: React.MouseEvent) => {
+      e.preventDefault();
+      isResizingRef.current = true;
+      startYRef.current = e.clientY;
+      startHeightRef.current = terminalHeight;
+      document.body.style.cursor = 'ns-resize';
+      document.body.style.userSelect = 'none';
+   }, [terminalHeight]);
+
+   useEffect(() => {
+      const handleResizeMove = (e: MouseEvent) => {
+         if (!isResizingRef.current) return;
+         const deltaY = e.clientY - startYRef.current;
+         const newHeight = Math.max(150, Math.min(600, startHeightRef.current + deltaY));
+         setTerminalHeight(newHeight);
+      };
+
+      const handleResizeEnd = () => {
+         if (isResizingRef.current) {
+            isResizingRef.current = false;
+            document.body.style.cursor = '';
+            document.body.style.userSelect = '';
+         }
+      };
+
+      document.addEventListener('mousemove', handleResizeMove);
+      document.addEventListener('mouseup', handleResizeEnd);
+
+      return () => {
+         document.removeEventListener('mousemove', handleResizeMove);
+         document.removeEventListener('mouseup', handleResizeEnd);
+      };
+   }, []);
 
    const addLine = (type: TerminalLine['type'], content: string, extra?: Partial<TerminalLine>) => {
       setLines(prev => [...prev, { type, content, timestamp: new Date(), ...extra }]);
@@ -539,7 +636,8 @@ export default function WebTerminal({
          {/* Terminal Output */}
          <div
             ref={terminalRef}
-            className="h-64 overflow-y-auto p-4 font-mono text-sm select-text"
+            className="overflow-y-auto p-4 font-mono text-sm select-text"
+            style={{ height: `${terminalHeight}px` }}
             onClick={() => {
                // 텍스트가 선택되어 있으면 포커스 이동하지 않음 (복사 가능하도록)
                const selection = window.getSelection();
@@ -563,6 +661,14 @@ export default function WebTerminal({
                   </div>
                </div>
             )}
+         </div>
+
+         {/* Resize Handle (세로만 조절) */}
+         <div
+            onMouseDown={handleResizeStart}
+            className="h-2 bg-gray-800 border-t border-gray-700 cursor-ns-resize hover:bg-gray-700 transition-colors flex items-center justify-center group"
+         >
+            <div className="w-12 h-1 bg-gray-600 rounded-full group-hover:bg-gray-500 transition-colors"></div>
          </div>
 
          {/* Input Line */}

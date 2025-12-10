@@ -92,7 +92,8 @@ export function ReportChart({ trendData, height = 300 }: ReportChartProps) {
             case 'Throughput':
                return `${value.toFixed(1)} MB/s`;
             case 'Capacity':
-               return `${formatBytes(value)}`;
+               // Capacity is a percentage value (0-1 range from Prometheus)
+               return `${(value * 100).toFixed(2)}%`;
             default:
                return value.toFixed(1);
          }

@@ -689,12 +689,12 @@ export default function ReportViewPage() {
                                     currentReport.data?.poolsSummary?.map(p => ({
                                        name: p.poolName,
                                        id: p.poolId,
-                                       type: 'replicated',
+                                       type: p.type || 'replicated',
                                        size: p.size,
                                        minSize: p.minSize,
                                        pgNum: p.pgNum,
-                                       pgpNum: p.pgNum, // Same as pgNum
-                                       crushRule: 'replicated_rule',
+                                       pgpNum: p.pgpNum || p.pgNum,
+                                       crushRule: p.crushRule || 'unknown',
                                        used: p.usedBytes,
                                        available: p.maxBytes - p.usedBytes,
                                     })) || [],
