@@ -1057,12 +1057,16 @@ function InteractiveNode({
             <>
                {isDark && (
                   <>
-                     <FullRack scale={3.5} position={[0, -0.4, 0]} castShadow />
-                     <FullRack scale={3.5} position={[0, -0.4, -1]} castShadow rotation={[0, Math.PI, 0]} />
+                     <FullRack scale={3.5} position={[0.5, -0.4, 0]} castShadow />
+                     <FullRack scale={3.5} position={[0.5, -0.4, -1]} castShadow rotation={[0, Math.PI, 0]} />
+                     <FullRack scale={3.5} position={[-0.5, -0.4, 0]} castShadow />
+                     <FullRack scale={3.5} position={[-0.5, -0.4, -1]} castShadow rotation={[0, Math.PI, 0]} />
+                     <pointLight color={Colors.cyan[400]} intensity={2} distance={6} decay={2} position={[0, 1.4, 0]} />
+                     <pointLight color={Colors.cyan[400]} intensity={2} distance={6} decay={2} position={[0, 0, 0.5]} />
                      <pointLight color={Colors.cyan[400]} intensity={2} distance={6} decay={2} position={[0, 0.1, -1.5]} />
                      <pointLight color={Colors.cyan[400]} intensity={2} distance={6} decay={2} position={[0, 0.5, -1.5]} />
                      <spotLight
-                        args={[Colors.blue[300], 20, 6, Math.PI / 2, 1, 0.3]} // -> MATH.PI/4 : 빛의 범위(45도) / 1: 빛 경게의 자연스러움 조절 / 0.5: 빛이 멀어질수론 희미해지는 정도 조절
+                        args={[Colors.blue[300], 20, 8, Math.PI / 2, 1, 0.3]} // -> MATH.PI/4 : 빛의 범위(45도) / 1: 빛 경게의 자연스러움 조절 / 0.5: 빛이 멀어질수론 희미해지는 정도 조절
                         castShadow
                         position={[0, 1.5, 3]}
                      />
@@ -1695,7 +1699,7 @@ const CephDashboard = React.memo(
                            position={[10, 20, 10]}
                            intensity={0.3}
                            castShadow
-                           shadow-mapSize={[2048, 2048]}
+                           shadow-mapSize={[1024, 1024]}
                            shadow-camera-far={50}
                            shadow-camera-left={-20}
                            shadow-camera-right={20}
