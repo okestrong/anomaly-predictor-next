@@ -12,6 +12,10 @@ import { useCephTopology } from '@/hooks/useCephTopology';
 import { BrightnessContrast, EffectComposer } from '@react-three/postprocessing';
 import Bubble from '@/components/models/Bubble';
 import TextSphere from '@/components/models/TextSphere';
+import { Hdd } from '@/components/models/Hdd';
+import { ServerFive } from '@/components/models/ServerFive';
+import { ServerTen } from '@/components/models/ServerTen';
+import { FullRack } from '@/components/models/FullRack';
 
 // Utility functions
 const formatBytes = (bytes: number): string => {
@@ -386,7 +390,8 @@ function PowerLine({ index, clusterPos, speed }: { index: number; clusterPos: TH
             {/* Cube edges outline */}
             <Edges color="#00ffff" linewidth={1} />
             {/* Constant bulb inside cube */}
-            {/*<pointLight ref={bulbRef} color="#00ffff" intensity={3} distance={4} decay={2} position={[0, 1, 0]} />*/}
+            <pointLight ref={bulbRef} color="#00ffff" intensity={3} distance={4} decay={2} position={[0, 2.5, 0]} />
+            <Hdd position={[0, 1.9, 0]} sacle={1} />
          </mesh>
       </group>
    );
@@ -555,9 +560,9 @@ function TrafficFlow({ intensityRate, flow, positions }: { intensityRate: number
             );
 
             return (
-               <Trail key={i} width={2.8} length={4} color={color} attenuation={t => t * t}>
+               <Trail key={i} width={1.5} length={4} color={color} attenuation={t => t * t}>
                   <mesh ref={el => (meshRefs.current[i] = el)} position={initialPos}>
-                     <sphereGeometry args={[0.3, 12, 12]} />
+                     <sphereGeometry args={[0.25, 12, 12]} />
                      <meshPhongMaterial color={color} emissive={color} emissiveIntensity={1.2} transparent opacity={0.9} />
                      {/*<pointLight color={Colors.cyan[500]} intensity={1} distance={0} decay={2} />*/}
                   </mesh>
@@ -901,6 +906,7 @@ function InteractiveNode({
    onSelect,
    daemonIndex,
    hostIndex,
+   isDark,
    centerPosition,
 }: {
    position: THREE.Vector3;
@@ -911,6 +917,7 @@ function InteractiveNode({
    onSelect: (data: any) => void;
    daemonIndex?: number;
    hostIndex?: number;
+   isDark?: boolean;
    centerPosition?: THREE.Vector3;
 }) {
    const meshRef = useRef<THREE.Mesh>(null);
@@ -1044,12 +1051,28 @@ function InteractiveNode({
    }
 
    return (
-      <Float speed={type === 'cluster' ? 2 : 0} rotationIntensity={type === 'cluster' ? 1 : 0} floatIntensity={type === 'cluster' ? 1 : 0}>
+      // <Float speed={type === 'cluster' ? 2 : 0} rotationIntensity={type === 'cluster' ? 1 : 0} floatIntensity={type === 'cluster' ? 1 : 0}>
+      <Float speed={0} rotationIntensity={0} floatIntensity={0}>
          {type === 'cluster' ? (
             <>
-               {/*<GlassBall scale={0.25} orbitCenterPosition={[0, 0, 0]} orbitRadius={45} y={0} angularSpeed={0.3} castShadow />*/}
+               <FullRack scale={3.5} position={[0, -0.4, 0]} castShadow />
+               <FullRack scale={3.5} position={[0, -0.4, -1]} castShadow rotation={[0, Math.PI, 0]} />
+               {isDark && (
+                  <>
+                     <pointLight color={Colors.cyan[400]} intensity={2} distance={6} decay={2} position={[0, 0.1, -1.5]} />
+                     <pointLight color={Colors.cyan[400]} intensity={2} distance={6} decay={2} position={[0, 0.5, -1.5]} />
+                     <spotLight
+                        args={[Colors.blue[300], 20, 6, Math.PI / 2, 1, 0.3]} // -> MATH.PI/4 : 빛의 범위(45도) / 1: 빛 경게의 자연스러움 조절 / 0.5: 빛이 멀어질수론 희미해지는 정도 조절
+                        castShadow
+                        position={[0, 1.5, 3]}
+                     />
+                  </>
+               )}
+               {/*<>
+               <GlassBall scale={0.25} orbitCenterPosition={[0, 0, 0]} orbitRadius={45} y={0} angularSpeed={0.3} castShadow />
                <Bubble position={[0, 0, 0]} scale={0.3} color={Colors.slate[50]} useBubble />
                <TextSphere position={[0, 0, 0]} scale={0.4} text="OKESTRO  OKESTRO" bgColor={Colors.white} textColor={Colors.blue[600]} />
+            </>*/}
             </>
          ) : type === 'osd' ? (
             <group position={position}>
@@ -1090,7 +1113,7 @@ function InteractiveNode({
                      }
                   />
                </mesh>
-               {nodeData.status !== 'placeholder' && <HostRotatingRings color={color} hostIndex={0} />}
+               {nodeData.status !== 'placeholder' && nodeData.status !== 'up' && <HostRotatingRings color={color} hostIndex={0} />}
             </group>
          ) : null}
 
@@ -1411,6 +1434,7 @@ function CephTopology3D({
 
             {/* Cluster Node */}
             <InteractiveNode
+               isDark={isDark}
                position={positions.cluster}
                nodeData={data.cluster}
                type="cluster"
@@ -1446,6 +1470,7 @@ function CephTopology3D({
                   // Render actual OSD
                   return (
                      <InteractiveNode
+                        isDark={isDark}
                         key={`osd-${slot.osdId}`}
                         position={slot.position}
                         nodeData={osdData}
@@ -1471,6 +1496,7 @@ function CephTopology3D({
 
                   return (
                      <InteractiveNode
+                        isDark={isDark}
                         key={`placeholder-${slot.hostIndex}-${slot.slotIndex}`}
                         position={slot.position}
                         nodeData={placeholderData}
@@ -1487,6 +1513,7 @@ function CephTopology3D({
             {/* Daemon Nodes */}
             {data.daemons.map((daemon, i) => (
                <InteractiveNode
+                  isDark={isDark}
                   key={daemon.daemonId}
                   position={positions.daemons[i]}
                   nodeData={daemon}

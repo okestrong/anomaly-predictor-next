@@ -84,6 +84,12 @@ export default function ChatInterface({ alert, threadId, onProcessingChange }: C
    const [terminalLines, setTerminalLines] = useState<TerminalLine[]>([]);
    const [terminalPendingCommands, setTerminalPendingCommands] = useState<Record<string, PendingCommand>>({});
 
+   // 터미널 데이터 변경 핸들러 (메모이제이션으로 무한 루프 방지)
+   const handleTerminalDataChange = useCallback((lines: TerminalLine[], pendingCmds: Record<string, PendingCommand>) => {
+      setTerminalLines(lines);
+      setTerminalPendingCommands(pendingCmds);
+   }, []);
+
    const messagesEndRef = useRef<HTMLDivElement>(null);
    const inputRef = useRef<HTMLTextAreaElement>(null);
    const hasStartedRef = useRef(false);
@@ -978,7 +984,7 @@ export default function ChatInterface({ alert, threadId, onProcessingChange }: C
       if (!currentStatus) return null;
 
       const statusConfig = {
-         [WorkflowStatus.INITIALIZED]: { color: 'bg-blue-100 text-blue-800', label: '초기화됨' },
+         [WorkflowStatus.INITIALIZED]: { color: 'bg-blue-100 text-blue-800', label: '준비 중' },
          [WorkflowStatus.INITIALIZING]: { color: 'bg-blue-100 text-blue-800', label: '초기화 중' },
          [WorkflowStatus.ANALYZING]: { color: 'bg-purple-100 text-purple-800', label: '분석 중' },
          [WorkflowStatus.COLLECTING_DATA]: { color: 'bg-indigo-100 text-indigo-800', label: '데이터 수집 중' },
@@ -1196,10 +1202,7 @@ export default function ChatInterface({ alert, threadId, onProcessingChange }: C
                         solutionTitle={webTerminalSolution.solution.title}
                         sessionId={threadId}
                         approvedCommands={webTerminalSolution.approvedCommands}
-                        onTerminalDataChange={(lines, pendingCmds) => {
-                           setTerminalLines(lines);
-                           setTerminalPendingCommands(pendingCmds);
-                        }}
+                        onTerminalDataChange={handleTerminalDataChange}
                         initialLines={terminalLines}
                         initialPendingCommands={terminalPendingCommands}
                         onComplete={() => {
@@ -1224,10 +1227,7 @@ export default function ChatInterface({ alert, threadId, onProcessingChange }: C
                         commands={[]}
                         solutionTitle="수동 터미널"
                         sessionId={threadId}
-                        onTerminalDataChange={(lines, pendingCmds) => {
-                           setTerminalLines(lines);
-                           setTerminalPendingCommands(pendingCmds);
-                        }}
+                        onTerminalDataChange={handleTerminalDataChange}
                         initialLines={terminalLines}
                         initialPendingCommands={terminalPendingCommands}
                         onComplete={() => {
@@ -1236,7 +1236,6 @@ export default function ChatInterface({ alert, threadId, onProcessingChange }: C
                      />
                   </div>
                )}
-
 
                {isProcessing && (
                   <div className="flex items-center gap-3 text-gray-400 animate-in fade-in duration-300">

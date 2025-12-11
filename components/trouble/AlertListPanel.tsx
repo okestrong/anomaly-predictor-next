@@ -59,13 +59,15 @@ export default function AlertListPanel({ selectedAlert, onAlertSelect, disabled 
    useEffect(() => {
       // 초기 데이터 로드
       fetchAlerts();
-      loadHistoryAlerts();
+      const history = loadAllHistoryAlerts();
+      setHistoryAlerts(history);
       cleanupOldHistory();
 
       // 30초 주기 갱신
       refreshIntervalRef.current = setInterval(() => {
          fetchAlerts();
-         loadHistoryAlerts();
+         const updatedHistory = loadAllHistoryAlerts();
+         setHistoryAlerts(updatedHistory);
       }, 30000);
 
       return () => {
@@ -73,6 +75,7 @@ export default function AlertListPanel({ selectedAlert, onAlertSelect, disabled 
             clearInterval(refreshIntervalRef.current);
          }
       };
+      // eslint-disable-next-line react-hooks/exhaustive-deps
    }, []);
 
    // History alerts 로드
@@ -100,8 +103,10 @@ export default function AlertListPanel({ selectedAlert, onAlertSelect, disabled 
             }
          });
 
-      loadHistoryAlerts();
-   }, [dashboardAlerts, loadHistoryAlerts]);
+      // history alerts 로드 (loadHistoryAlerts 대신 직접 호출하여 의존성 제거)
+      const history = loadAllHistoryAlerts();
+      setHistoryAlerts(history);
+   }, [dashboardAlerts]);
 
    // Active alerts 필터링
    const filteredAlerts = alerts.filter(alert => {
