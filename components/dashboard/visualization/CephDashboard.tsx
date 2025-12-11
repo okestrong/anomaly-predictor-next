@@ -9,7 +9,7 @@ import styles from './CephDashboard.module.css';
 import Colors from '@/utils/color';
 import gsap from 'gsap';
 import { useCephTopology } from '@/hooks/useCephTopology';
-import { BrightnessContrast, EffectComposer } from '@react-three/postprocessing';
+import { Bloom, BrightnessContrast, EffectComposer } from '@react-three/postprocessing';
 import Bubble from '@/components/models/Bubble';
 import TextSphere from '@/components/models/TextSphere';
 import { Hdd } from '@/components/models/Hdd';
@@ -1055,10 +1055,10 @@ function InteractiveNode({
       <Float speed={0} rotationIntensity={0} floatIntensity={0}>
          {type === 'cluster' ? (
             <>
-               <FullRack scale={3.5} position={[0, -0.4, 0]} castShadow />
-               <FullRack scale={3.5} position={[0, -0.4, -1]} castShadow rotation={[0, Math.PI, 0]} />
                {isDark && (
                   <>
+                     <FullRack scale={3.5} position={[0, -0.4, 0]} castShadow />
+                     <FullRack scale={3.5} position={[0, -0.4, -1]} castShadow rotation={[0, Math.PI, 0]} />
                      <pointLight color={Colors.cyan[400]} intensity={2} distance={6} decay={2} position={[0, 0.1, -1.5]} />
                      <pointLight color={Colors.cyan[400]} intensity={2} distance={6} decay={2} position={[0, 0.5, -1.5]} />
                      <spotLight
@@ -1068,11 +1068,12 @@ function InteractiveNode({
                      />
                   </>
                )}
-               {/*<>
-               <GlassBall scale={0.25} orbitCenterPosition={[0, 0, 0]} orbitRadius={45} y={0} angularSpeed={0.3} castShadow />
-               <Bubble position={[0, 0, 0]} scale={0.3} color={Colors.slate[50]} useBubble />
-               <TextSphere position={[0, 0, 0]} scale={0.4} text="OKESTRO  OKESTRO" bgColor={Colors.white} textColor={Colors.blue[600]} />
-            </>*/}
+               {!isDark && (
+                  <>
+                     <Bubble position={[0, 0, 0]} scale={0.3} color={Colors.slate[50]} useBubble />
+                     <TextSphere position={[0, 0, 0]} scale={0.4} text="OKESTRO  OKESTRO" bgColor={Colors.white} textColor={Colors.blue[600]} />
+                  </>
+               )}
             </>
          ) : type === 'osd' ? (
             <group position={position}>
