@@ -3370,44 +3370,64 @@ export default function ClusterTopologyView() {
       return tube;
    };
 
-   // Force-Directed Layout으로 PG들을 Pool 주위에 배치
+   // Sunflower/Fibonacci Layout으로 PG들을 원점(0,0,0) 중심으로 균일하게 배치
    const positionPGsAroundPool = (pool: THREE.Group, pgs: any[]): THREE.Group[] => {
       const pgNodes: THREE.Group[] = [];
       const poolPos = pool.position;
       const targetY = poolPos.y - 25;
 
-      const nodes = pgs.map(pgData => {
-         const angle = Math.random() * Math.PI * 2;
-         const radius = 15 + Math.random() * 20;
+      // Sunflower 배치 파라미터 (기존 크기 유지: 15~35 기본, PG 많으면 확장)
+      const goldenAngle = Math.PI * (3 - Math.sqrt(5)); // ~137.5° (황금각)
+      const minRadius = 15; // 기존과 동일한 최소 반경
+      const baseMaxRadius = 35; // 기존과 동일한 기본 최대 반경
+      // PG 수에 따라 최대 반경 동적 확장 (기존 크기 기반)
+      const maxRadius = Math.max(baseMaxRadius, minRadius + Math.sqrt(pgs.length) * 8);
+      const pgSpacing = 8; // PG 간 최소 간격
+
+      // 중심점: 원점(0, 0, 0)을 기준으로 배치 (Pool 위치와 무관하게 중앙 정렬)
+      const centerX = 0;
+      const centerZ = 0;
+
+      const nodes = pgs.map((pgData, index) => {
+         // Sunflower 패턴: 중심에서 바깥으로 균일하게 분포
+         const normalizedIndex = (index + 0.5) / pgs.length; // 0.5 offset으로 중심 피함
+         const radius = minRadius + Math.sqrt(normalizedIndex) * (maxRadius - minRadius);
+         const angle = index * goldenAngle;
 
          return {
             pgData,
-            position: new THREE.Vector3(poolPos.x + Math.cos(angle) * radius, targetY, poolPos.z + Math.sin(angle) * radius),
+            position: new THREE.Vector3(
+               centerX + Math.cos(angle) * radius,
+               targetY,
+               centerZ + Math.sin(angle) * radius
+            ),
             velocity: new THREE.Vector3(0, 0, 0),
             force: new THREE.Vector3(0, 0, 0),
          };
       });
 
-      // Force-Directed 시뮬레이션
-      for (let iteration = 0; iteration < 50; iteration++) {
+      // 미세 조정을 위한 Force-Directed 시뮬레이션 (겹침 방지)
+      for (let iteration = 0; iteration < 30; iteration++) {
          nodes.forEach(node => {
             node.force.set(0, 0, 0);
 
-            const toPool = poolPos.clone().sub(node.position);
-            toPool.y = 0;
-            const poolDistance = toPool.length();
-            if (poolDistance > 0) {
-               toPool.normalize().multiplyScalar(0.1);
-               node.force.add(toPool);
+            // 중심 방향으로 약한 인력 (원형 유지)
+            const toCenter = new THREE.Vector3(centerX, 0, centerZ).sub(node.position);
+            toCenter.y = 0;
+            const centerDistance = toCenter.length();
+            if (centerDistance > maxRadius) {
+               toCenter.normalize().multiplyScalar(0.3);
+               node.force.add(toCenter);
             }
 
+            // 다른 PG와의 반발력 (겹침 방지)
             nodes.forEach(otherNode => {
                if (otherNode !== node) {
                   const diff = node.position.clone().sub(otherNode.position);
                   diff.y = 0;
                   const distance = diff.length();
-                  if (distance > 0 && distance < 12) {
-                     diff.normalize().multiplyScalar(200 / (distance * distance));
+                  if (distance > 0 && distance < pgSpacing) {
+                     diff.normalize().multiplyScalar(100 / (distance * distance));
                      node.force.add(diff);
                   }
                }
@@ -3416,17 +3436,23 @@ export default function ClusterTopologyView() {
 
          nodes.forEach(node => {
             node.velocity.add(node.force.multiplyScalar(0.1));
-            node.velocity.multiplyScalar(0.9);
+            node.velocity.multiplyScalar(0.85);
             node.position.add(node.velocity);
             node.position.y = targetY;
 
-            // Apply boundary constraint to keep PGs within Stars radius
-            const maxRadius = 200;
-            const distanceFromCenter = Math.sqrt(node.position.x * node.position.x + node.position.z * node.position.z);
-            if (distanceFromCenter > maxRadius) {
-               const scale = maxRadius / distanceFromCenter;
-               node.position.x *= scale;
-               node.position.z *= scale;
+            // 중심으로부터의 최소/최대 거리 제한
+            const dx = node.position.x - centerX;
+            const dz = node.position.z - centerZ;
+            const distanceFromCenter = Math.sqrt(dx * dx + dz * dz);
+
+            if (distanceFromCenter < minRadius) {
+               const scale = minRadius / distanceFromCenter;
+               node.position.x = centerX + dx * scale;
+               node.position.z = centerZ + dz * scale;
+            } else if (distanceFromCenter > maxRadius * 1.2) {
+               const scale = (maxRadius * 1.2) / distanceFromCenter;
+               node.position.x = centerX + dx * scale;
+               node.position.z = centerZ + dz * scale;
             }
          });
       }

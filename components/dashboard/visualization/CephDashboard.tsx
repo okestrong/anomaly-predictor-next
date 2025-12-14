@@ -2,7 +2,7 @@
 
 import React, { Suspense, useEffect, useMemo, useRef, useState } from 'react';
 import { Canvas, ThreeEvent, useFrame, useThree } from '@react-three/fiber';
-import { Edges, Environment, Float, Html, Line, OrbitControls, Stars, Text, Trail } from '@react-three/drei';
+import { Edges, Environment, Float, Html, Line, OrbitControls, Stars, Text, Trail, useTexture } from '@react-three/drei';
 import * as THREE from 'three';
 import { CephTopologyData, NetworkTraffic } from './cephTypes';
 import styles from './CephDashboard.module.css';
@@ -13,9 +13,8 @@ import { Bloom, BrightnessContrast, EffectComposer } from '@react-three/postproc
 import Bubble from '@/components/models/Bubble';
 import TextSphere from '@/components/models/TextSphere';
 import { Hdd } from '@/components/models/Hdd';
-import { ServerFive } from '@/components/models/ServerFive';
-import { ServerTen } from '@/components/models/ServerTen';
 import { FullRack } from '@/components/models/FullRack';
+import { Ceph } from '@/components/models/Ceph';
 
 // Utility functions
 const formatBytes = (bytes: number): string => {
@@ -341,13 +340,13 @@ function PowerLine({ index, clusterPos, speed }: { index: number; clusterPos: TH
          {/*<Line points={linePoints} color="#00ffff" lineWidth={3} transparent opacity={0.25} />*/}
 
          {/* Moving electricity particles - 올챙이 효과 */}
-         {[0, 1, 2].map(particleIdx => (
+         {[0, 1, 2, 3].map(particleIdx => (
             <group key={`power-${index}-${particleIdx}`}>
                {/* 메인 파티클 (머리) */}
                <mesh ref={el => (particleRefs.current[particleIdx] = el)} castShadow>
                   <sphereGeometry args={[0.2, 12, 12]} />
                   <meshStandardMaterial color={Colors.cyan[600]} emissive={Colors.cyan[600]} emissiveIntensity={3} transparent opacity={0.95} />
-                  {particleIdx % 2 === 1 && <pointLight color={Colors.cyan[400]} intensity={2} distance={6} decay={2} />}
+                  {particleIdx === 1 && <pointLight color={Colors.cyan[400]} intensity={2} distance={6} decay={2} />}
                </mesh>
 
                {/* 꼬리 구체들 */}
@@ -930,28 +929,19 @@ function InteractiveNode({
       if (!meshRef.current) return;
 
       // Floating animation for cluster
-      if (type === 'cluster') {
+      /*if (type === 'cluster') {
          meshRef.current.rotation.y = state.clock.elapsedTime * 0.5;
          meshRef.current.position.y = position.y + Math.sin(state.clock.elapsedTime) * 0.2;
-      }
+      }*/
 
       // OSD rotation - cylinder bows towards center like people bowing in a circle
-      if (type === 'osd' && centerPosition) {
-         // Calculate direction to center in XZ plane (horizontal plane)
+      /*if (type === 'osd' && centerPosition) {
          const directionXZ = new THREE.Vector3(centerPosition.x - position.x, 0, centerPosition.z - position.z).normalize();
-
-         // Calculate angle to face center (rotation around Y axis)
          const angleToCenter = Math.atan2(directionXZ.x, directionXZ.z);
-
-         // Create quaternion for Y rotation (turning to face center)
          const yQuaternion = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), angleToCenter);
-
-         // Create quaternion for X rotation (continuously rotating towards center)
          const xQuaternion = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1, 0, 0), state.clock.elapsedTime * 0.3);
-
-         // Apply Y rotation first (face center), then X rotation (bow)
          meshRef.current.quaternion.copy(yQuaternion).multiply(xQuaternion);
-      }
+      }*/
 
       // Daemon orbital rotation and self-rotation
       if (type === 'daemon' && daemonIndex !== undefined && groupRef.current) {
@@ -981,7 +971,10 @@ function InteractiveNode({
          return <sphereGeometry args={[0.5, 16, 16]} />;
       }
       if (type === 'osd') {
-         return <cylinderGeometry args={[0.5, 0.5, 1, 5]} />;
+         return <sphereGeometry args={[0.7, 16, 16]} />;
+         // return <cylinderGeometry args={[0.4, 0.7, 1.4, 12]} />;
+         // return <torusKnotGeometry args={[0.5, 0.15, 256, 128]} />;
+         // return <torusGeometry args={[0.5, 0.2]} />;
       }
       return <boxGeometry args={[0.8, 0.8, 0.8]} />;
    }, [type]);
@@ -1035,7 +1028,7 @@ function InteractiveNode({
             <DaemonHolographicHUD daemonData={nodeData} color={Colors.fuchsia[500]} />
 
             {/* Label */}
-            <Text position={[0, -size * 0.8, 0]} fontSize={0.25} color="white" outlineColor="black" outlineWidth={0.03} anchorX="center" anchorY="top">
+            <Text position={[0, -size * 1, 0]} fontSize={0.15} color="white" outlineColor="black" outlineWidth={0.01} anchorX="center" anchorY="top">
                {nodeData.daemonId}
             </Text>
 
@@ -1057,18 +1050,24 @@ function InteractiveNode({
             <>
                {isDark && (
                   <>
+                     <Ceph scale={1.6} position={[0, 1.6, -0.5]} rotation-y={Math.PI} />
+                     <spotLight color={Colors.red[200]} position={[0, 4, -0.8]} angle={0.5} penumbra={1} intensity={7} />
+                     <Text color={Colors.white} position={[0, 1.92, 0.02]} fontSize={0.25} rotation-x={-Math.PI / 2}>
+                        CEPH
+                     </Text>
+
                      <FullRack scale={3.5} position={[0.5, -0.4, 0]} castShadow />
                      <FullRack scale={3.5} position={[0.5, -0.4, -1]} castShadow rotation={[0, Math.PI, 0]} />
                      <FullRack scale={3.5} position={[-0.5, -0.4, 0]} castShadow />
                      <FullRack scale={3.5} position={[-0.5, -0.4, -1]} castShadow rotation={[0, Math.PI, 0]} />
-                     <pointLight color={Colors.cyan[400]} intensity={2} distance={6} decay={2} position={[0, 1.4, 0]} />
+                     <pointLight color={Colors.orange[400]} intensity={2} distance={6} decay={2} position={[0, 1.4, 0.2]} />
                      <pointLight color={Colors.cyan[400]} intensity={2} distance={6} decay={2} position={[0, 0, 0.5]} />
                      <pointLight color={Colors.cyan[400]} intensity={2} distance={6} decay={2} position={[0, 0.1, -1.5]} />
                      <pointLight color={Colors.cyan[400]} intensity={2} distance={6} decay={2} position={[0, 0.5, -1.5]} />
                      <spotLight
                         args={[Colors.blue[300], 20, 8, Math.PI / 2, 1, 0.3]} // -> MATH.PI/4 : 빛의 범위(45도) / 1: 빛 경게의 자연스러움 조절 / 0.5: 빛이 멀어질수론 희미해지는 정도 조절
-                        castShadow
                         position={[0, 1.5, 3]}
+                        castShadow
                      />
                   </>
                )}
@@ -1091,18 +1090,20 @@ function InteractiveNode({
                   receiveShadow
                >
                   {geometry}
+                  {/*<meshMatcapMaterial*/}
                   <meshPhysicalMaterial
                      // map={nodeData.status !== 'placeholder' ? aluminiumTexture : undefined}
+                     // map={texture}
                      color={color}
                      emissive={color}
                      emissiveIntensity={
                         nodeData.status === 'placeholder'
-                           ? 0.1 // Placeholder: very subtle glow
+                           ? 0.3 // Placeholder: very subtle glow
                            : nodeData.status === 'inactive'
                              ? 0 // Inactive: no glow
-                             : hovered
-                               ? 0.5
-                               : 0.2
+                             : isDark
+                               ? 0.7
+                               : 0
                      }
                      metalness={nodeData.status === 'placeholder' ? 0.3 : 0.5}
                      roughness={nodeData.status === 'placeholder' ? 0.3 : 0.2}
@@ -1386,8 +1387,8 @@ function SafeEffectComposer({ isDark }: { isDark: boolean }) {
    try {
       return (
          <EffectComposer multisampling={0} resolutionScale={1}>
-            {/*<Bloom mipmapBlur luminanceThreshold={0.3} intensity={0.6} radius={0.4} />*/}
-            <BrightnessContrast brightness={isDark ? 0 : 0.15} contrast={0.2} />
+            <Bloom mipmapBlur luminanceThreshold={0.1} intensity={0.5} radius={0.4} />
+            <BrightnessContrast brightness={isDark ? -0.1 : 0.05} contrast={0.25} />
          </EffectComposer>
       );
    } catch (error) {
@@ -1411,6 +1412,7 @@ function CephTopology3D({
    const { camera } = useThree();
    const positions = useMemo(() => calculateNodePositions(data), [data.hosts.length, data.osds.length, data.daemons.length]);
    const cameraMoved = useRef(false);
+   const osdTexture = useTexture('/images/gold-wave.jpg');
 
    useEffect(() => {
       if (data && !cameraMoved.current) {
@@ -1475,6 +1477,7 @@ function CephTopology3D({
                   // Render actual OSD
                   return (
                      <InteractiveNode
+                        // texture={osdTexture}
                         isDark={isDark}
                         key={`osd-${slot.osdId}`}
                         position={slot.position}
@@ -1694,12 +1697,12 @@ const CephDashboard = React.memo(
                      <Suspense fallback={<LoadingText />}>
                         {/* Environment and Lighting */}
                         <Environment files="/3d/background/hongkong.jpg" />
-                        <ambientLight intensity={1.2} />
+                        <ambientLight intensity={1} />
                         <directionalLight
                            position={[10, 20, 10]}
                            intensity={0.3}
                            castShadow
-                           shadow-mapSize={[1024, 1024]}
+                           shadow-mapSize={[512, 512]}
                            shadow-camera-far={50}
                            shadow-camera-left={-20}
                            shadow-camera-right={20}
@@ -1711,6 +1714,11 @@ const CephDashboard = React.memo(
 
                         {/* Stars Background */}
                         <Stars radius={100} depth={50} count={1000} factor={4} saturation={0} fade speed={1} />
+                        {/*<CyberDog position={[-2, -0.4, 1]} scale={2} castShadow />*/}
+                        {/*<spotLight
+                           args={[Colors.blue[400], 20, 8, Math.PI / 2, 1, 0.3]} // -> MATH.PI/4 : 빛의 범위(45도) / 1: 빛 경게의 자연스러움 조절 / 0.5: 빛이 멀어질수론 희미해지는 정도 조절
+                           position={[-2, 0, 4]}
+                        />*/}
 
                         {/* Ground with reflection - bumpy marble-like surface */}
                         <BumpyGround isDark={cardVisible} />
