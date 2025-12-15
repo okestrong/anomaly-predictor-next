@@ -1,14 +1,7 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
 import { Client, IMessage } from '@stomp/stompjs';
 import SockJS from 'sockjs-client';
-import {
-   TroubleResponse,
-   TroubleRequest,
-   UserMessageRequest,
-   SolutionSelectionRequest,
-   ApprovalRequest,
-   ApprovalStatusChangedMetadata,
-} from '@/types/trouble';
+import { TroubleResponse, TroubleRequest, UserMessageRequest, SolutionSelectionRequest, ApprovalRequest, ApprovalStatusChangedMetadata } from '@/types/trouble';
 
 interface UseTroubleWebSocketProps {
    threadId: string | null;
@@ -40,7 +33,7 @@ export function useTroubleWebSocket({ threadId, onMessage, onApprovalStatusChang
       setConnecting(true);
 
       const client = new Client({
-         webSocketFactory: () => new SockJS('http://localhost:8080/ws/trouble'),
+         webSocketFactory: () => new SockJS(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080'}/ws/trouble`),
          reconnectDelay: 5000,
          heartbeatIncoming: 4000,
          heartbeatOutgoing: 4000,
