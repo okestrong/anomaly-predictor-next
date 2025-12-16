@@ -103,10 +103,25 @@ export default function AlertListPanel({ selectedAlert, onAlertSelect, disabled 
             }
          });
 
+      // 현재 선택된 alert가 active 목록에서 사라졌는지 확인
+      if (selectedAlert) {
+         const selectedTimestamp = getAlertTimestamp(selectedAlert);
+         const stillExists = convertedAlerts.some(
+            alert => getAlertTimestamp(alert) === selectedTimestamp
+         );
+
+         // 선택된 alert가 active 목록에 없고, 세션이 있으면 history로 이동
+         if (!stillExists && hasSession(selectedTimestamp)) {
+            moveToHistory(selectedTimestamp);
+            // History 탭으로 자동 전환
+            setActiveTab('history');
+         }
+      }
+
       // history alerts 로드 (loadHistoryAlerts 대신 직접 호출하여 의존성 제거)
       const history = loadAllHistoryAlerts();
       setHistoryAlerts(history);
-   }, [dashboardAlerts]);
+   }, [dashboardAlerts, selectedAlert]);
 
    // Active alerts 필터링
    const filteredAlerts = alerts.filter(alert => {
