@@ -10,11 +10,11 @@ import Colors from '@/utils/color';
 import gsap from 'gsap';
 import { useCephTopology } from '@/hooks/useCephTopology';
 import { Bloom, BrightnessContrast, EffectComposer } from '@react-three/postprocessing';
-import Bubble from '@/components/models/Bubble';
-import TextSphere from '@/components/models/TextSphere';
 import { Hdd } from '@/components/models/Hdd';
 import { FullRack } from '@/components/models/FullRack';
 import { Ceph } from '@/components/models/Ceph';
+import { SpaceShipTwo } from '@/components/models/SpaceShipTwo';
+import { BluePortal } from '@/components/models/BluePortal';
 
 // Utility functions
 const formatBytes = (bytes: number): string => {
@@ -398,6 +398,12 @@ function PowerLine({ index, clusterPos, speed }: { index: number; clusterPos: TH
 
 // Bumpy Ground Component with marble-like reflective surface
 function BumpyGround({ isDark }: { isDark: boolean }) {
+   const groundTexture = useTexture('/3d/textures/planet/stone-ground.jpg');
+
+   // Configure texture to repeat instead of stretch
+   groundTexture.wrapS = groundTexture.wrapT = THREE.RepeatWrapping;
+   groundTexture.repeat.set(9, 9); // Repeat 9x9 times across the plane
+
    const geometry = useMemo(() => {
       const geo = new THREE.PlaneGeometry(50, 50, 150, 150);
       const positionAttribute = geo.attributes.position;
@@ -466,7 +472,8 @@ function BumpyGround({ isDark }: { isDark: boolean }) {
 
    return (
       <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -2, 0]} receiveShadow geometry={geometry}>
-         <meshStandardMaterial roughness={isDark ? 0.2 : 1} color={isDark ? Colors.neutral[400] : Colors.white} metalness={0.75} />
+         <meshStandardMaterial map={groundTexture} roughness={isDark ? 0.2 : 1} metalness={0.75} />
+         {/*<meshStandardMaterial roughness={isDark ? 0.2 : 1} color={isDark ? Colors.neutral[400] : Colors.white} metalness={0.75} />*/}
          {/*<MeshReflectorMaterial
             blur={[300, 100]}
             resolution={2048}
@@ -1073,8 +1080,17 @@ function InteractiveNode({
                )}
                {!isDark && (
                   <>
-                     <Bubble position={[0, 0, 0]} scale={0.3} color={Colors.slate[50]} useBubble />
-                     <TextSphere position={[0, 0, 0]} scale={0.4} text="OKESTRO  OKESTRO" bgColor={Colors.white} textColor={Colors.blue[600]} />
+                     <BluePortal position={[0, 0, 0.5]} scale={6} castShadow />
+                     <spotLight
+                        position={[0, 0.5, 1.5]}
+                        target-position={[0, 1, 0.5]}
+                        angle={Math.PI / 3}
+                        penumbra={0.5}
+                        intensity={10}
+                        color={Colors.cyan[300]}
+                     />
+                     {/*<Bubble position={[0, 0, 0]} scale={0.3} color={Colors.slate[50]} useBubble />*/}
+                     {/*<TextSphere position={[0, 0, 0]} scale={0.4} text="OKESTRO  OKESTRO" bgColor={Colors.white} textColor={Colors.blue[600]} />*/}
                   </>
                )}
             </>
@@ -1103,7 +1119,7 @@ function InteractiveNode({
                              ? 0 // Inactive: no glow
                              : isDark
                                ? 0.7
-                               : 0
+                               : 0.3
                      }
                      metalness={nodeData.status === 'placeholder' ? 0.3 : 0.5}
                      roughness={nodeData.status === 'placeholder' ? 0.3 : 0.2}
@@ -1387,8 +1403,8 @@ function SafeEffectComposer({ isDark }: { isDark: boolean }) {
    try {
       return (
          <EffectComposer multisampling={0} resolutionScale={1}>
-            <Bloom mipmapBlur luminanceThreshold={0.1} intensity={0.5} radius={0.4} />
-            <BrightnessContrast brightness={isDark ? -0.1 : 0.05} contrast={0.25} />
+            <Bloom mipmapBlur luminanceThreshold={0.1} intensity={isDark ? 0.8 : 0.6} radius={0.7} />
+            <BrightnessContrast brightness={isDark ? -0.05 : 0} contrast={0.25} />
          </EffectComposer>
       );
    } catch (error) {
@@ -1420,7 +1436,7 @@ function CephTopology3D({
          setTimeout(() => {
             gsap.to(camera.position, {
                x: 10,
-               y: 12,
+               y: 15,
                z: 16,
                duration: 4,
                ease: 'power2.inOut',
@@ -1680,7 +1696,7 @@ const CephDashboard = React.memo(
                <div className={styles.centerCanvas}>
                   <Canvas
                      shadows
-                     camera={{ position: [-20, 2, 12], fov: 70 }}
+                     camera={{ position: [35, 2, 5], fov: 70 }}
                      gl={{
                         antialias: true,
                         toneMapping: THREE.ACESFilmicToneMapping,
@@ -1697,7 +1713,7 @@ const CephDashboard = React.memo(
                      <Suspense fallback={<LoadingText />}>
                         {/* Environment and Lighting */}
                         <Environment files="/3d/background/hongkong.jpg" />
-                        <ambientLight intensity={1} />
+                        {/*<ambientLight intensity={1} />*/}
                         <directionalLight
                            position={[10, 20, 10]}
                            intensity={0.3}
@@ -1715,13 +1731,34 @@ const CephDashboard = React.memo(
                         {/* Stars Background */}
                         <Stars radius={100} depth={50} count={1000} factor={4} saturation={0} fade speed={1} />
                         {/*<CyberDog position={[-2, -0.4, 1]} scale={2} castShadow />*/}
+                        {!cardVisible && (
+                           <>
+                              <SpaceShipTwo position={[0, -3.5, 0]} scale={10} castShadow />
+                              {/*<spotLight // 위에서 비추는 메인 조명
+                                 position={[-15.5, 4, 1]}
+                                 target-position={[15, 2, 1]}
+                                 angle={Math.PI / 2}
+                                 penumbra={0.5}
+                                 intensity={10}
+                                 color="#ffffff"
+                              />*/}
+                              <spotLight // 아래에서 비추는 보조 조명 (림 라이트 효과)
+                                 position={[0, -6, 0]}
+                                 target-position={[0, -3.5, 0]} // 모델을 향해
+                                 angle={Math.PI / 2} // 조명 범위 (90도)
+                                 penumbra={0.8}
+                                 intensity={20}
+                                 color={Colors.white} // 살짝 푸른색으로 차별화
+                              />
+                           </>
+                        )}
+
                         {/*<spotLight
                            args={[Colors.blue[400], 20, 8, Math.PI / 2, 1, 0.3]} // -> MATH.PI/4 : 빛의 범위(45도) / 1: 빛 경게의 자연스러움 조절 / 0.5: 빛이 멀어질수론 희미해지는 정도 조절
                            position={[-2, 0, 4]}
                         />*/}
-
                         {/* Ground with reflection - bumpy marble-like surface */}
-                        <BumpyGround isDark={cardVisible} />
+                        {cardVisible && <BumpyGround isDark={cardVisible} />}
 
                         {/* Contact Shadows */}
                         {/*<ContactShadows position={[0, -2, 0]} opacity={0.4} scale={30} blur={2} far={10} />*/}

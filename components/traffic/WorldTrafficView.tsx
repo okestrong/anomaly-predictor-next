@@ -1428,49 +1428,83 @@ const Table = ({
 
 const GroundPlane = () => {
    const groundTexture = useTexture('/3d/textures/planet/stone-ground.jpg');
-   const planeRef = useRef<THREE.Mesh>(null);
 
    // Configure texture to repeat instead of stretch
    groundTexture.wrapS = groundTexture.wrapT = THREE.RepeatWrapping;
-   groundTexture.repeat.set(9, 9); // Repeat 20x20 times across the plane
+   groundTexture.repeat.set(9, 9); // Repeat 9x9 times across the plane
 
-   useEffect(() => {
-      if (planeRef.current) {
-         const geometry = planeRef.current.geometry;
-         const positionAttribute = geometry.attributes.position;
+   // Create bumpy geometry using FBM noise (similar to CephDashboard's BumpyGround)
+   const geometry = useMemo(() => {
+      const geo = new THREE.PlaneGeometry(500, 500, 200, 200); // 더 많은 세분화로 디테일 증가
+      const positionAttribute = geo.attributes.position;
 
-         // Vertex를 조작하여 울퉁불퉁한 표면 생성
-         for (let i = 0; i < positionAttribute.count; i++) {
-            const x = positionAttribute.getX(i);
-            const y = positionAttribute.getY(i);
-            const smallCurve = -1.5; // -k ~ k, k = 0.4 ~ 1.9 정도(범위를 벗어나도 됨)
-            const bigCurve = 1.6; // 숫자가 커질수록 굴곡이 커진다. (smallCurve 의 절대값 + 0.1 정도가 딱 이쁜듯)
+      // Hash function for pseudo-random values
+      const hash = (x: number, y: number): number => {
+         const h = Math.sin(x * 12.9898 + y * 78.233) * 43758.5453;
+         return h - Math.floor(h);
+      };
 
-            // 자갈 효과: 작은 랜덤 높이 변화
-            const bumpHeight = Math.random() * 0.8 + smallCurve;
-            // 큰 굴곡 추가 (노이즈 효과)
-            const largeWave = Math.sin(x * 0.05) * Math.cos(y * 0.05) * bigCurve;
+      // 2D noise function with smooth interpolation
+      const noise = (x: number, y: number): number => {
+         const ix = Math.floor(x);
+         const iy = Math.floor(y);
+         const fx = x - ix;
+         const fy = y - iy;
 
-            // Z축 변경 (rotation-x로 인해 Z가 높이가 됨)
-            positionAttribute.setZ(i, bumpHeight + largeWave);
+         const a = hash(ix, iy);
+         const b = hash(ix + 1, iy);
+         const c = hash(ix, iy + 1);
+         const d = hash(ix + 1, iy + 1);
+
+         // Smooth interpolation (smoothstep)
+         const u = fx * fx * (3 - 2 * fx);
+         const v = fy * fy * (3 - 2 * fy);
+
+         return a * (1 - u) * (1 - v) + b * u * (1 - v) + c * (1 - u) * v + d * u * v;
+      };
+
+      // Fractal Brownian Motion - multiple octaves of noise
+      const fbm = (x: number, y: number, octaves: number): number => {
+         let value = 0;
+         let amplitude = 1;
+         let frequency = 1;
+         let maxValue = 0;
+
+         for (let i = 0; i < octaves; i++) {
+            value += noise(x * frequency, y * frequency) * amplitude;
+            maxValue += amplitude;
+            amplitude *= 0.5;
+            frequency *= 2;
          }
 
-         // 법선 재계산으로 조명이 올바르게 적용되도록
-         geometry.computeVertexNormals();
-         positionAttribute.needsUpdate = true;
+         return value / maxValue; // Normalize
+      };
+
+      // Apply irregular noise to create bumpy surface
+      for (let i = 0; i < positionAttribute.count; i++) {
+         const x = positionAttribute.getX(i);
+         const y = positionAttribute.getY(i);
+
+         // Multiple octaves of noise for natural-looking terrain
+         const height1 = fbm(x * 0.02, y * 0.02, 6) * 7.5; // Large features
+         const height2 = fbm(x * 0.05, y * 0.05, 5) * 4; // Medium features
+         const height3 = fbm(x * 0.15, y * 0.15, 4) * 2; // Small details
+         const height4 = fbm(x * 0.4, y * 0.4, 3) * 1; // Fine details
+
+         // Combine different scales
+         const totalHeight = height1 + height2 + height3 + height4;
+
+         positionAttribute.setZ(i, totalHeight);
       }
+
+      geo.computeVertexNormals();
+      return geo;
    }, []);
 
    return (
-      <Plane
-         ref={planeRef}
-         position={[0, 0, 0]}
-         args={[500, 500, 100, 100]} // 세분화 추가: 100x100 segments
-         rotation-x={-Math.PI / 2}
-         receiveShadow
-      >
-         <meshStandardMaterial map={groundTexture} metalness={0} roughness={0.9} bumpScale={0.2} />
-      </Plane>
+      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -2, 0]} receiveShadow geometry={geometry}>
+         <meshStandardMaterial map={groundTexture} metalness={0} roughness={0.9} />
+      </mesh>
    );
 };
 
