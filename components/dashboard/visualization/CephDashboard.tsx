@@ -1713,7 +1713,7 @@ const CephDashboard = React.memo(
                      <Suspense fallback={<LoadingText />}>
                         {/* Environment and Lighting */}
                         <Environment files="/3d/background/hongkong.jpg" />
-                        {/*<ambientLight intensity={1} />*/}
+                        {cardVisible && <ambientLight intensity={1} />}
                         <directionalLight
                            position={[10, 20, 10]}
                            intensity={0.3}

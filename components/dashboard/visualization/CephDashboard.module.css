@@ -1,7 +1,7 @@
 .dashboard {
     width: 100vw;
     height: calc(100vh - 65px);
-    background: linear-gradient(135deg, #0a0a1a 0%, #1a0a2a 50%, #0a0a1a 100%);
+    background: linear-gradient(135deg, #0a0a1a 0%, #0c4a6e 50%, #0a0a1a 100%);
     color: #ffffff;
     font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
     display: flex;
