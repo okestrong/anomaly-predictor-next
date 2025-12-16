@@ -19,7 +19,7 @@ interface EmailRecipientsState {
    clearEmails: () => void;
 }
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080';
+const API_URL = process.env.NEXT_PUBLIC_API_URL as string;
 
 /**
  * Email Recipients Store
@@ -46,9 +46,7 @@ export const useEmailRecipientsStore = create<EmailRecipientsState>((set, get) =
          }
 
          const recipients: EmailRecipient[] = await response.json();
-         const emails = recipients
-            .filter((r) => r.isActive !== false)
-            .map((r) => r.email);
+         const emails = recipients.filter(r => r.isActive !== false).map(r => r.email);
 
          set({ emails, recipients, isLoading: false });
       } catch (error: any) {

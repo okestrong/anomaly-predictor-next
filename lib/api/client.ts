@@ -1,5 +1,5 @@
 // API Client Configuration using native fetch
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080';
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL as string;
 const API_TIMEOUT = 90000; // 30 seconds
 
 // ========== Locale Utilities (i18n support) ==========
@@ -10,10 +10,10 @@ const API_TIMEOUT = 90000; // 30 seconds
  * @returns locale 코드 (예: "ko", "en")
  */
 export const getCurrentLocale = (): string => {
-  // TODO: 향후 i18n 라우팅 적용 시 URL path에서 추출
-  // const pathLocale = window.location.pathname.split('/')[1];
-  // if (['ko', 'en', 'ja'].includes(pathLocale)) return pathLocale;
-  return 'ko'; // 현재는 한국어 고정
+   // TODO: 향후 i18n 라우팅 적용 시 URL path에서 추출
+   // const pathLocale = window.location.pathname.split('/')[1];
+   // if (['ko', 'en', 'ja'].includes(pathLocale)) return pathLocale;
+   return 'ko'; // 현재는 한국어 고정
 };
 
 /**
@@ -21,7 +21,7 @@ export const getCurrentLocale = (): string => {
  * navigator.language 형식(ko-KR)이 아닌 간단한 형식(ko) 사용
  */
 export const getAcceptLanguage = (): string => {
-  return getCurrentLocale();
+   return getCurrentLocale();
 };
 
 // Custom error class for API errors
@@ -291,7 +291,7 @@ export const apiWithRetry = async <T>(requestFn: () => Promise<T>, maxRetries: n
 
 // Helper function for Next.js Server Actions (if needed)
 export const createServerActionClient = (baseUrl?: string) => {
-   const serverBaseUrl = baseUrl || process.env.API_URL || 'http://localhost:8080';
+   const serverBaseUrl = baseUrl || process.env.API_URL;
 
    return {
       async get<T>(endpoint: string, config: RequestConfig = {}): Promise<T> {

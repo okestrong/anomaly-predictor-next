@@ -33,7 +33,7 @@ export function useTroubleWebSocket({ threadId, onMessage, onApprovalStatusChang
       setConnecting(true);
 
       const client = new Client({
-         webSocketFactory: () => new SockJS(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080'}/ws/trouble`),
+         webSocketFactory: () => new SockJS(`${process.env.NEXT_PUBLIC_API_URL}/ws/trouble`),
          reconnectDelay: 5000,
          heartbeatIncoming: 4000,
          heartbeatOutgoing: 4000,

@@ -3,7 +3,7 @@
  * 백엔드 프록시를 통해 Ceph 명령어 실행 및 승인 관리
  */
 
-const BACKEND_BASE_URL = process.env.NEXT_PUBLIC_BACKEND_API_URL || 'http://localhost:8080';
+const BACKEND_BASE_URL = process.env.NEXT_PUBLIC_API_URL as string;
 const EXECUTOR_API_PATH = '/api/trouble/executor';
 
 export interface ExecuteCommandRequest {
@@ -92,11 +92,7 @@ export async function executeCommand(request: ExecuteCommandRequest): Promise<Co
  * 승인된 명령어의 request_id로 실행 요청
  * placeholder가 있던 명령어는 실제 값으로 대체하여 전송
  */
-export async function executeApprovedCommand(
-   requestId: string,
-   command: string,
-   args: string[]
-): Promise<CommandResponse> {
+export async function executeApprovedCommand(requestId: string, command: string, args: string[]): Promise<CommandResponse> {
    const response = await fetch(`${BACKEND_BASE_URL}${EXECUTOR_API_PATH}/commands/${requestId}/execute`, {
       method: 'POST',
       headers: {

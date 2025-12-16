@@ -365,7 +365,7 @@ export class DashboardWebSocket {
       private onError: (error: any) => void,
    ) {}
 
-   connect(baseUrl: string = process.env.NEXT_PUBLIC_DASHBOARD_WS_URL || 'http://localhost:8080') {
+   connect(baseUrl: string = process.env.NEXT_PUBLIC_DASHBOARD_WS_URL as string) {
       // SockJS requires http/https URL, not ws/wss
       // Convert ws:// to http:// and wss:// to https://
       let httpUrl = baseUrl;
