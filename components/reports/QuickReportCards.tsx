@@ -41,8 +41,8 @@ const reportTypes: ReportTypeCard[] = [
    },
    {
       id: 'PREDICTIONS',
-      title: 'Predictions Report',
-      description: 'AI failure predictions and risk analysis',
+      title: 'Anomaly Response Report',
+      description: 'Detect anomalies and risk analysis early',
       icon: <TrendingUp className="w-6 h-6" />,
       color: 'text-purple-600 dark:text-purple-400',
       borderColor: 'border-purple-200 dark:border-purple-800',

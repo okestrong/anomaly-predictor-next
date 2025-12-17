@@ -1742,14 +1742,14 @@ const CephDashboard = React.memo(
                                  intensity={10}
                                  color="#ffffff"
                               />*/}
-                              <spotLight // 아래에서 비추는 보조 조명 (림 라이트 효과)
+                              {/*<spotLight // 아래에서 비추는 보조 조명 (림 라이트 효과)
                                  position={[0, -6, 0]}
                                  target-position={[0, -3.5, 0]} // 모델을 향해
                                  angle={Math.PI / 2} // 조명 범위 (90도)
                                  penumbra={0.8}
                                  intensity={20}
                                  color={Colors.white} // 살짝 푸른색으로 차별화
-                              />
+                              />*/}
                            </>
                         )}
 

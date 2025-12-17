@@ -338,7 +338,9 @@ export default function ReportViewPage() {
                   <div className="grid grid-cols-4 gap-4 pt-4 border-t border-gray-200">
                      <div>
                         <p className="text-xs text-gray-500 mb-1">Type</p>
-                        <p className="text-sm font-semibold text-gray-900 capitalize">{currentReport.type.replace('-', ' ')}</p>
+                        <p className="text-sm font-semibold text-gray-900 capitalize">
+                           {currentReport.type.replace('-', ' ').replace(/PREDICTIONS/, 'ANOMALY RESPONSE')}
+                        </p>
                      </div>
                      <div>
                         <p className="text-xs text-gray-500 mb-1">Status</p>

@@ -64,12 +64,12 @@ export default function PredictionDashboard() {
             <div className="flex items-center justify-between mb-6">
                <div>
                   <h1 className="text-3xl font-bold text-white mb-2 flex items-baseline">
-                     Predictive Incident Analysis
+                     Proactive Anomaly Response
                      <span className="text-xl text-slate-300 ml-2">
                         by <span className="text-white">RAG</span>
                      </span>
                   </h1>
-                  <p className="text-gray-400">RAG-powered predictive analytics for proactive cluster management</p>
+                  <p className="text-gray-400">RAG-powered system anomalies detection for proactive anomaly response</p>
                </div>
 
                <div className="flex items-center space-x-4">
@@ -121,7 +121,7 @@ export default function PredictionDashboard() {
                      <span className="text-xs text-gray-400">Active</span>
                   </div>
                   <div className="text-2xl font-bold text-orange-400 mb-1">{highRiskPredictions.length}</div>
-                  <div className="text-xs text-gray-400">High Risk Predictions</div>
+                  <div className="text-xs text-gray-400">High Risk Anomalies</div>
                   <div className="mt-3 flex space-x-1">
                      {Array.from({ length: 5 }, (_, i) => (
                         <div key={i} className={cn('flex-1 h-1 rounded-full', i < highRiskPredictions.length ? 'bg-orange-400' : 'bg-black/30')} />

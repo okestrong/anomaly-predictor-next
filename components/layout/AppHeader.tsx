@@ -140,8 +140,8 @@ export default function AppHeader() {
             },*/
             {
                id: 'prediction',
-               name: 'Predictive Analytics',
-               description: 'Failure prediction and forecasting',
+               name: 'Proactive Anomaly Response',
+               description: 'Detects system anomalies early and provides AI-driven recommendations',
                icon: SparklesIcon,
                route: '/prediction',
             },

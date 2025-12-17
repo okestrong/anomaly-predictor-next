@@ -38,8 +38,8 @@ export default function PredictionsReportPage() {
             // Redirect to view the generated report
             router.push(`/reports/view/${report.id}`);
          } catch (error) {
-            console.error('Failed to generate predictions report:', error);
-            toast.error('Failed to generate predictions report');
+            console.error('Failed to generate anomaly response report:', error);
+            toast.error('Failed to generate anomaly response report');
             router.push('/reports');
          }
       };
@@ -48,7 +48,7 @@ export default function PredictionsReportPage() {
    }, [generateReport, router]);
 
    if (isGenerating) {
-      return <ReportLoading title="Generating Predictions Report..." desc="Running AI analysis on 12 prediction categories" />;
+      return <ReportLoading title="Generating Anomaly Response Report..." desc="Running AI analysis on 12 anomaly categories" />;
    }
 
    return null;

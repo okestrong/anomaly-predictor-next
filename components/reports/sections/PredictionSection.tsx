@@ -110,19 +110,19 @@ export default function PredictionSection({ predictions }: PredictionSectionProp
          <div className="mb-8 print:hidden">
             <h1 className="text-2xl font-bold text-gray-100 mb-2 print:text-black">Cluster Health Forecast</h1>
             <p className="text-sm text-gray-300 print:text-gray-700">
-               Machine learning-powered predictive analytics for proactive cluster management and failure prevention
+               AI-powered proactive anomaly detection and response for stable cluster management and failure prevention
             </p>
          </div>
 
          {/* Summary Statistics */}
          <section className="border border-gray-300 bg-white mb-8 print:border print:border-gray-300 print:hidden">
             <div className="bg-gray-50 px-6 py-3 border-b border-gray-300">
-               <h2 className="text-sm font-bold text-gray-900 uppercase tracking-wide">Prediction Overview</h2>
+               <h2 className="text-sm font-bold text-gray-900 uppercase tracking-wide">Detection Overview</h2>
             </div>
             <div className="p-6">
                <div className="grid grid-cols-4 gap-4">
                   <div className="text-center p-4 border border-gray-200 bg-gray-50">
-                     <div className="text-xs text-gray-600 mb-1 uppercase font-semibold print:text-gray-700">Total Predictions</div>
+                     <div className="text-xs text-gray-600 mb-1 uppercase font-semibold print:text-gray-700">Total Detections</div>
                      <div className="text-3xl font-bold text-gray-900 print:text-black">{predictions.length}</div>
                   </div>
                   <div className="text-center p-4 border border-red-200 bg-red-50">
@@ -195,9 +195,11 @@ export default function PredictionSection({ predictions }: PredictionSectionProp
                            {/* Time to Impact */}
                            <div className="border border-orange-200 bg-orange-50 p-4 print:bg-orange-50">
                               <div className="text-xs font-semibold text-gray-700 mb-2 uppercase tracking-wide print:text-gray-800">
-                                 Estimated Time to Impact
+                                 Recommended Response Time
                               </div>
-                              <div className="text-3xl font-bold text-orange-900 print:text-black">{prediction.timeToImpact}</div>
+                              <div className="text-3xl font-bold text-orange-900 print:text-black">
+                                 {prediction.timeToImpact?.replace(/\s*후\s*$/, '') || prediction.timeToImpact}
+                              </div>
                               <div className="text-xs text-orange-700 mt-2 print:text-orange-800">Based on current trend analysis</div>
                            </div>
                         </div>
@@ -289,7 +291,7 @@ export default function PredictionSection({ predictions }: PredictionSectionProp
                               Category: <span className="font-semibold text-gray-900 print:text-black">{prediction.category}</span>
                            </span>
                            <span>
-                              Prediction ID: <span className="font-mono text-gray-700 print:text-black">{prediction.id}</span>
+                              Anomaly-Response ID: <span className="font-mono text-gray-700 print:text-black">{prediction.id}</span>
                            </span>
                         </div>
                      </div>
@@ -301,10 +303,10 @@ export default function PredictionSection({ predictions }: PredictionSectionProp
          {/* Report Footer Note */}
          <div className="mt-8 p-6 border border-gray-300 bg-gray-50 print:border-gray-300 print:bg-gray-100">
             <p className="text-xs text-gray-700 leading-relaxed print:text-gray-800">
-               <strong className="font-bold text-gray-900 print:text-black">Note:</strong> These predictions are generated using advanced machine learning
-               algorithms trained on historical cluster performance data. Predictions should be used as a proactive monitoring tool and validated with current
-               system metrics. The confidence score indicates the model's certainty based on available data patterns. Regular monitoring and timely action on
-               high-severity predictions can prevent potential system failures and maintain optimal cluster health.
+               <strong className="font-bold text-gray-900 print:text-black">Note:</strong> These insights are generated using advanced AI Agent architecture
+               build by LangGraph and cluster performance data. This analysis should be used as a proactive monitoring tool and validated with current system
+               metrics. The confidence score indicates the model's certainty based on available data patterns. Regular monitoring and timely action on
+               high-severity anomalies can prevent potential system failures and maintain optimal cluster health.
             </p>
          </div>
       </div>

@@ -184,12 +184,12 @@ export default function ReportTitlePage({
                   {/* Summary Statistics */}
                   <section className="border border-gray-300 bg-white mb-8 print:border print:border-gray-300">
                      <div className="bg-gray-100 px-6 py-3 border-b border-gray-300">
-                        <h2 className="text-sm font-bold text-gray-900 uppercase tracking-wide">Prediction Overview</h2>
+                        <h2 className="text-sm font-bold text-gray-900 uppercase tracking-wide">Detection Overview</h2>
                      </div>
                      <div className="p-6">
                         <div className="grid grid-cols-4 gap-4">
                            <div className="text-center p-4 border border-gray-200 bg-gray-50">
-                              <div className="text-xs text-gray-600 mb-1 uppercase font-semibold print:text-gray-700">Total Predictions</div>
+                              <div className="text-xs text-gray-600 mb-1 uppercase font-semibold print:text-gray-700">Total Detections</div>
                               <div className="text-3xl font-bold text-gray-900 print:text-black">{predictions.length}</div>
                            </div>
                            <div className="text-center p-4 border border-red-200 bg-red-50">

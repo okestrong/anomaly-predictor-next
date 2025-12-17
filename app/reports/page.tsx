@@ -9,6 +9,7 @@ import { LoadingSpinner } from '@/components/common';
 import ReportsPageClient from '@/components/reports/ReportsPageClient';
 import { ReportAPI } from '@/lib/api/reportApi';
 import type { Report } from '@/types/report';
+import Footer from '@/components/common/Footer';
 
 // ==================== ISR 설정 ====================
 // 60초마다 자동으로 재검증 (백그라운드 자동 갱신)
@@ -79,6 +80,7 @@ export default async function ReportsPage() {
          >
             <ReportsPageClient initialReports={reports} initialStats={stats} />
          </Suspense>
+         <Footer />
       </div>
    );
 }

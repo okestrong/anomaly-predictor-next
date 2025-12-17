@@ -29,8 +29,8 @@ export default function Footer({ width }: FooterProps) {
                   </div>
                </div>
                <div className="text-right">
-                  <p className="text-gray-100 font-medium text-lg mb-1">AI-Powered Anomaly Prediction Dashboard</p>
-                  <p className="text-gray-400 text-sm font-light">Intelligent monitoring and predictive analytics for Ceph clusters</p>
+                  <p className="text-gray-100 font-medium text-lg mb-1">AI-Powered Proactive Anomaly Analytics Dashboard</p>
+                  <p className="text-gray-400 text-sm font-light">Intelligent monitoring and proactive analytics for Ceph clusters</p>
                </div>
             </div>
 

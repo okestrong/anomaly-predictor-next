@@ -113,8 +113,10 @@ export default function PredictionCard({ prediction }: PredictionCardProps) {
                   <div className="text-sm font-semibold text-ai-circuit">{(prediction.confidence * 100).toFixed(0)}%</div>
                </div>
                <div className="bg-black/20 rounded-lg p-2">
-                  <div className="text-xs text-gray-400">Time to Impact</div>
-                  <div className="text-sm font-semibold text-orange-400">{prediction.timeToImpact}</div>
+                  <div className="text-xs text-gray-400">Recommended Response Time</div>
+                  <div className="text-sm font-semibold text-orange-400">
+                     {prediction.timeToImpact?.replace(/\s*후\s*$/, '') || prediction.timeToImpact}
+                  </div>
                </div>
             </div>
 

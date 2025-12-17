@@ -3,8 +3,8 @@ import AppHeader from '@/components/layout/AppHeader';
 import PredictionDashboard from '@/components/prediction/PredictionDashboard';
 
 export const metadata: Metadata = {
-   title: 'Predictive Risk Analysis - Ceph Cluster',
-   description: 'ML-powered predictive analytics for proactive cluster management and failure prevention',
+   title: 'Proactive Anomalies Response - Ceph Cluster',
+   description: 'AI-powered proactive anomaly detection and response for stable cluster management and failure prevention',
 };
 
 export default function PredictionPage() {
