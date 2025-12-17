@@ -1427,7 +1427,7 @@ const Table = ({
 };
 
 const GroundPlane = () => {
-   const groundTexture = useTexture('/3d/textures/planet/stone-ground.jpg');
+   const groundTexture = useTexture('/3d/textures/planet/land.jpg');
 
    // Configure texture to repeat instead of stretch
    groundTexture.wrapS = groundTexture.wrapT = THREE.RepeatWrapping;
@@ -1502,9 +1502,44 @@ const GroundPlane = () => {
    }, []);
 
    return (
-      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -2, 0]} receiveShadow geometry={geometry}>
+      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -2.2, 0]} receiveShadow geometry={geometry}>
          <meshStandardMaterial map={groundTexture} metalness={0} roughness={0.9} />
       </mesh>
+   );
+};
+
+// Central Cylinder with texture on side only
+const CentralCylinder = ({ position, radius, height }: { position: [number, number, number]; radius: number; height: number }) => {
+   const sideTexture = useTexture('/3d/textures/planet/lobby-ground.jpg');
+
+   // 텍스처 반복 설정 (옆면에 맞게)
+   sideTexture.wrapS = sideTexture.wrapT = THREE.RepeatWrapping;
+   sideTexture.repeat.set(4, 1); // 가로 4번 반복
+
+   return (
+      <group position={position}>
+         {/* 실린더 옆면 (텍스처 적용) */}
+         <mesh castShadow>
+            <cylinderGeometry args={[radius, radius, height, 32, 1, true]} />
+            <meshStandardMaterial map={sideTexture} color={Colors.neutral[300]} metalness={0.3} roughness={0.7} side={THREE.DoubleSide} />
+         </mesh>
+         {/* 실린더 윗면 (반투명) */}
+         <mesh position={[0, height / 2, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+            <circleGeometry args={[radius, 32]} />
+            <meshPhysicalMaterial
+               color={Colors.neutral[200]}
+               metalness={0.8}
+               roughness={0.2}
+               transparent={true}
+               opacity={0.3}
+               transmission={0.6}
+               thickness={1}
+               emissive={Colors.cyan[400]}
+               emissiveIntensity={0.3}
+               side={THREE.DoubleSide}
+            />
+         </mesh>
+      </group>
    );
 };
 
@@ -1625,39 +1660,8 @@ const WorldTrafficView: FC<Props> = () => {
                   writeOps={writeOps}
                />
 
-               {/* Central cylinder - 옆면만 불투명 */}
-               <group position={cyl_position}>
-                  {/* 실린더 옆면 (불투명) */}
-                  <mesh>
-                     <cylinderGeometry args={[cyl_rarius, cyl_rarius, cyl_height, 32, 1, true]} />
-                     <meshPhysicalMaterial
-                        color={Colors.neutral[200]}
-                        metalness={0.8}
-                        roughness={0.2}
-                        transparent={false}
-                        opacity={1.0}
-                        emissive={Colors.cyan[400]}
-                        emissiveIntensity={0.08}
-                        side={THREE.DoubleSide}
-                     />
-                  </mesh>
-                  {/* 실린더 윗면 (반투명, 수평) */}
-                  <mesh position={[0, cyl_height / 2, 0]} rotation={[-Math.PI / 2, 0, 0]}>
-                     <circleGeometry args={[cyl_rarius, 32]} />
-                     <meshPhysicalMaterial
-                        color={Colors.neutral[200]}
-                        metalness={0.8}
-                        roughness={0.2}
-                        transparent={true}
-                        opacity={0.5}
-                        transmission={0.4}
-                        thickness={1}
-                        emissive={Colors.cyan[400]}
-                        emissiveIntensity={0.5}
-                        side={THREE.DoubleSide}
-                     />
-                  </mesh>
-               </group>
+               {/* Central cylinder - 옆면만 텍스처, 윗면 투명 */}
+               <CentralCylinder position={cyl_position} radius={cyl_rarius} height={cyl_height} />
                {/*<mesh position={[0, 32.5, 0]} rotation={[Math.PI / 2, 0, 0]}>
                   <torusGeometry args={[30, 0.1, 8, 64]} />
                   <meshStandardMaterial color={0x06b6d4} emissive={0x06b6d4} emissiveIntensity={1.0} transparent={false} />

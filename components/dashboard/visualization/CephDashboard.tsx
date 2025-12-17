@@ -398,7 +398,7 @@ function PowerLine({ index, clusterPos, speed }: { index: number; clusterPos: TH
 
 // Bumpy Ground Component with marble-like reflective surface
 function BumpyGround({ isDark }: { isDark: boolean }) {
-   const groundTexture = useTexture('/3d/textures/planet/stone-ground.jpg');
+   const groundTexture = useTexture('/3d/textures/planet/lobby-ground.jpg');
 
    // Configure texture to repeat instead of stretch
    groundTexture.wrapS = groundTexture.wrapT = THREE.RepeatWrapping;
@@ -1428,7 +1428,25 @@ function CephTopology3D({
    const { camera } = useThree();
    const positions = useMemo(() => calculateNodePositions(data), [data.hosts.length, data.osds.length, data.daemons.length]);
    const cameraMoved = useRef(false);
-   const osdTexture = useTexture('/images/gold-wave.jpg');
+   const loaded = useRef(false);
+   // const osdTexture = useTexture('/images/gold-wave.jpg');
+
+   useEffect(() => {
+      if (loaded.current && !isDark) {
+         setTimeout(() => {
+            gsap.to(camera.position, {
+               x: 20,
+               y: 0,
+               z: 15,
+               duration: 2.5,
+               ease: 'power2.inOut',
+               onUpdate: () => {
+                  camera.updateProjectionMatrix();
+               },
+            });
+         }, 100);
+      }
+   }, [isDark, camera]);
 
    useEffect(() => {
       if (data && !cameraMoved.current) {
@@ -1445,6 +1463,7 @@ function CephTopology3D({
                },
             });
          }, 100);
+         setTimeout(() => (loaded.current = true), 4000);
       }
    }, [camera, data]);
 
@@ -1696,7 +1715,7 @@ const CephDashboard = React.memo(
                <div className={styles.centerCanvas}>
                   <Canvas
                      shadows
-                     camera={{ position: [25, 0, 10], fov: 70 }}
+                     camera={{ position: [15, 0, 20], fov: 70 }}
                      gl={{
                         antialias: true,
                         toneMapping: THREE.ACESFilmicToneMapping,

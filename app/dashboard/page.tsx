@@ -98,7 +98,7 @@ export default function DashboardPage() {
       // Show cards after 6 seconds
       setTimeout(() => {
          setCardsVisible(true);
-      }, 7000);
+      }, 6000);
 
       // Cleanup on unmount
       return () => {
