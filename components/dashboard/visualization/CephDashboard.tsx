@@ -1080,7 +1080,7 @@ function InteractiveNode({
                )}
                {!isDark && (
                   <>
-                     <BluePortal position={[0, 0, 0.5]} scale={6} castShadow />
+                     <BluePortal position={[0, 0, 0.5]} scale={6} />
                      <spotLight
                         position={[0, 0.5, 1.5]}
                         target-position={[0, 1, 0.5]}
@@ -1119,7 +1119,7 @@ function InteractiveNode({
                              ? 0 // Inactive: no glow
                              : isDark
                                ? 0.7
-                               : 0.3
+                               : 0.5
                      }
                      metalness={nodeData.status === 'placeholder' ? 0.3 : 0.5}
                      roughness={nodeData.status === 'placeholder' ? 0.3 : 0.2}
@@ -1403,7 +1403,7 @@ function SafeEffectComposer({ isDark }: { isDark: boolean }) {
    try {
       return (
          <EffectComposer multisampling={0} resolutionScale={1}>
-            <Bloom mipmapBlur luminanceThreshold={0.1} intensity={isDark ? 0.8 : 0.6} radius={0.7} />
+            <Bloom mipmapBlur luminanceThreshold={0.1} intensity={isDark ? 0.8 : 0.7} radius={0.7} />
             <BrightnessContrast brightness={isDark ? -0.05 : 0} contrast={0.25} />
          </EffectComposer>
       );
@@ -1444,7 +1444,7 @@ function CephTopology3D({
                   camera.updateProjectionMatrix();
                },
             });
-         }, 500);
+         }, 100);
       }
    }, [camera, data]);
 
@@ -1696,7 +1696,7 @@ const CephDashboard = React.memo(
                <div className={styles.centerCanvas}>
                   <Canvas
                      shadows
-                     camera={{ position: [35, 2, 5], fov: 70 }}
+                     camera={{ position: [25, 0, 10], fov: 70 }}
                      gl={{
                         antialias: true,
                         toneMapping: THREE.ACESFilmicToneMapping,
