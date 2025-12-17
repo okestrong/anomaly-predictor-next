@@ -346,7 +346,7 @@ function PowerLine({ index, clusterPos, speed }: { index: number; clusterPos: TH
                <mesh ref={el => (particleRefs.current[particleIdx] = el)} castShadow>
                   <sphereGeometry args={[0.2, 12, 12]} />
                   <meshStandardMaterial color={Colors.cyan[600]} emissive={Colors.cyan[600]} emissiveIntensity={3} transparent opacity={0.95} />
-                  {particleIdx === 1 && <pointLight color={Colors.cyan[400]} intensity={2} distance={6} decay={2} />}
+                  {particleIdx === 1 && <pointLight color={Colors.cyan[400]} intensity={0.5} distance={6} decay={2} />}
                </mesh>
 
                {/* 꼬리 구체들 */}
@@ -1404,7 +1404,7 @@ function SafeEffectComposer({ isDark }: { isDark: boolean }) {
       return (
          <EffectComposer multisampling={0} resolutionScale={1}>
             <Bloom mipmapBlur luminanceThreshold={0.1} intensity={isDark ? 0.8 : 0.7} radius={0.7} />
-            <BrightnessContrast brightness={isDark ? -0.05 : 0} contrast={0.25} />
+            <BrightnessContrast brightness={isDark ? -0.15 : 0} contrast={0.25} />
          </EffectComposer>
       );
    } catch (error) {
