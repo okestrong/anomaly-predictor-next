@@ -3388,11 +3388,28 @@ export default function ClusterTopologyView() {
       const centerX = 0;
       const centerZ = 0;
 
+      // 128개 이상일 때: 바깥쪽 링에 배치할 PG 수 계산
+      const outerRingRadius = maxRadius * 0.95; // 바깥 링 반경
+      const outerRingCircumference = 2 * Math.PI * outerRingRadius;
+      const outerRingPGCount = Math.floor(outerRingCircumference / pgSpacing); // 링에 들어갈 PG 수
+
       const nodes = pgs.map((pgData, index) => {
-         // Sunflower 패턴: 중심에서 바깥으로 균일하게 분포
-         const normalizedIndex = (index + 0.5) / pgs.length; // 0.5 offset으로 중심 피함
-         const radius = minRadius + Math.sqrt(normalizedIndex) * (maxRadius - minRadius);
-         const angle = index * goldenAngle;
+         let radius: number;
+         let angle: number;
+
+         if (pgs.length >= 128 && index < outerRingPGCount) {
+            // 바깥쪽 링에 배치 (원형 테두리)
+            radius = outerRingRadius;
+            angle = (index / outerRingPGCount) * Math.PI * 2; // 균등 분포
+         } else {
+            // 안쪽에 sunflower 패턴으로 배치
+            const innerIndex = pgs.length >= 128 ? index - outerRingPGCount : index;
+            const innerTotal = pgs.length >= 128 ? pgs.length - outerRingPGCount : pgs.length;
+            const normalizedIndex = (innerIndex + 0.5) / innerTotal;
+            const innerMaxRadius = pgs.length >= 128 ? outerRingRadius - pgSpacing : maxRadius;
+            radius = minRadius + Math.sqrt(normalizedIndex) * (innerMaxRadius - minRadius);
+            angle = innerIndex * goldenAngle;
+         }
 
          return {
             pgData,

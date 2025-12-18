@@ -1135,7 +1135,7 @@ function InteractiveNode({
                      }
                   />
                </mesh>
-               {nodeData.status !== 'placeholder' && nodeData.status !== 'up' && <HostRotatingRings color={color} hostIndex={0} />}
+               {nodeData.status === 'down' && <HostRotatingRings color={color} hostIndex={0} />}
             </group>
          ) : null}
 
@@ -1509,6 +1509,10 @@ function CephTopology3D({
                const centerPos = new THREE.Vector3(hostPos.x, slot.position.y, hostPos.z);
 
                if (osdData) {
+                  if (osdData.status !== 'up') {
+                     console.log('##### osdData=', osdData);
+                  }
+
                   // Render actual OSD
                   return (
                      <InteractiveNode
@@ -1519,7 +1523,7 @@ function CephTopology3D({
                         nodeData={osdData}
                         type="osd"
                         color={getStatusColor(osdData.status)}
-                        size={osdData.status === 'inactive' ? 0.3 : 0.4 + (osdData.utilizationPercent / 100) * 0.3}
+                        size={osdData.status === 'inactive' ? 0.3 : 0.4 + ((osdData.utilizationPercent ?? 0) / 100) * 0.3}
                         onSelect={onNodeSelect}
                         centerPosition={centerPos}
                      />
