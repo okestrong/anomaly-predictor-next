@@ -30,6 +30,8 @@ export function useTroubleWebSocket({ threadId, onMessage, onApprovalStatusChang
    useEffect(() => {
       if (!threadId) return;
 
+      // threadId 변경 시 연결 상태 초기화 (race condition 방지)
+      setConnected(false);
       setConnecting(true);
 
       const client = new Client({
@@ -96,11 +98,11 @@ export function useTroubleWebSocket({ threadId, onMessage, onApprovalStatusChang
       };
    }, [threadId]);
 
-   // 트러블슈팅 시작
-   const startTroubleshooting = useCallback((request: TroubleRequest) => {
+   // 트러블슈팅 시작 (성공 여부 반환)
+   const startTroubleshooting = useCallback((request: TroubleRequest): boolean => {
       if (!clientRef.current || !clientRef.current.connected) {
-         console.error('WebSocket not connected');
-         return;
+         console.error('WebSocket not connected - clientRef:', !!clientRef.current, 'connected:', clientRef.current?.connected);
+         return false;
       }
 
       clientRef.current.publish({
@@ -109,6 +111,7 @@ export function useTroubleWebSocket({ threadId, onMessage, onApprovalStatusChang
       });
 
       console.log('📤 Sent start request:', request);
+      return true;
    }, []);
 
    // 사용자 메시지 전송

@@ -66,6 +66,9 @@ export default function ChatInterface({ alert, threadId, onProcessingChange }: C
    // 기존 세션 복원 여부
    const [sessionRestored, setSessionRestored] = useState(false);
 
+   // 현재 분석이 시작된 alertId를 추적 (새 alert 클릭 시 재시작 보장)
+   const startedAlertIdRef = useRef<string | null>(null);
+
    // 파라미터 입력 다이얼로그 상태
    const [parameterDialogOpen, setParameterDialogOpen] = useState(false);
    const [pendingExecutionSolution, setPendingExecutionSolution] = useState<{ solution: Solution; index: number } | null>(null);
@@ -174,6 +177,7 @@ export default function ChatInterface({ alert, threadId, onProcessingChange }: C
          setSessionRestored(true);
          setIsProcessing(false);
          hasStartedRef.current = true; // 이미 시작된 것으로 표시
+         startedAlertIdRef.current = `${alert.alertId}-${alert.timestamp}`; // 복원된 alert 기록
          // 터미널 데이터 복원
          setTerminalLines(existingSession.terminalLines || []);
          setTerminalPendingCommands(existingSession.pendingCommands || {});
@@ -186,6 +190,7 @@ export default function ChatInterface({ alert, threadId, onProcessingChange }: C
          setSessionRestored(false);
          setTerminalLines([]);
          setTerminalPendingCommands({});
+         startedAlertIdRef.current = null; // 새 alert이므로 초기화
       }
 
       // Alert 메타 정보 저장 (세션 존재 여부 및 alertInfo 저장)
@@ -202,6 +207,8 @@ export default function ChatInterface({ alert, threadId, onProcessingChange }: C
       setPendingApprovals(new Map());
       setCommandStatuses(new Map());
       setSolutionsAwaitingApproval(new Map());
+      setCurrentStatus(null); // 상태 배지 초기화
+      setCurrentNode(null);
    }, [alert.alertId, alert.timestamp]); // alertId와 timestamp를 의존성으로 사용
 
    // 진단 타이핑 완료 후 해결책 표시
@@ -255,16 +262,26 @@ export default function ChatInterface({ alert, threadId, onProcessingChange }: C
 
    // 초기 실행 (한 번만, 세션이 복원되지 않은 경우에만)
    useEffect(() => {
-      if (connected && alert && !hasStartedRef.current && !sessionRestored) {
-         hasStartedRef.current = true;
-         startTroubleshooting({
+      // 이미 이 alert에 대해 시작했거나, 세션이 복원된 경우 스킵
+      const currentAlertId = `${alert.alertId}-${alert.timestamp}`;
+      const alreadyStartedForThisAlert = startedAlertIdRef.current === currentAlertId;
+
+      if (connected && alert && !alreadyStartedForThisAlert && !sessionRestored) {
+         const success = startTroubleshooting({
             threadId,
             alertInfo: alert,
             message: `Alert "${alert.title}"에 대해 분석하고 해결 방법을 제안해주세요.`,
             targetLanguage: getCurrentLocale(), // 현재 locale 전달 (번역용)
          });
 
-         setIsProcessing(true);
+         if (success) {
+            startedAlertIdRef.current = currentAlertId;
+            hasStartedRef.current = true;
+            setIsProcessing(true);
+         } else {
+            // WebSocket이 아직 준비되지 않음 - 다음 connected 변경 시 재시도됨
+            console.log('Troubleshooting start failed - WebSocket not ready, will retry on next connected change');
+         }
       }
    }, [connected, alert, threadId, startTroubleshooting, sessionRestored]);
 
