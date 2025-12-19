@@ -471,7 +471,7 @@ function BumpyGround({ isDark }: { isDark: boolean }) {
    }, []);
 
    return (
-      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -2, 0]} receiveShadow geometry={geometry}>
+      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, isDark ? -2 : -7, 0]} receiveShadow geometry={geometry}>
          <meshStandardMaterial map={groundTexture} roughness={isDark ? 0.2 : 1} metalness={0.75} />
          {/*<meshStandardMaterial roughness={isDark ? 0.2 : 1} color={isDark ? Colors.neutral[400] : Colors.white} metalness={0.75} />*/}
          {/*<MeshReflectorMaterial
@@ -1403,7 +1403,7 @@ function SafeEffectComposer({ isDark }: { isDark: boolean }) {
    try {
       return (
          <EffectComposer multisampling={0} resolutionScale={1}>
-            <Bloom mipmapBlur luminanceThreshold={0.1} intensity={isDark ? 0.8 : 0.7} radius={0.7} />
+            {/*<Bloom mipmapBlur luminanceThreshold={0.1} intensity={isDark ? 0.8 : 0.7} radius={0.7} />*/}
             <BrightnessContrast brightness={isDark ? -0.15 : 0} contrast={0.25} />
          </EffectComposer>
       );
@@ -1781,7 +1781,7 @@ const CephDashboard = React.memo(
                            position={[-2, 0, 4]}
                         />*/}
                         {/* Ground with reflection - bumpy marble-like surface */}
-                        {cardVisible && <BumpyGround isDark={cardVisible} />}
+                        <BumpyGround isDark={cardVisible} />
 
                         {/* Contact Shadows */}
                         {/*<ContactShadows position={[0, -2, 0]} opacity={0.4} scale={30} blur={2} far={10} />*/}
