@@ -13,8 +13,9 @@ import { Bloom, BrightnessContrast, EffectComposer } from '@react-three/postproc
 import { Hdd } from '@/components/models/Hdd';
 import { FullRack } from '@/components/models/FullRack';
 import { Ceph } from '@/components/models/Ceph';
-import { SpaceShipTwo } from '@/components/models/SpaceShipTwo';
 import { BluePortal } from '@/components/models/BluePortal';
+import { Forza } from '@/components/models/Forza';
+import { Kevin } from '@/components/models/Kevin';
 
 // Utility functions
 const formatBytes = (bytes: number): string => {
@@ -471,7 +472,7 @@ function BumpyGround({ isDark }: { isDark: boolean }) {
    }, []);
 
    return (
-      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, isDark ? -2 : -7, 0]} receiveShadow geometry={geometry}>
+      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, isDark ? -2 : -2.7, 0]} receiveShadow geometry={geometry}>
          <meshStandardMaterial map={groundTexture} roughness={isDark ? 0.2 : 1} metalness={0.75} />
          {/*<meshStandardMaterial roughness={isDark ? 0.2 : 1} color={isDark ? Colors.neutral[400] : Colors.white} metalness={0.75} />*/}
          {/*<MeshReflectorMaterial
@@ -1401,10 +1402,17 @@ function SafeEffectComposer({ isDark }: { isDark: boolean }) {
    }
 
    try {
+      if (isDark) {
+         return (
+            <EffectComposer multisampling={0} resolutionScale={1}>
+               <Bloom mipmapBlur luminanceThreshold={0.1} intensity={0.8} radius={0.7} />
+               <BrightnessContrast brightness={-0.05} contrast={0.25} />
+            </EffectComposer>
+         );
+      }
       return (
          <EffectComposer multisampling={0} resolutionScale={1}>
-            {/*<Bloom mipmapBlur luminanceThreshold={0.1} intensity={isDark ? 0.8 : 0.7} radius={0.7} />*/}
-            <BrightnessContrast brightness={isDark ? -0.15 : 0} contrast={0.25} />
+            <BrightnessContrast brightness={0.1} contrast={0.25} />
          </EffectComposer>
       );
    } catch (error) {
@@ -1736,7 +1744,6 @@ const CephDashboard = React.memo(
                      <Suspense fallback={<LoadingText />}>
                         {/* Environment and Lighting */}
                         <Environment files="/3d/background/hongkong.jpg" />
-                        {cardVisible && <ambientLight intensity={1} />}
                         <directionalLight
                            position={[10, 20, 10]}
                            intensity={0.3}
@@ -1753,10 +1760,12 @@ const CephDashboard = React.memo(
 
                         {/* Stars Background */}
                         <Stars radius={100} depth={50} count={1000} factor={4} saturation={0} fade speed={1} />
-                        {/*<CyberDog position={[-2, -0.4, 1]} scale={2} castShadow />*/}
+                        <Kevin position={[0, 2.135, cardVisible ? -0.2 : 0.1]} sacle={100} />
+
                         {!cardVisible && (
                            <>
-                              <SpaceShipTwo position={[0, -3.5, 0]} scale={10} castShadow />
+                              <Forza position={[-4, -1.5, -0.5]} scale={1} rotation-y={Math.PI / 3} rotation-x={-Math.PI / 16} castShadow />
+                              {/*<SpaceShipTwo position={[0, -3.5, 0]} scale={10} castShadow />*/}
                               {/*<spotLight // 위에서 비추는 메인 조명
                                  position={[-15.5, 4, 1]}
                                  target-position={[15, 2, 1]}
@@ -1775,7 +1784,6 @@ const CephDashboard = React.memo(
                               />*/}
                            </>
                         )}
-
                         {/*<spotLight
                            args={[Colors.blue[400], 20, 8, Math.PI / 2, 1, 0.3]} // -> MATH.PI/4 : 빛의 범위(45도) / 1: 빛 경게의 자연스러움 조절 / 0.5: 빛이 멀어질수론 희미해지는 정도 조절
                            position={[-2, 0, 4]}
